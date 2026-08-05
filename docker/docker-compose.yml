@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: candleapp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: candle
+      POSTGRES_PASSWORD: candle_dev_password
+      POSTGRES_DB: candleapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - candle_pg_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U candle -d candleapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: candleapp_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: candle_minio
+      MINIO_ROOT_PASSWORD: candle_minio_password
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    volumes:
+      - candle_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: candleapp_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    env_file:
+      - ../backend/.env
+    environment:
+      DATABASE_URL: postgres://candle:candle_dev_password@postgres:5432/candleapp
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: candle_minio
+      MINIO_SECRET_KEY: candle_minio_password
+    ports:
+      - "4000:4000"
+    volumes:
+      - ../backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+volumes:
+  candle_pg_data:
+  candle_minio_data:
