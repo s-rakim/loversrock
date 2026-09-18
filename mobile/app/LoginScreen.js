@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { apiFetch, setTokens } from '../services/api';
+import { apiFetch, setTokens, pingServer, API_URL } from '../services/api';
 import { provisionWidgets } from '../services/widgetBridge';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
@@ -12,6 +12,23 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  // Signing in is the first thing that ever touches the network, so a bad
+  // EXPO_PUBLIC_API_URL, a Tailscale drop or a stopped backend all surface here
+  // as one indistinguishable failure. This separates "can't reach the server"
+  // from "wrong email or password" without needing a laptop.
+  async function testConnection() {
+    setTesting(true);
+    try {
+      await pingServer();
+      Alert.alert('Connected', `The backend at ${API_URL} is up.`);
+    } catch (err) {
+      Alert.alert('No connection', err.message);
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function submit() {
     if (!email || !password || (mode === 'signup' && !name)) {
@@ -92,6 +109,12 @@ export default function LoginScreen({ navigation }) {
             {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Log in'}
           </Text>
         </MorphButton>
+
+        <MorphButton onPress={testConnection} disabled={testing} style={styles.switchButton}>
+          <Text style={[font.muted, styles.diagnostic]}>
+            {testing ? 'Checking…' : `Test connection · ${API_URL}`}
+          </Text>
+        </MorphButton>
       </FadeInUp>
     </KeyboardAvoidingView>
   );
@@ -118,4 +141,5 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   switchButton: { alignItems: 'center', marginTop: spacing.md },
+  diagnostic: { fontSize: 12, textAlign: 'center' },
 });

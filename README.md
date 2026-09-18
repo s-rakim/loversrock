@@ -80,6 +80,28 @@ EAS compiles in the cloud and gives you a download link — no Android SDK or
 Xcode needed locally. See [`docs/WIDGETS.md`](docs/WIDGETS.md) for the full
 matrix, including the local `expo prebuild` path and the iOS requirements.
 
+#### If the app says it can't reach the server
+
+The API URL is **baked into the binary at build time** from
+`EXPO_PUBLIC_API_URL` in `eas.json`. Changing it means a new build; there is no
+in-app server setting. Tap **Test connection** on the login screen — it shows
+the URL the app was built with and pings `/health`, which tells you which of
+these it is:
+
+| Symptom | Cause |
+|---|---|
+| "still the placeholder" | `eas.json` was never edited. Replace `100.x.x.x` in **all three** profiles and rebuild. |
+| "points at localhost" | On a phone that means the phone. Use the server's Tailscale IP (`tailscale ip -4` on the server). |
+| "Can't reach the server" | Tailscale down on either end, or the backend isn't listening. From the server: `curl http://<tailscale-ip>:4000/health`. |
+| Connects, then 500s | Backend is up but can't reach Postgres or MinIO — check `docker compose logs backend`. |
+
+The backend serves plain HTTP because a Tailscale IP has no hostname to put on
+a certificate. Both platforms block that in release builds by default, so
+`plugins/withCleartextTraffic.js` opts back in (Android
+`usesCleartextTraffic`, iOS ATS). The traffic still rides inside Tailscale's
+WireGuard tunnel. If you later terminate TLS in front of the backend, remove
+that plugin from `app.json`.
+
 ### Pushing this repo to your own GitHub
 
 ```bash

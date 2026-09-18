@@ -22,6 +22,7 @@
       ]
     },
     "plugins": [
+      "./plugins/withCleartextTraffic",
       "./plugins/withAndroidWidgets",
       "./plugins/withIosWidgets",
       [
