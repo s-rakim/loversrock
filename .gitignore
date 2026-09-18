@@ -1,0 +1,32 @@
+node_modules/
+.env
+.env.local
+*.log
+npm-debug.log*
+
+# Backend
+backend/node_modules/
+backend/dist/
+
+# Mobile / Expo
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+mobile/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Docker volumes (data only, not compose files)
+docker/data/

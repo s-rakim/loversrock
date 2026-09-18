@@ -1,0 +1,52 @@
+[
+  {
+    "dayOffset": 0,
+    "questions": [
+      { "questionOrder": 1, "type": "trivia", "questionText": "What is the capital of France?", "choices": ["Paris", "Lyon", "Marseille", "Nice"], "correctAnswer": "Paris" },
+      { "questionOrder": 2, "type": "guess_partner", "questionText": "Pick your go-to comfort food.", "choices": ["Pizza", "Mac and cheese", "Ramen", "Ice cream"] },
+      { "questionOrder": 3, "type": "this_or_that", "questionText": "Morning person or night owl?", "choices": ["Morning person", "Night owl"] },
+      { "questionOrder": 4, "type": "trivia", "questionText": "How many hearts does an octopus have?", "choices": ["1", "2", "3", "4"], "correctAnswer": "3" },
+      { "questionOrder": 5, "type": "guess_partner", "questionText": "Pick your ideal weekend activity.", "choices": ["Hiking", "Movie marathon", "Brunch with friends", "Sleeping in"] }
+    ]
+  },
+  {
+    "dayOffset": 1,
+    "questions": [
+      { "questionOrder": 1, "type": "this_or_that", "questionText": "Sweet or savory breakfast?", "choices": ["Sweet", "Savory"] },
+      { "questionOrder": 2, "type": "trivia", "questionText": "What planet is known as the Red Planet?", "choices": ["Venus", "Mars", "Jupiter", "Saturn"], "correctAnswer": "Mars" },
+      { "questionOrder": 3, "type": "guess_partner", "questionText": "Pick your dream vacation spot.", "choices": ["Tropical beach", "European city", "Mountain retreat", "Road trip"] },
+      { "questionOrder": 4, "type": "this_or_that", "questionText": "Texting or calling?", "choices": ["Texting", "Calling"] },
+      { "questionOrder": 5, "type": "trivia", "questionText": "What's the largest ocean on Earth?", "choices": ["Atlantic", "Indian", "Arctic", "Pacific"], "correctAnswer": "Pacific" }
+    ]
+  },
+  {
+    "dayOffset": 2,
+    "questions": [
+      { "questionOrder": 1, "type": "guess_partner", "questionText": "Pick a superpower you'd want.", "choices": ["Flight", "Invisibility", "Mind reading", "Time travel"] },
+      { "questionOrder": 2, "type": "trivia", "questionText": "What year did the first iPhone release?", "choices": ["2005", "2007", "2009", "2011"], "correctAnswer": "2007" },
+      { "questionOrder": 3, "type": "this_or_that", "questionText": "Coffee or tea?", "choices": ["Coffee", "Tea"] },
+      { "questionOrder": 4, "type": "guess_partner", "questionText": "Pick your favorite season.", "choices": ["Spring", "Summer", "Fall", "Winter"] },
+      { "questionOrder": 5, "type": "trivia", "questionText": "What's the smallest prime number?", "choices": ["0", "1", "2", "3"], "correctAnswer": "2" }
+    ]
+  },
+  {
+    "dayOffset": 3,
+    "questions": [
+      { "questionOrder": 1, "type": "this_or_that", "questionText": "Book or movie adaptation?", "choices": ["Book", "Movie"] },
+      { "questionOrder": 2, "type": "guess_partner", "questionText": "Pick your karaoke go-to genre.", "choices": ["Pop", "Rock", "R&B", "Country"] },
+      { "questionOrder": 3, "type": "trivia", "questionText": "How many bones are in the adult human body?", "choices": ["186", "206", "226", "246"], "correctAnswer": "206" },
+      { "questionOrder": 4, "type": "this_or_that", "questionText": "Cats or dogs?", "choices": ["Cats", "Dogs"] },
+      { "questionOrder": 5, "type": "guess_partner", "questionText": "Pick a game night category you'd win.", "choices": ["Trivia", "Charades", "Card games", "Board strategy games"] }
+    ]
+  },
+  {
+    "dayOffset": 4,
+    "questions": [
+      { "questionOrder": 1, "type": "trivia", "questionText": "What gas do plants primarily absorb from the air?", "choices": ["Oxygen", "Nitrogen", "Carbon dioxide", "Hydrogen"], "correctAnswer": "Carbon dioxide" },
+      { "questionOrder": 2, "type": "this_or_that", "questionText": "Window seat or aisle seat?", "choices": ["Window", "Aisle"] },
+      { "questionOrder": 3, "type": "guess_partner", "questionText": "Pick your ideal date night.", "choices": ["Fancy dinner", "Cozy night in", "Concert or show", "Outdoor adventure"] },
+      { "questionOrder": 4, "type": "trivia", "questionText": "What is the tallest mountain in the world?", "choices": ["K2", "Kilimanjaro", "Everest", "Denali"], "correctAnswer": "Everest" },
+      { "questionOrder": 5, "type": "this_or_that", "questionText": "Save it for later or use it now?", "choices": ["Save it", "Use it now"] }
+    ]
+  }
+]

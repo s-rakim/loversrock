@@ -1,0 +1,16 @@
+[
+  { "dayOffset": 0, "category": "connection", "content": "What's one small thing I did this week that made you feel loved?" },
+  { "dayOffset": 1, "category": "either_or", "content": "Lazy Sunday at home or spontaneous day trip — which sounds better right now?" },
+  { "dayOffset": 2, "category": "gratitude", "content": "What's something about our relationship you're most grateful for today?" },
+  { "dayOffset": 3, "category": "future", "content": "If we could teleport anywhere for dinner tonight, where would you pick?" },
+  { "dayOffset": 4, "category": "connection", "content": "What's a memory of us that randomly popped into your head recently?" },
+  { "dayOffset": 5, "category": "either_or", "content": "Would you rather we cook together or get takeout and watch a movie tonight?" },
+  { "dayOffset": 6, "category": "reflection", "content": "What's one thing I could do more of that would make your week easier?" },
+  { "dayOffset": 7, "category": "gratitude", "content": "Name one way your partner has grown since you first got together." },
+  { "dayOffset": 8, "category": "playful", "content": "If our relationship had a theme song right now, what would it be?" },
+  { "dayOffset": 9, "category": "future", "content": "What's one thing on your bucket list you haven't told me about yet?" },
+  { "dayOffset": 10, "category": "connection", "content": "What's something small I do that you don't think I realize you notice?" },
+  { "dayOffset": 11, "category": "either_or", "content": "Beach vacation or mountain cabin — and why?" },
+  { "dayOffset": 12, "category": "reflection", "content": "What's a challenge we handled well together recently?" },
+  { "dayOffset": 13, "category": "playful", "content": "What's the most 'us' inside joke we have right now?" }
+]

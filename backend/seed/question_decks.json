@@ -1,0 +1,39 @@
+[
+  { "slug": "would-you-rather-classic", "category": "Would You Rather", "emoji": "🤔", "title": "Classic Would You Rather", "isLocked": false, "sortOrder": 1 },
+  { "slug": "would-you-rather-spicy", "category": "Would You Rather", "emoji": "🌶️", "title": "Spicy Would You Rather", "isLocked": true, "sortOrder": 2 },
+  { "slug": "would-you-rather-family", "category": "Would You Rather", "emoji": "👨‍👩‍👧", "title": "Family Edition", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "deep-questions-getting-serious", "category": "Deep Questions", "emoji": "💭", "title": "Getting Serious", "isLocked": false, "sortOrder": 1 },
+  { "slug": "deep-questions-life-goals", "category": "Deep Questions", "emoji": "🎯", "title": "Life Goals", "isLocked": true, "sortOrder": 2 },
+  { "slug": "deep-questions-fears", "category": "Deep Questions", "emoji": "🌑", "title": "Facing Fears", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "spicy-heat-check", "category": "Hot & Spicy", "emoji": "🔥", "title": "Heat Check", "isLocked": true, "sortOrder": 1 },
+  { "slug": "spicy-truth-or-dare", "category": "Hot & Spicy", "emoji": "😈", "title": "Truth or Dare", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "unhinged-chaos-questions", "category": "Unhinged", "emoji": "🤪", "title": "Chaos Questions", "isLocked": false, "sortOrder": 1 },
+  { "slug": "unhinged-would-you-rather", "category": "Unhinged", "emoji": "🙃", "title": "Unhinged Would You Rather", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "communication-love-languages", "category": "Effective Communication", "emoji": "🗣️", "title": "Love Languages Check-In", "isLocked": false, "sortOrder": 1 },
+  { "slug": "communication-conflict-styles", "category": "Effective Communication", "emoji": "🤝", "title": "Conflict Styles", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "money-matters-basics", "category": "Money Matters", "emoji": "💰", "title": "Money Basics", "isLocked": false, "sortOrder": 1 },
+  { "slug": "money-matters-future", "category": "Money Matters", "emoji": "🏦", "title": "Planning Ahead", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "parenting-someday", "category": "Parenting Perspectives", "emoji": "👶", "title": "Someday, Maybe Kids", "isLocked": true, "sortOrder": 1 },
+  { "slug": "parenting-values", "category": "Parenting Perspectives", "emoji": "📚", "title": "Parenting Values", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "wellness-check-in", "category": "Wellness", "emoji": "🧘", "title": "Wellness Check-In", "isLocked": false, "sortOrder": 1 },
+  { "slug": "wellness-self-care", "category": "Wellness", "emoji": "🛁", "title": "Self-Care Habits", "isLocked": true, "sortOrder": 2 },
+  { "slug": "wellness-mental-health", "category": "Wellness", "emoji": "🧠", "title": "Mental Health Check-In", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "photo-prompts-throwback", "category": "Photo Prompts", "emoji": "📸", "title": "Throwback Photos", "isLocked": false, "sortOrder": 1 },
+  { "slug": "photo-prompts-silly", "category": "Photo Prompts", "emoji": "🤳", "title": "Silly Selfies", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "future-five-year-plan", "category": "Future Plans & Dreams", "emoji": "🚀", "title": "Five Year Plan", "isLocked": false, "sortOrder": 1 },
+  { "slug": "future-bucket-dreams", "category": "Future Plans & Dreams", "emoji": "🌠", "title": "Bucket List Dreams", "isLocked": true, "sortOrder": 2 },
+  { "slug": "future-travel-goals", "category": "Future Plans & Dreams", "emoji": "✈️", "title": "Travel Goals", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "popular-most-asked", "category": "Popular Community Questions", "emoji": "⭐", "title": "Most Asked Questions", "isLocked": false, "sortOrder": 1 },
+  { "slug": "popular-newlywed-game", "category": "Popular Community Questions", "emoji": "💍", "title": "The Newlywed Game", "isLocked": false, "sortOrder": 2 },
+  { "slug": "popular-late-night", "category": "Popular Community Questions", "emoji": "🌙", "title": "Late Night Talks", "isLocked": true, "sortOrder": 3 }
+]

@@ -1,0 +1,12 @@
+[
+  { "title": "Cook a new recipe together", "description": "Pick a cuisine neither of you has tried cooking before and follow a recipe from scratch.", "category": "at_home", "costTier": "$" },
+  { "title": "Sunset picnic", "description": "Pack snacks and find a spot to watch the sunset together, phones away.", "category": "outdoors", "costTier": "free" },
+  { "title": "Museum or gallery afternoon", "description": "Wander a local museum or art gallery and rate each exhibit out of 10.", "category": "culture", "costTier": "$" },
+  { "title": "Recreate your first date", "description": "Go back to where you had your first date, or recreate it as closely as you can.", "category": "sentimental", "costTier": "$$" },
+  { "title": "Stargazing drive", "description": "Drive somewhere with low light pollution, bring blankets, and just look up.", "category": "outdoors", "costTier": "free" },
+  { "title": "Two-player video game night", "description": "Pick a co-op or competitive game neither of you has played and learn it together.", "category": "at_home", "costTier": "free" },
+  { "title": "Local trivia night", "description": "Find a bar or venue hosting trivia and team up.", "category": "going_out", "costTier": "$" },
+  { "title": "Build a blanket fort and marathon a show", "description": "Full blanket fort, snacks, and a season of something you've both been meaning to watch.", "category": "at_home", "costTier": "free" },
+  { "title": "Weekend farmers market crawl", "description": "Visit a farmers market, try samples, and cook whatever looks best that night.", "category": "outdoors", "costTier": "$" },
+  { "title": "Book a couples massage or spa hour", "description": "Treat yourselves to an hour of side-by-side relaxation.", "category": "splurge", "costTier": "$$$" }
+]
