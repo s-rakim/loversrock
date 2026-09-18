@@ -10,7 +10,7 @@ const QUIZ_BANK_WARNING_DAYS = 7;
 
 // Hard-deletes memories soft-deleted more than 30 days ago, including their
 // MinIO objects. Runs nightly at 03:00 server time.
-async function cleanupExpiredMemories() {
+export async function cleanupExpiredMemories() {
   const { rows } = await query(
     `SELECT id, image_url FROM memories
      WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '${MEMORY_RETENTION_DAYS} days'`
@@ -29,7 +29,7 @@ async function cleanupExpiredMemories() {
 // Warns (server log + push to all active pairs' devices would be excessive;
 // this is an operator-facing warning) when fewer than 7 days of quiz content
 // remain ahead of today.
-async function checkQuizBankLevel() {
+export async function checkQuizBankLevel() {
   const { rows } = await query(
     `SELECT COUNT(DISTINCT scheduled_date) AS days_remaining
      FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE`
@@ -43,7 +43,7 @@ async function checkQuizBankLevel() {
 }
 
 // Weekly random date-idea nudge to every active (non-unlinked) pair.
-async function pushWeeklyDateIdea() {
+export async function pushWeeklyDateIdea() {
   const { rows: pairs } = await query(
     `SELECT id, user_a_id, user_b_id FROM pairs WHERE unlinked_at IS NULL`
   );
@@ -68,7 +68,7 @@ async function pushWeeklyDateIdea() {
 
 // Daily "period expected tomorrow" nudge — personal to each user, never
 // sent to their partner (see docs/SPEC.md #5).
-async function pushPeriodReminders() {
+export async function pushPeriodReminders() {
   const { rows: settingsRows } = await query('SELECT * FROM period_settings');
   const today = toDateString(new Date());
 
@@ -81,7 +81,7 @@ async function pushPeriodReminders() {
     if (!lastCycle) continue;
 
     const predictions = computePredictions({
-      lastCycleStart: lastCycle.start_date.toISOString ? lastCycle.start_date.toISOString().slice(0, 10) : lastCycle.start_date,
+      lastCycleStart: lastCycle.start_date,
       settings: {
         averageCycleLength: settings.average_cycle_length,
         averagePeriodLength: settings.average_period_length,

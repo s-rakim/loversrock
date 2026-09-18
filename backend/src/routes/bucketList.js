@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { uploadBase64Image } from '../config/storage.js';
 
-const router = Router();
+const router = asyncRouter();
 
 router.use(requireAuth, requirePair);
 

@@ -1,9 +1,9 @@
-import { Router } from 'express';
+import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { computeCycleStats, computePredictions, toDateString } from '../models/periodPredictions.js';
 
-const router = Router();
+const router = asyncRouter();
 
 const DEFAULT_SETTINGS = { averageCycleLength: 28, averagePeriodLength: 5, lutealPhaseLength: 14 };
 
@@ -130,9 +130,17 @@ router.get('/log/:date', async (req, res) => {
   res.json({ log: rows[0] || null });
 });
 
+const FLOW_VALUES = ['spotting', 'light', 'medium', 'heavy'];
+
 router.post('/log', async (req, res) => {
   const { date, flow, symptoms, mood, notes } = req.body;
   if (!date) return res.status(400).json({ error: 'date is required' });
+  if (flow && !FLOW_VALUES.includes(flow)) {
+    return res.status(400).json({ error: `flow must be one of: ${FLOW_VALUES.join(', ')}` });
+  }
+  if (symptoms && !Array.isArray(symptoms)) {
+    return res.status(400).json({ error: 'symptoms must be an array' });
+  }
 
   const { rows } = await query(
     `INSERT INTO period_daily_logs (user_id, log_date, flow, symptoms, mood, notes)
@@ -165,7 +173,7 @@ router.get('/calendar', async (req, res) => {
   const today = toDateString(new Date());
   const predictions = lastCycle
     ? computePredictions({
-        lastCycleStart: lastCycle.start_date.toISOString ? lastCycle.start_date.toISOString().slice(0, 10) : lastCycle.start_date,
+        lastCycleStart: lastCycle.start_date,
         settings: {
           averageCycleLength: settings.average_cycle_length,
           averagePeriodLength: settings.average_period_length,
@@ -190,7 +198,7 @@ router.get('/predictions', async (req, res) => {
 
   const predictions = lastCycle
     ? computePredictions({
-        lastCycleStart: lastCycle.start_date.toISOString ? lastCycle.start_date.toISOString().slice(0, 10) : lastCycle.start_date,
+        lastCycleStart: lastCycle.start_date,
         settings: {
           averageCycleLength: settings.average_cycle_length,
           averagePeriodLength: settings.average_period_length,
@@ -218,7 +226,7 @@ router.get('/partner', requirePair, async (req, res) => {
   const today = toDateString(new Date());
   const predictions = lastCycle
     ? computePredictions({
-        lastCycleStart: lastCycle.start_date.toISOString ? lastCycle.start_date.toISOString().slice(0, 10) : lastCycle.start_date,
+        lastCycleStart: lastCycle.start_date,
         settings: {
           averageCycleLength: partnerSettings.average_cycle_length,
           averagePeriodLength: partnerSettings.average_period_length,

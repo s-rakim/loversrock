@@ -2,20 +2,29 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_CYCLES_FOR_AVERAGE = 6;
 const MIN_CYCLES_FOR_AVERAGE = 2;
 
-function toDate(dateString) {
-  return new Date(`${dateString}T00:00:00Z`);
+// Accepts either a 'YYYY-MM-DD' string or a Date and always yields the
+// calendar day. Uses local components rather than toISOString() so a Date
+// parsed at local midnight doesn't slip to the previous day off-UTC.
+export function toDateString(value) {
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
 }
 
-export function toDateString(date) {
-  return date.toISOString().slice(0, 10);
+function toDate(value) {
+  return new Date(`${toDateString(value)}T00:00:00Z`);
 }
 
-export function addDays(dateString, days) {
-  return toDateString(new Date(toDate(dateString).getTime() + days * DAY_MS));
+export function addDays(value, days) {
+  return new Date(toDate(value).getTime() + days * DAY_MS).toISOString().slice(0, 10);
 }
 
-export function daysBetween(fromDateString, toDateStringVal) {
-  return Math.round((toDate(toDateStringVal).getTime() - toDate(fromDateString).getTime()) / DAY_MS);
+export function daysBetween(from, to) {
+  return Math.round((toDate(to).getTime() - toDate(from).getTime()) / DAY_MS);
 }
 
 // Recomputes rolling averages from the user's own cycle history (most

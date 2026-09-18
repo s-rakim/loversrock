@@ -7,6 +7,7 @@ import { initSockets } from './sockets/index.js';
 import { startCronJobs } from './cron/index.js';
 import { ensureBucket, getObjectStream } from './config/storage.js';
 import { requireAuth } from './middleware/auth.js';
+import { wrapAsync } from './lib/asyncRouter.js';
 
 import authRoutes from './routes/auth.js';
 import dailyPromptRoutes from './routes/dailyPrompt.js';
@@ -48,19 +49,31 @@ app.use('/period', periodRoutes);
 
 // Auth-gated media streaming out of MinIO — mobile clients never get direct
 // storage credentials or presigned URLs, everything proxies through here.
-app.get('/media/:key(*)', requireAuth, async (req, res) => {
-  try {
-    const stream = await getObjectStream(req.params.key);
-    stream.on('error', () => res.status(404).end());
-    stream.pipe(res);
-  } catch (err) {
-    res.status(404).json({ error: 'Not found' });
-  }
-});
+app.get(
+  '/media/:key(*)',
+  wrapAsync(requireAuth),
+  wrapAsync(async (req, res) => {
+    try {
+      const stream = await getObjectStream(req.params.key);
+      stream.on('error', () => res.status(404).end());
+      stream.pipe(res);
+    } catch (err) {
+      res.status(404).json({ error: 'Not found' });
+    }
+  })
+);
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
+  const status = err.status || 500;
+  res.status(status).json({ error: status === 500 ? 'Internal server error' : err.message });
+});
+
+// Last-resort net. Handlers are already wrapped (src/lib/asyncRouter.js), but
+// this is a server two people rely on being up — a stray rejection from a
+// timer, socket callback, or cron tick must never take it down.
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] unhandled rejection (kept alive):', reason);
 });
 
 const io = initSockets(httpServer, corsOrigins.length ? corsOrigins : true);

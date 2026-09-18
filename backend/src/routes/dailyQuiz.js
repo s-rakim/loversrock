@@ -1,10 +1,10 @@
-import { Router } from 'express';
+import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { pairLocalDateString, getUserDeviceTokens } from '../models/pairs.js';
 import { sendNotification } from '../config/firebase.js';
 
-const router = Router();
+const router = asyncRouter();
 
 router.use(requireAuth, requirePair);
 
@@ -152,7 +152,7 @@ router.get('/archive', async (req, res) => {
 
   const byDate = {};
   for (const q of questions) {
-    const key = q.scheduled_date.toISOString ? q.scheduled_date.toISOString().slice(0, 10) : String(q.scheduled_date);
+    const key = q.scheduled_date;
     if (!byDate[key]) byDate[key] = { total: 0, attempted: 0, scored: 0, correct: 0 };
     byDate[key].total += 1;
     const mine = attempts.find((a) => a.quiz_question_id === q.id && a.user_id === req.userId);
