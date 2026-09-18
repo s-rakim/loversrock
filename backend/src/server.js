@@ -22,6 +22,7 @@ import decksRoutes from './routes/decks.js';
 import gamesRoutes from './routes/games.js';
 import locationRoutes from './routes/location.js';
 import periodRoutes from './routes/period.js';
+import widgetRoutes from './routes/widget.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -46,6 +47,7 @@ app.use('/decks', decksRoutes);
 app.use('/games', gamesRoutes);
 app.use('/location', locationRoutes);
 app.use('/period', periodRoutes);
+app.use('/widget', widgetRoutes);
 
 // Auth-gated media streaming out of MinIO — mobile clients never get direct
 // storage credentials or presigned URLs, everything proxies through here.

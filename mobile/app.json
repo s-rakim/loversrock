@@ -22,6 +22,8 @@
       ]
     },
     "plugins": [
+      "./plugins/withAndroidWidgets",
+      "./plugins/withIosWidgets",
       [
         "expo-location",
         {

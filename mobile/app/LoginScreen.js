@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { apiFetch, setTokens } from '../services/api';
+import { provisionWidgets } from '../services/widgetBridge';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import StickerField, { HeartShape } from '../components/Stickers';
@@ -23,6 +24,10 @@ export default function LoginScreen({ navigation }) {
       const body = mode === 'login' ? { email, password } : { name, email, password };
       const data = await apiFetch(path, { method: 'POST', body });
       await setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+
+      // Hands the home/lock screen widgets their own scoped token. No-ops in
+      // Expo Go, where the native widget module isn't present.
+      provisionWidgets();
 
       try {
         await apiFetch('/bucket-list');

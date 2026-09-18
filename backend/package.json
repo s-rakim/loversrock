@@ -10,7 +10,8 @@
     "seed": "node seed/run-seed.js",
     "test:integration": "node test/integration.mjs",
     "test:contract": "node test/contract.mjs",
-    "test:cron": "node test/cron.mjs"
+    "test:cron": "node test/cron.mjs",
+    "test:widget": "node test/widget.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

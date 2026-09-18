@@ -223,6 +223,21 @@ CREATE TABLE IF NOT EXISTS period_daily_logs (
   UNIQUE(user_id, log_date)
 );
 
+-- Home/lock screen widgets run in a separate OS process on a 15-30 minute
+-- refresh cadence. They cannot hold a 15-minute access token or perform the
+-- refresh-token dance, so they get their own long-lived credential instead:
+-- read-only, good for GET /widget/summary and nothing else, revocable on its
+-- own without touching the user's session. Only the SHA-256 hash is stored.
+CREATE TABLE IF NOT EXISTS widget_tokens (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash    TEXT NOT NULL UNIQUE,
+  label         TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_used_at  TIMESTAMPTZ,
+  revoked_at    TIMESTAMPTZ
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_partner_id ON users(partner_id);
 CREATE INDEX IF NOT EXISTS idx_prompt_responses_pair_prompt ON prompt_responses(pair_id, prompt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_pair_question ON quiz_attempts(pair_id, quiz_question_id);
@@ -231,3 +246,4 @@ CREATE INDEX IF NOT EXISTS idx_messages_pair_sent_at ON messages(pair_id, sent_a
 CREATE INDEX IF NOT EXISTS idx_widget_photos_pair_created_at ON widget_photos(pair_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_period_cycles_user_start ON period_cycles(user_id, start_date);
 CREATE INDEX IF NOT EXISTS idx_period_daily_logs_user_date ON period_daily_logs(user_id, log_date);
+CREATE INDEX IF NOT EXISTS idx_widget_tokens_active ON widget_tokens(token_hash) WHERE revoked_at IS NULL;

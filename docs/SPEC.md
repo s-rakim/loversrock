@@ -70,12 +70,16 @@ that data is not this app's to share.
 
 ## Known, deliberate gaps
 
-- **Native Android home-screen widgets.** Every widget's underlying feature
-  (Canvas doodle, Countdown, daily photo, Distance Apart) exists as a working
-  in-app screen. The literal launcher-pinnable Kotlin `AppWidgetProvider` +
-  Expo config plugin + `expo prebuild` step is not implemented — it can't be
-  compiled or verified without a real Android build environment, and shipping
-  unverified native code isn't worth the risk. See `docs/ANDROID_WIDGET.md`.
+- **Widgets are written but never compiled.** The Android `AppWidgetProvider`s,
+  the iOS WidgetKit extension (home + lock screen), the native bridge, and both
+  Expo config plugins all exist, and the data layer behind them is tested. None
+  of the native code has been built, because that needs Xcode and the Android
+  SDK. Treat it as a first draft that needs a real device pass — see
+  `docs/WIDGETS.md`, which lists the specific parts most likely to need a nudge.
+- **Android has no lock screen widget.** Google removed them in Android 5.0 and
+  they are tablet-only as of Android 15/16, so there is no API to target on a
+  phone. Android gets a silent ongoing notification instead; iOS gets real
+  WidgetKit accessory widgets. This is a platform limit, not a shortcut.
 - **Web marketing landing page.** Out of scope — mobile-only per explicit
   product direction. The reference design's web-only effects (WebGL shaders,
   DOM SVG filters, `ResizeObserver`-driven liquid layouts) don't have direct
