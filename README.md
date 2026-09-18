@@ -34,18 +34,31 @@ isn't on the tailnet.
    cp .env.example .env
    ```
    Fill in `FIREBASE_SERVICE_ACCOUNT_JSON` with the full service-account JSON from a free Firebase project (as a single-line string). This is required even for a fully local setup, since FCM is the only piece that has to be cloud-hosted.
-3. **Start Postgres + MinIO:**
+3. **Start the stack** (Postgres + MinIO + the backend API):
    ```bash
    cd docker
    docker compose up -d
    ```
-4. **Install, migrate, seed:**
+4. **Create the schema and load the seed data.** Compose does *not* do this for
+   you — `docker/init.sql` only installs the Postgres extensions, so a freshly
+   started stack has an empty database and every endpoint answers
+   `500 relation "users" does not exist` until you run:
    ```bash
-   cd backend
-   npm install
-   npm run migrate
-   npm run seed
+   docker compose exec backend npm run migrate
+   docker compose exec backend npm run seed
    ```
+   **Re-run `migrate` after pulling changes.** `src/config/schema.sql` is the
+   whole schema and every statement is `IF NOT EXISTS`, so it is safe to run
+   any number of times — but new tables (period tracking, widget tokens) only
+   appear once you do. Backend *code* needs no rebuild: `docker-compose.yml`
+   bind-mounts `../backend` into the container, so a `docker compose restart
+   backend` picks up edits. Rebuild (`docker compose build backend`) only when
+   `package.json` dependencies change.
+
+   Prefer running the backend on the host instead of in Docker? `npm install &&
+   npm run migrate && npm run seed` from `backend/` works too — Postgres and
+   MinIO publish their ports — but stop the container first
+   (`docker compose stop backend`) or port 4000 will already be taken.
 5. **Tailscale:** sign into the same Tailscale account on your PC and your phone, then get your PC's tailnet IP:
    ```bash
    tailscale ip -4
