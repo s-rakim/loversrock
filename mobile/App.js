@@ -25,6 +25,7 @@ import MessagesScreen from './app/MessagesScreen';
 import CanvasScreen from './app/CanvasScreen';
 import ThumbKissScreen from './app/ThumbKissScreen';
 import DistanceApartScreen from './app/DistanceApartScreen';
+import PeriodTrackerScreen from './app/PeriodTrackerScreen';
 import GamesScreen from './app/GamesScreen';
 import SettingsScreen from './app/SettingsScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
@@ -105,6 +106,7 @@ export default function App() {
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
+            <Stack.Screen name="PeriodTracker" component={PeriodTrackerScreen} options={{ title: 'Cycle Tracker' }} />
             <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ title: 'Four in a Row' }} />
             <Stack.Screen name="Anagrams" component={AnagramsScreen} options={{ title: 'Anagrams' }} />
             <Stack.Screen name="LoveGolf" component={LoveGolfScreen} options={{ title: 'Love Golf' }} />

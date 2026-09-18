@@ -3,6 +3,7 @@ import { query } from '../config/db.js';
 import { deleteObject } from '../config/storage.js';
 import { sendNotification } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
+import { computePredictions, toDateString } from '../models/periodPredictions.js';
 
 const MEMORY_RETENTION_DAYS = 30;
 const QUIZ_BANK_WARNING_DAYS = 7;
@@ -65,9 +66,51 @@ async function pushWeeklyDateIdea() {
   }
 }
 
+// Daily "period expected tomorrow" nudge — personal to each user, never
+// sent to their partner (see docs/SPEC.md #5).
+async function pushPeriodReminders() {
+  const { rows: settingsRows } = await query('SELECT * FROM period_settings');
+  const today = toDateString(new Date());
+
+  for (const settings of settingsRows) {
+    const { rows: cycles } = await query(
+      'SELECT * FROM period_cycles WHERE user_id = $1 ORDER BY start_date DESC LIMIT 1',
+      [settings.user_id]
+    );
+    const lastCycle = cycles[0];
+    if (!lastCycle) continue;
+
+    const predictions = computePredictions({
+      lastCycleStart: lastCycle.start_date.toISOString ? lastCycle.start_date.toISOString().slice(0, 10) : lastCycle.start_date,
+      settings: {
+        averageCycleLength: settings.average_cycle_length,
+        averagePeriodLength: settings.average_period_length,
+        lutealPhaseLength: settings.luteal_phase_length,
+      },
+      today,
+    });
+
+    const daysUntil = predictions.nextPeriodDate
+      ? Math.round((new Date(`${predictions.nextPeriodDate}T00:00:00Z`) - new Date(`${today}T00:00:00Z`)) / 86400000)
+      : null;
+
+    if (daysUntil === 1) {
+      const tokens = await getUserDeviceTokens(settings.user_id);
+      if (tokens.length === 0) continue;
+      await sendNotification(tokens, {
+        title: 'Period expected tomorrow',
+        body: "Based on your cycle history, your period is expected to start tomorrow.",
+      }).catch((err) => console.error('[cron] period reminder push failed:', err.message));
+    }
+  }
+}
+
 export function startCronJobs() {
   cron.schedule('0 3 * * *', cleanupExpiredMemories);
   cron.schedule('0 6 * * *', checkQuizBankLevel);
   cron.schedule('0 9 * * 1', pushWeeklyDateIdea);
-  console.log('[cron] jobs scheduled: memory cleanup (nightly), quiz bank check (daily), weekly date idea (Mondays)');
+  cron.schedule('0 8 * * *', pushPeriodReminders);
+  console.log(
+    '[cron] jobs scheduled: memory cleanup (nightly), quiz bank check (daily), weekly date idea (Mondays), period reminders (daily)'
+  );
 }

@@ -52,6 +52,22 @@ value when **both** users in the pair currently have sharing enabled. This is
 the most sensitive data type in the app and gets the most conservative
 default of anything in the schema.
 
+## 5. Period tracking is personal data, scoped by `user_id` not `pair_id`
+
+`period_settings`, `period_cycles`, and `period_daily_logs` are all scoped by
+`user_id`. Unlike every other content table in this app, period data is
+**not** pair-shared by default — it belongs to the person logging it.
+
+Partner visibility is opt-in and layered on top: `period_settings.sharing_enabled`
+defaults to `false`, exactly like `location_sharing_enabled` (see decision
+#4), and either partner can turn it off instantly. But sharing here is
+**narrower than location sharing**: even with sharing on, `GET
+/period/partner` only ever returns the *computed* cycle phase and predicted
+dates (e.g. "luteal phase, next period in 4 days") — it never exposes raw
+daily logs, flow intensity, symptoms, mood, or notes, regardless of the
+sharing flag. There is no setting that unlocks that detail to a partner;
+that data is not this app's to share.
+
 ## Known, deliberate gaps
 
 - **Native Android home-screen widgets.** Every widget's underlying feature

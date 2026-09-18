@@ -189,9 +189,45 @@ CREATE TABLE IF NOT EXISTS games_catalog (
   sort_order       INTEGER NOT NULL DEFAULT 0
 );
 
+-- Period tracking. Scoped by user_id, never pair_id — this is personal
+-- health data, not shared couple content (see docs/SPEC.md #5). Partner
+-- visibility is layered on top via period_settings.sharing_enabled and
+-- only ever exposes computed phase/dates, never raw logs.
+CREATE TABLE IF NOT EXISTS period_settings (
+  user_id                 UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  average_cycle_length    INTEGER NOT NULL DEFAULT 28,
+  average_period_length   INTEGER NOT NULL DEFAULT 5,
+  luteal_phase_length     INTEGER NOT NULL DEFAULT 14,
+  sharing_enabled         BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- One row per period. end_date is NULL while the period is ongoing.
+CREATE TABLE IF NOT EXISTS period_cycles (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  start_date    DATE NOT NULL,
+  end_date      DATE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS period_daily_logs (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  log_date      DATE NOT NULL,
+  flow          TEXT CHECK (flow IN ('spotting', 'light', 'medium', 'heavy')),
+  symptoms      JSONB,
+  mood          TEXT,
+  notes         TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(user_id, log_date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_partner_id ON users(partner_id);
 CREATE INDEX IF NOT EXISTS idx_prompt_responses_pair_prompt ON prompt_responses(pair_id, prompt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_pair_question ON quiz_attempts(pair_id, quiz_question_id);
 CREATE INDEX IF NOT EXISTS idx_memories_pair_taken_at ON memories(pair_id, taken_at);
 CREATE INDEX IF NOT EXISTS idx_messages_pair_sent_at ON messages(pair_id, sent_at);
 CREATE INDEX IF NOT EXISTS idx_widget_photos_pair_created_at ON widget_photos(pair_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_period_cycles_user_start ON period_cycles(user_id, start_date);
+CREATE INDEX IF NOT EXISTS idx_period_daily_logs_user_date ON period_daily_logs(user_id, log_date);
