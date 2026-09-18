@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "loversrock.",
+    "slug": "loversrock",
+    "scheme": "loversrock",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.loversrock.app"
+    },
+    "android": {
+      "package": "com.loversrock.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "loversrock uses your location to show how far apart you and your partner are, only while sharing is turned on."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "loversrock needs access to your photos to add them to your shared Memories."
+        }
+      ]
+    ]
+  }
+}
