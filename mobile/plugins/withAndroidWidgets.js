@@ -101,13 +101,33 @@ function withBridgePackage(config) {
       contents = contents.replace(/^(package .*)$/m, `$1\n\n${importLine}`);
     }
 
-    // Expo's generated MainApplication adds packages via `packages.add(...)`
-    // inside getPackages(); hook in right after the autolinked list is built.
+    // Expo SDK 51 generates `return PackageList(this).packages`; older
+    // templates used `val packages = PackageList(this).packages`. Handle both,
+    // and fail loudly rather than silently shipping an unregistered module —
+    // a missing package means NativeModules.WidgetBridge is null at runtime
+    // and the widgets never receive credentials.
     if (!contents.includes('WidgetBridgePackage()')) {
+      const before = contents;
+
       contents = contents.replace(
-        /(val packages = PackageList\(this\)\.packages)/,
-        '$1\n              packages.add(WidgetBridgePackage())'
+        /return\s+PackageList\(this\)\.packages\s*$/m,
+        'return PackageList(this).packages.apply {\n              add(WidgetBridgePackage())\n            }'
       );
+
+      if (contents === before) {
+        contents = contents.replace(
+          /(val packages = PackageList\(this\)\.packages)/,
+          '$1\n              packages.add(WidgetBridgePackage())'
+        );
+      }
+
+      if (contents === before) {
+        throw new Error(
+          '[withAndroidWidgets] Could not register WidgetBridgePackage in MainApplication — ' +
+            'the generated template shape changed. Add `packages.add(WidgetBridgePackage())` ' +
+            'to getPackages() manually, or update this plugin.'
+        );
+      }
     }
 
     cfg.modResults.contents = contents;

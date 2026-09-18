@@ -64,6 +64,22 @@ isn't on the tailnet.
    npx expo start --tunnel
    ```
 
+### Building a real installable app
+
+Expo Go is fine for day-to-day JS work, but **the home/lock screen widgets are
+native and cannot run in it**. To get an actual APK you can sideload:
+
+```bash
+cd mobile
+# edit eas.json: replace 100.x.x.x with your Tailscale IP
+npm install -g eas-cli && eas login
+eas build --profile preview --platform android
+```
+
+EAS compiles in the cloud and gives you a download link — no Android SDK or
+Xcode needed locally. See [`docs/WIDGETS.md`](docs/WIDGETS.md) for the full
+matrix, including the local `expo prebuild` path and the iOS requirements.
+
 ### Pushing this repo to your own GitHub
 
 ```bash

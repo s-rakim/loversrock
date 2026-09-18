@@ -116,10 +116,28 @@ function withWidgetTarget(config) {
     project.addSourceFile('WidgetData.swift', { target: target.uuid }, group.uuid);
     project.addSourceFile('LoversRockWidgets.swift', { target: target.uuid }, group.uuid);
 
-    // The bridge compiles into the app target.
+    // The bridge compiles into the app target. A group key is required here:
+    // without one, xcode's addSourceFile falls through to addPluginFile, which
+    // looks for a "Plugins" group that Expo projects don't have and throws.
     const appTarget = project.getFirstTarget().uuid;
-    project.addSourceFile(`${cfg.modRequest.projectName}/WidgetBridge.swift`, { target: appTarget });
-    project.addSourceFile(`${cfg.modRequest.projectName}/WidgetBridge.m`, { target: appTarget });
+    const appGroupKey =
+      project.findPBXGroupKey({ name: cfg.modRequest.projectName }) ||
+      project.findPBXGroupKey({ path: cfg.modRequest.projectName });
+
+    if (appGroupKey) {
+      project.addSourceFile(`${cfg.modRequest.projectName}/WidgetBridge.swift`, { target: appTarget }, appGroupKey);
+      project.addSourceFile(`${cfg.modRequest.projectName}/WidgetBridge.m`, { target: appTarget }, appGroupKey);
+    }
+
+    // Best-effort build ordering. The embed phase (dstSubfolderSpec 13) is what
+    // actually ships the .appex and is verified present; this dependency is
+    // belt-and-braces and silently no-ops on some `xcode` versions, so confirm
+    // it in Xcode under the app target's Build Phases > Dependencies.
+    try {
+      project.addTargetDependency(appTarget, [target.uuid]);
+    } catch (e) {
+      console.warn(`[withIosWidgets] could not add target dependency: ${e.message}`);
+    }
 
     const configurations = project.pbxXCBuildConfigurationSection();
     for (const key of Object.keys(configurations)) {

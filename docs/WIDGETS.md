@@ -49,29 +49,49 @@ mood or notes.
 
 ## Building
 
-Widgets are native code, so **they cannot run in Expo Go.** You need a
-dev-client or production build:
+Widgets are native code, so **they cannot run in Expo Go.** You need a real
+build.
+
+### Easiest: EAS Build (no local toolchain)
+
+Expo compiles it in the cloud and hands you an installable file. This is the
+recommended path, and the only one that works for iOS without a Mac.
+
+```bash
+cd mobile
+
+# 1. Point the build at your server. Edit eas.json and replace
+#    100.x.x.x with your Tailscale IP in every profile's EXPO_PUBLIC_API_URL.
+
+# 2. One-time
+npm install -g eas-cli
+eas login
+eas build:configure
+
+# 3. Build an installable APK you can sideload
+eas build --profile preview --platform android
+
+# 4. iOS (needs a paid Apple Developer account for device installs)
+eas build --profile preview --platform ios
+```
+
+`preview` produces a release APK with `distribution: internal` — EAS gives you
+a download link/QR, no Play Store involved. Use `--profile development` plus
+`expo-dev-client` when you want to iterate on native code with fast refresh.
+
+### Local build (Android only, needs the Android SDK)
 
 ```bash
 cd mobile
 npm install
-
-# Generates android/ and ios/ and runs the widget config plugins
-npx expo prebuild --clean
-
-# Android (needs Android SDK)
-npx expo run:android
-
-# iOS (needs macOS + Xcode)
-npx expo run:ios
+npx expo prebuild --clean   # generates android/ + ios/, runs the config plugins
+npx expo run:android        # needs ANDROID_HOME and the SDK installed
 ```
 
-Or via EAS, which needs no local toolchain:
+`android/` and `ios/` are gitignored on purpose — they are generated output.
+Re-run `expo prebuild --clean` after changing `app.json` or either plugin.
 
-```bash
-eas build --profile development --platform android
-eas build --profile development --platform ios
-```
+iOS additionally needs macOS with Xcode; there is no way around that.
 
 The config plugins (`mobile/plugins/`) do the wiring at prebuild time:
 - `withAndroidWidgets.js` — copies the Kotlin sources and `res/`, registers
@@ -95,20 +115,36 @@ issues the token and hands it to the native side. Logging out clears it.
 
 ## Verified vs. unverified
 
-The **data layer is tested** — `backend/test/widget.mjs` covers token issuing,
-the security boundary, the privacy boundary, summary correctness, the photo
-endpoint and revocation against a live stack.
+**Tested against a live stack** — `backend/test/widget.mjs` (29 assertions):
+token issuing, the security boundary (the widget token cannot read messages,
+memories or raw period logs), the privacy boundary, summary correctness, the
+photo endpoint, and revocation.
 
-The **native code is not compiled or run.** It was written without access to
-Xcode or the Android SDK. Expect to need a real build to shake out:
+**Verified by running `expo prebuild`** — the config plugins were executed for
+real and the generated projects inspected:
 
-- The iOS Xcode target creation in `withIosWidgets.js` is the most fragile
-  part — programmatic `.pbxproj` manipulation often needs a manual nudge in
-  Xcode (check the extension's target membership and signing).
-- Widget layout/sizing on real devices.
-- `MainApplication` patching in `withAndroidWidgets.js` depends on Expo's
-  generated file shape; if the regex misses, add `WidgetBridgePackage()`
-  manually.
+- Kotlin sources land in `android/app/src/main/java/com/loversrock/app/widgets/`
+- `res/layout` + `res/xml` widget resources merge into the app's res tree
+- both `AppWidgetProvider` receivers and `POST_NOTIFICATIONS` appear in the
+  merged `AndroidManifest.xml`
+- `WidgetBridgePackage()` is registered in `MainApplication.getPackages()`
+- the iOS `LoversRockWidgets` extension target exists with the right bundle id,
+  `Info.plist` and an iOS 16 deployment target
+- the App Group entitlement is applied to the main app
+- the `.appex` is in the app's embed phase (`dstSubfolderSpec = 13`)
+
+Two bugs were found and fixed this way: `addSourceFile` without a group key
+crashed prebuild outright, and the `MainApplication` regex silently failed to
+register the bridge package (which would have left `NativeModules.WidgetBridge`
+null at runtime, so widgets would never have received credentials).
+
+**Still unverified — nothing has been compiled.** No Xcode, no Android SDK.
+What a real build still needs to shake out:
+
+- Kotlin and Swift compilation. Nothing here has been through a compiler.
+- Widget layout and sizing on real devices.
+- The iOS target dependency silently no-ops on some `xcode` package versions;
+  check the app target's Build Phases > Dependencies in Xcode, and its signing.
 - RemoteViews bitmaps cross a Binder transaction with a ~1MB limit; the photo
-  widget downsamples (`inSampleSize = 2`), which may need tuning for very
-  large photos.
+  widget downsamples (`inSampleSize = 2`), which may need tuning for large
+  photos.
