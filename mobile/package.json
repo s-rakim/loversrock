@@ -9,11 +9,16 @@
     "ios": "expo start --ios"
   },
   "dependencies": {
+    "@expo/vector-icons": "^14.0.0",
     "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/slider": "4.5.2",
+    "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
     "expo": "~51.0.0",
+    "expo-blur": "~13.0.2",
     "expo-image-picker": "~15.0.7",
+    "expo-linear-gradient": "~13.0.2",
     "expo-location": "~17.0.1",
     "expo-secure-store": "~13.0.2",
     "expo-sensors": "~13.0.9",

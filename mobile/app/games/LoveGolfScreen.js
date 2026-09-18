@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
 import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
+import Icon from '../../components/Icon';
 
 const { width } = Dimensions.get('window');
 const FIELD_SIZE = Math.min(width - spacing.lg * 2, 380);
@@ -83,9 +84,12 @@ export default function LoveGolfScreen() {
 
       {holedOut && (
         <FadeInUp>
-          <Text style={[font.h2, { color: colors.success, marginTop: spacing.md }]}>Holed out! ⛳</Text>
+          <View style={styles.holedRow}>
+            <Icon name="golf-outline" color={colors.success} size={18} />
+            <Text style={[font.h2, { color: colors.success }]}>Holed out!</Text>
+          </View>
           <MorphButton onPress={nextHole} style={styles.nextButton}>
-            <Text style={{ color: '#000', fontWeight: '700' }}>Next hole</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Next hole</Text>
           </MorphButton>
         </FadeInUp>
       )}
@@ -102,4 +106,5 @@ const styles = StyleSheet.create({
   hole: { position: 'absolute', width: HOLE_RADIUS * 2, height: HOLE_RADIUS * 2, borderRadius: HOLE_RADIUS, backgroundColor: '#000' },
   ball: { position: 'absolute', width: BALL_RADIUS * 2, height: BALL_RADIUS * 2, borderRadius: BALL_RADIUS, backgroundColor: '#fff' },
   nextButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, marginTop: spacing.sm },
+  holedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
 });

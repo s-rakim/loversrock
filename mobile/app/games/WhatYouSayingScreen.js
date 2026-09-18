@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
 import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
+import StickerField from '../../components/Stickers';
 
 const WORD_BANK = ['ANNIVERSARY', 'CHOCOLATE', 'FIREWORKS', 'VACATION', 'PROPOSAL', 'SERENADE', 'MOONLIGHT', 'BOUQUET'];
 const REVEAL_INTERVAL_MS = 2500;
@@ -48,6 +49,7 @@ export default function WhatYouSayingScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <FadeInUp>
         <Text style={font.muted}>Score: {score}</Text>
         <Text style={styles.masked}>{maskWord(word, revealedCount)}</Text>
@@ -68,12 +70,12 @@ export default function WhatYouSayingScreen() {
             style={styles.input}
           />
           <MorphButton onPress={submitGuess} style={styles.primaryButton}>
-            <Text style={{ color: '#000', fontWeight: '700' }}>Guess</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Guess</Text>
           </MorphButton>
         </View>
       ) : (
         <MorphButton onPress={next} style={styles.primaryButton}>
-          <Text style={{ color: '#000', fontWeight: '700' }}>Next word</Text>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Next word</Text>
         </MorphButton>
       )}
     </View>

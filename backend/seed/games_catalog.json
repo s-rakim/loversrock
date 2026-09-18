@@ -1,9 +1,9 @@
 [
-  { "slug": "four-in-a-row", "emoji": "🔴", "title": "Four in a Row", "subtitle": "Classic connect-four, pass and play", "isLocked": false, "isImplemented": true, "sortOrder": 1 },
-  { "slug": "anagrams", "emoji": "🔤", "title": "Anagrams", "subtitle": "Unscramble the letters before time runs out", "isLocked": false, "isImplemented": true, "sortOrder": 2 },
-  { "slug": "love-golf", "emoji": "⛳", "title": "Love Golf", "subtitle": "Tilt your phone to putt into the hole", "isLocked": false, "isImplemented": true, "sortOrder": 3 },
-  { "slug": "draw-duel", "emoji": "✏️", "title": "Draw Duel", "subtitle": "One draws live, the other guesses in real time", "isLocked": false, "isImplemented": true, "sortOrder": 4 },
-  { "slug": "what-you-saying", "emoji": "💬", "title": "What You Saying", "subtitle": "Guess the word as letters reveal", "isLocked": false, "isImplemented": true, "sortOrder": 5 },
-  { "slug": "perfect-pair", "emoji": "🔗", "title": "Perfect Pair", "subtitle": "Word association chain — don't break it", "isLocked": false, "isImplemented": true, "sortOrder": 6 },
-  { "slug": "love-letters", "emoji": "🔠", "title": "Love Letters", "subtitle": "Scrabble-style tile scoring word game", "isLocked": false, "isImplemented": true, "sortOrder": 7 }
+  { "slug": "four-in-a-row", "emoji": "grid-outline", "title": "Four in a Row", "subtitle": "Classic connect-four, pass and play", "isLocked": false, "isImplemented": true, "sortOrder": 1 },
+  { "slug": "anagrams", "emoji": "text-outline", "title": "Anagrams", "subtitle": "Unscramble the letters before time runs out", "isLocked": false, "isImplemented": true, "sortOrder": 2 },
+  { "slug": "love-golf", "emoji": "golf-outline", "title": "Love Golf", "subtitle": "Tilt your phone to putt into the hole", "isLocked": false, "isImplemented": true, "sortOrder": 3 },
+  { "slug": "draw-duel", "emoji": "brush-outline", "title": "Draw Duel", "subtitle": "One draws live, the other guesses in real time", "isLocked": false, "isImplemented": true, "sortOrder": 4 },
+  { "slug": "what-you-saying", "emoji": "chatbox-ellipses-outline", "title": "What You Saying", "subtitle": "Guess the word as letters reveal", "isLocked": false, "isImplemented": true, "sortOrder": 5 },
+  { "slug": "perfect-pair", "emoji": "link-outline", "title": "Perfect Pair", "subtitle": "Word association chain — don't break it", "isLocked": false, "isImplemented": true, "sortOrder": 6 },
+  { "slug": "love-letters", "emoji": "albums-outline", "title": "Love Letters", "subtitle": "Scrabble-style tile scoring word game", "isLocked": false, "isImplemented": true, "sortOrder": 7 }
 ]

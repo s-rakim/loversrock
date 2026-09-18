@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, ScrollView, ActivityIndicator, Alert
 import { apiFetch } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import StickerField from '../components/Stickers';
 
 export default function DeckDetailScreen({ route, navigation }) {
   const { slug, title } = route.params;
@@ -40,44 +41,47 @@ export default function DeckDetailScreen({ route, navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
-      {questions.map((q, i) => (
-        <FadeInUp key={q.id} delay={i * 40}>
-          <View style={styles.card}>
-            <Text style={font.h2}>{q.questionText}</Text>
+    <View style={styles.container}>
+      <StickerField variant="minimal" />
+      <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+        {questions.map((q, i) => (
+          <FadeInUp key={q.id} delay={i * 40}>
+            <View style={styles.card}>
+              <Text style={font.h2}>{q.questionText}</Text>
 
-            {q.myAnswer === null ? (
-              <>
-                <TextInput
-                  placeholder="Your answer…"
-                  placeholderTextColor={colors.textMuted}
-                  value={drafts[q.id] || ''}
-                  onChangeText={(text) => setDrafts((d) => ({ ...d, [q.id]: text }))}
-                  style={styles.input}
-                  multiline
-                />
-                <MorphButton onPress={() => submit(q.id)} style={styles.submitButton}>
-                  <Text style={styles.submitButtonText}>Answer</Text>
-                </MorphButton>
-              </>
-            ) : (
-              <View style={{ marginTop: spacing.sm }}>
-                <Text style={font.muted}>You said</Text>
-                <Text style={font.body}>{q.myAnswer}</Text>
-                {q.bothAnswered ? (
-                  <>
-                    <Text style={[font.muted, { marginTop: spacing.sm }]}>They said</Text>
-                    <Text style={font.body}>{q.partnerAnswer}</Text>
-                  </>
-                ) : (
-                  <Text style={[font.muted, { marginTop: spacing.sm }]}>Waiting on your partner…</Text>
-                )}
-              </View>
-            )}
-          </View>
-        </FadeInUp>
-      ))}
-    </ScrollView>
+              {q.myAnswer === null ? (
+                <>
+                  <TextInput
+                    placeholder="Your answer…"
+                    placeholderTextColor={colors.textMuted}
+                    value={drafts[q.id] || ''}
+                    onChangeText={(text) => setDrafts((d) => ({ ...d, [q.id]: text }))}
+                    style={styles.input}
+                    multiline
+                  />
+                  <MorphButton onPress={() => submit(q.id)} style={styles.submitButton}>
+                    <Text style={styles.submitButtonText}>Answer</Text>
+                  </MorphButton>
+                </>
+              ) : (
+                <View style={{ marginTop: spacing.sm }}>
+                  <Text style={font.muted}>You said</Text>
+                  <Text style={font.body}>{q.myAnswer}</Text>
+                  {q.bothAnswered ? (
+                    <>
+                      <Text style={[font.muted, { marginTop: spacing.sm }]}>They said</Text>
+                      <Text style={font.body}>{q.partnerAnswer}</Text>
+                    </>
+                  ) : (
+                    <Text style={[font.muted, { marginTop: spacing.sm }]}>Waiting on your partner…</Text>
+                  )}
+                </View>
+              )}
+            </View>
+          </FadeInUp>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -93,5 +97,5 @@ const styles = StyleSheet.create({
     padding: spacing.md, marginTop: spacing.sm, minHeight: 60, textAlignVertical: 'top',
   },
   submitButton: { backgroundColor: colors.accent, borderRadius: radius.pill, alignSelf: 'flex-start', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, marginTop: spacing.sm },
-  submitButtonText: { color: '#000', fontWeight: '700' },
+  submitButtonText: { color: '#fff', fontWeight: '700' },
 });

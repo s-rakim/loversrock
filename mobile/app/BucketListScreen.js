@@ -4,6 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch, connectSocket } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 export default function BucketListScreen() {
   const [items, setItems] = useState([]);
@@ -61,6 +63,7 @@ export default function BucketListScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <View style={styles.addRow}>
         <TextInput
           placeholder="Add something to your list…"
@@ -70,9 +73,7 @@ export default function BucketListScreen() {
           style={styles.input}
           onSubmitEditing={addItem}
         />
-        <MorphButton onPress={addItem} style={styles.addButton}>
-          <Text style={styles.addButtonText}>Add</Text>
-        </MorphButton>
+        <Icon name="add-circle" chip={false} color={colors.accent} size={40} onPress={addItem} />
       </View>
 
       <FlatList
@@ -82,12 +83,23 @@ export default function BucketListScreen() {
         renderItem={({ item, index }) => (
           <FadeInUp delay={index * 25}>
             <MorphButton onPress={() => toggle(item)} style={styles.row}>
-              <Text style={styles.checkbox}>{item.is_completed ? '✅' : '⬜️'}</Text>
+              <Icon
+                name={item.is_completed ? 'checkmark-circle' : 'ellipse-outline'}
+                chip={false}
+                color={item.is_completed ? colors.success : colors.textMuted}
+                size={22}
+                style={{ marginRight: spacing.sm }}
+              />
               <Text style={[font.body, item.is_completed && styles.completedText]}>{item.title}</Text>
             </MorphButton>
           </FadeInUp>
         )}
-        ListEmptyComponent={<Text style={[font.muted, { padding: spacing.lg }]}>Nothing on your list yet.</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyRow}>
+            <Icon name="checkbox-outline" chip chipSize={40} />
+            <Text style={font.muted}>Nothing on your list yet.</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -101,11 +113,11 @@ const styles = StyleSheet.create({
     padding: spacing.md, borderWidth: 1, borderColor: colors.border,
   },
   addButton: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: spacing.lg, justifyContent: 'center' },
-  addButtonText: { color: '#000', fontWeight: '700' },
+  addButtonText: { color: '#fff', fontWeight: '700' },
   row: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
     padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,
   },
-  checkbox: { fontSize: 18, marginRight: spacing.sm },
   completedText: { textDecorationLine: 'line-through', color: colors.textMuted },
+  emptyRow: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg },
 });

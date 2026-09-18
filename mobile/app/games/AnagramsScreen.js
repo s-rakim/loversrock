@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
+import Icon from '../../components/Icon';
+import StickerField from '../../components/Stickers';
 
 const WORD_BANK = [
   'LOVE', 'HEART', 'KISS', 'HUGS', 'DATE', 'SWEET', 'DREAM', 'TOGETHER',
@@ -66,6 +68,7 @@ export default function AnagramsScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <FadeInUp>
         <Text style={font.muted}>Score: {score}</Text>
         <Text style={[font.h2, { marginVertical: spacing.md }]}>Unscramble the word</Text>
@@ -89,11 +92,16 @@ export default function AnagramsScreen() {
       </View>
 
       {feedback === 'wrong' && <Text style={{ color: colors.danger, marginTop: spacing.md }}>Not quite — try again.</Text>}
-      {feedback === 'correct' && <Text style={{ color: colors.success, marginTop: spacing.md }}>Correct! 🎉</Text>}
+      {feedback === 'correct' && (
+        <View style={styles.correctRow}>
+          <Icon name="sparkles" color={colors.gold} size={16} />
+          <Text style={{ color: colors.success, fontWeight: '700' }}>Correct!</Text>
+        </View>
+      )}
 
       <View style={styles.actions}>
         <MorphButton onPress={checkAnswer} disabled={remainingIdx.length > 0} style={styles.checkButton}>
-          <Text style={{ color: '#000', fontWeight: '700' }}>Check</Text>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Check</Text>
         </MorphButton>
         <MorphButton onPress={nextWord} style={styles.skipButton}>
           <Text style={font.body}>Skip</Text>
@@ -105,6 +113,7 @@ export default function AnagramsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
+  correctRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
   answerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 56, marginVertical: spacing.lg, justifyContent: 'center' },
   lettersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
   tile: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },

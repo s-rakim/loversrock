@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Aler
 import { apiFetch, setTokens } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import StickerField, { HeartShape } from '../components/Stickers';
 
 export default function LoginScreen({ navigation }) {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
@@ -25,7 +26,7 @@ export default function LoginScreen({ navigation }) {
 
       try {
         await apiFetch('/bucket-list');
-        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+        navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
       } catch {
         navigation.reset({ index: 0, routes: [{ name: 'Pairing' }] });
       }
@@ -38,8 +39,12 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StickerField variant="form" />
       <FadeInUp>
-        <Text style={font.wordmark}>loversrock.</Text>
+        <View style={styles.wordmarkRow}>
+          <HeartShape size={26} />
+          <Text style={font.wordmark}>loversrock.</Text>
+        </View>
         <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.xl }]}>
           just for the two of you.
         </Text>
@@ -89,6 +94,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', padding: spacing.lg },
+  wordmarkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   input: {
     backgroundColor: colors.surface,
     color: colors.text,
@@ -105,6 +111,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.sm,
   },
-  primaryButtonText: { color: '#000', fontWeight: '700', fontSize: 16 },
+  primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   switchButton: { alignItems: 'center', marginTop: spacing.md },
 });

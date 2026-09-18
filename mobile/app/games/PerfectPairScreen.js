@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
+import StickerField from '../../components/Stickers';
 
 // Each word maps to its one "correct" association plus a few distractors —
 // picking the correct word continues the chain; any wrong pick ends it.
@@ -61,6 +62,7 @@ export default function PerfectPairScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <FadeInUp>
         <Text style={font.muted}>Chain: {chain}</Text>
         <Text style={[font.h1, { marginVertical: spacing.lg, textAlign: 'center' }]}>{current}</Text>
@@ -82,7 +84,7 @@ export default function PerfectPairScreen() {
           <Text style={[font.h2, { color: colors.danger, textAlign: 'center' }]}>Chain broken!</Text>
           <Text style={[font.muted, { textAlign: 'center', marginBottom: spacing.md }]}>Final chain: {chain}</Text>
           <MorphButton onPress={restart} style={styles.restartButton}>
-            <Text style={{ color: '#000', fontWeight: '700' }}>Try again</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Try again</Text>
           </MorphButton>
         </FadeInUp>
       )}

@@ -5,8 +5,8 @@
     "scheme": "loversrock",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#000000",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F4F2",
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": false,

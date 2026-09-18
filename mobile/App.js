@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { getAccessToken } from './services/api';
 import { colors } from './theme';
+import { GlassProvider } from './components/GlassContext';
+import GlassTabBar from './components/GlassTabBar';
 
 import LoginScreen from './app/LoginScreen';
 import PairingScreen from './app/PairingScreen';
@@ -22,6 +26,7 @@ import CanvasScreen from './app/CanvasScreen';
 import ThumbKissScreen from './app/ThumbKissScreen';
 import DistanceApartScreen from './app/DistanceApartScreen';
 import GamesScreen from './app/GamesScreen';
+import SettingsScreen from './app/SettingsScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
 import AnagramsScreen from './app/games/AnagramsScreen';
 import LoveGolfScreen from './app/games/LoveGolfScreen';
@@ -31,10 +36,11 @@ import PerfectPairScreen from './app/games/PerfectPairScreen';
 import LoveLettersScreen from './app/games/LoveLettersScreen';
 
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
 const navTheme = {
-  ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border },
+  ...DefaultTheme,
+  colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.accent },
 };
 
 const screenOptions = {
@@ -43,6 +49,25 @@ const screenOptions = {
   headerShadowVisible: false,
   contentStyle: { backgroundColor: colors.bg },
 };
+
+// The five primary destinations live behind the floating liquid-glass tab
+// bar (components/GlassTabBar.js); everything else is pushed on top of it
+// as a normal stack screen so the glass bar stays visible on the tabs but
+// out of the way on deep/focused screens (quiz, canvas, games, etc).
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <GlassTabBar {...props} />}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Games" component={GamesScreen} />
+      <Tab.Screen name="Messages" component={MessagesScreen} />
+      <Tab.Screen name="Memories" component={MemoriesScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+  );
+}
 
 export default function App() {
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -63,32 +88,33 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
-      <StatusBar style="light" />
-      <Stack.Navigator initialRouteName={hasToken ? 'Home' : 'Login'} screenOptions={screenOptions}>
-        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
-        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="DailyPrompt" component={DailyPromptScreen} options={{ title: "Today's Prompt" }} />
-        <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Daily Quiz' }} />
-        <Stack.Screen name="DeckDetail" component={DeckDetailScreen} options={{ title: 'Deck' }} />
-        <Stack.Screen name="Memories" component={MemoriesScreen} options={{ title: 'Memories' }} />
-        <Stack.Screen name="BucketList" component={BucketListScreen} options={{ title: 'Bucket List' }} />
-        <Stack.Screen name="DateIdeas" component={DateIdeasScreen} options={{ title: 'Date Ideas' }} />
-        <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
-        <Stack.Screen name="Messages" component={MessagesScreen} options={{ title: 'Messages' }} />
-        <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
-        <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
-        <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
-        <Stack.Screen name="Games" component={GamesScreen} options={{ title: 'Arcade' }} />
-        <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ title: 'Four in a Row' }} />
-        <Stack.Screen name="Anagrams" component={AnagramsScreen} options={{ title: 'Anagrams' }} />
-        <Stack.Screen name="LoveGolf" component={LoveGolfScreen} options={{ title: 'Love Golf' }} />
-        <Stack.Screen name="DrawDuel" component={DrawDuelScreen} options={{ title: 'Draw Duel' }} />
-        <Stack.Screen name="WhatYouSaying" component={WhatYouSayingScreen} options={{ title: 'What You Saying' }} />
-        <Stack.Screen name="PerfectPair" component={PerfectPairScreen} options={{ title: 'Perfect Pair' }} />
-        <Stack.Screen name="LoveLetters" component={LoveLettersScreen} options={{ title: 'Love Letters' }} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <GlassProvider>
+        <NavigationContainer theme={navTheme}>
+          <StatusBar style="dark" />
+          <Stack.Navigator initialRouteName={hasToken ? 'MainTabs' : 'Login'} screenOptions={screenOptions}>
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
+            <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+            <Stack.Screen name="DailyPrompt" component={DailyPromptScreen} options={{ title: "Today's Prompt" }} />
+            <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Daily Quiz' }} />
+            <Stack.Screen name="DeckDetail" component={DeckDetailScreen} options={{ title: 'Deck' }} />
+            <Stack.Screen name="BucketList" component={BucketListScreen} options={{ title: 'Bucket List' }} />
+            <Stack.Screen name="DateIdeas" component={DateIdeasScreen} options={{ title: 'Date Ideas' }} />
+            <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
+            <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
+            <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
+            <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
+            <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ title: 'Four in a Row' }} />
+            <Stack.Screen name="Anagrams" component={AnagramsScreen} options={{ title: 'Anagrams' }} />
+            <Stack.Screen name="LoveGolf" component={LoveGolfScreen} options={{ title: 'Love Golf' }} />
+            <Stack.Screen name="DrawDuel" component={DrawDuelScreen} options={{ title: 'Draw Duel' }} />
+            <Stack.Screen name="WhatYouSaying" component={WhatYouSayingScreen} options={{ title: 'What You Saying' }} />
+            <Stack.Screen name="PerfectPair" component={PerfectPairScreen} options={{ title: 'Perfect Pair' }} />
+            <Stack.Screen name="LoveLetters" component={LoveLettersScreen} options={{ title: 'Love Letters' }} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </GlassProvider>
+    </SafeAreaProvider>
   );
 }

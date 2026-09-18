@@ -5,6 +5,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { apiFetch, mediaUrl } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 export default function MemoriesScreen() {
   const [memories, setMemories] = useState([]);
@@ -70,8 +72,11 @@ export default function MemoriesScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
+      <Text style={[font.h1, { marginBottom: spacing.md }]}>Memories</Text>
       <MorphButton onPress={addMemory} disabled={uploading} style={styles.addButton}>
-        <Text style={styles.addButtonText}>{uploading ? 'Uploading…' : '+ Add memory'}</Text>
+        <Icon name="add-circle-outline" chip={false} color="#fff" size={18} />
+        <Text style={styles.addButtonText}>{uploading ? 'Uploading…' : 'Add memory'}</Text>
       </MorphButton>
 
       <FlatList
@@ -79,7 +84,7 @@ export default function MemoriesScreen() {
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={{ gap: spacing.sm }}
-        contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.xl }}
+        contentContainerStyle={{ gap: spacing.sm, paddingBottom: 140 }}
         renderItem={({ item, index }) => (
           <FadeInUp delay={index * 30} style={{ flex: 1 }}>
             <MorphButton onPress={() => removeMemory(item.id)} style={styles.tile}>
@@ -88,7 +93,12 @@ export default function MemoriesScreen() {
             </MorphButton>
           </FadeInUp>
         )}
-        ListEmptyComponent={<Text style={[font.muted, { padding: spacing.lg }]}>No memories yet — add your first one.</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyRow}>
+            <Icon name="images-outline" chip chipSize={40} />
+            <Text style={font.muted}>No memories yet — add your first one.</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -97,9 +107,13 @@ export default function MemoriesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  addButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center', marginBottom: spacing.md },
-  addButtonText: { color: '#000', fontWeight: '700' },
-  tile: { backgroundColor: colors.surface, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm },
+  addButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+    backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.sm, marginBottom: spacing.md,
+  },
+  addButtonText: { color: '#fff', fontWeight: '700' },
+  tile: { backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm },
   image: { width: '100%', aspectRatio: 1 },
   caption: { ...font.muted, padding: spacing.xs },
+  emptyRow: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg },
 });

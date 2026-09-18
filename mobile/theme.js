@@ -1,29 +1,36 @@
+// Grey-white base with a romantic rose accent. Text is a warm near-black
+// for contrast on the light surfaces, rather than pure black.
 export const colors = {
-  bg: '#000000',
-  surface: '#121212',
-  surfaceAlt: '#1a1a1a',
-  border: '#262626',
-  text: '#f5f5f0',
-  textMuted: '#9a9a9a',
-  accent: '#FFE862',
-  danger: '#ff5c5c',
-  success: '#4ade80',
+  bg: '#F7F4F2',
+  surface: '#FFFFFF',
+  surfaceAlt: '#F3ECEA',
+  border: '#E9E1DE',
+  text: '#2B2320',
+  textMuted: '#8C7F79',
+  accent: '#E8607A', // romantic rose — primary accent, replaces the old yellow
+  accentSoft: '#FCE1E6', // pale blush, used behind icon chips / stickers
+  gold: '#D9A441', // secondary warm accent, used sparingly (streaks, premium)
+  danger: '#D9455B',
+  success: '#3FA372',
+  glassTintLight: 'rgba(255,255,255,0.7)',
+  glassBorder: 'rgba(232, 96, 122, 0.18)',
 };
 
-// Category-specific gradient pairs for deck/game cards.
+// Soft pastel duotones for deck/game gradient chips — tuned to sit on the
+// grey-white base rather than a dark card.
 export const categoryGradients = {
-  'Would You Rather': ['#ff6a6a', '#ffb56b'],
-  'Deep Questions': ['#6a7bff', '#8f6aff'],
-  'Hot & Spicy': ['#ff4d6a', '#ff8a3d'],
-  Unhinged: ['#c76aff', '#ff6ac1'],
-  'Effective Communication': ['#3dd6c4', '#3d9bd6'],
-  'Money Matters': ['#3dd67a', '#8fd63d'],
-  'Parenting Perspectives': ['#ffb56b', '#ff8a6a'],
-  Wellness: ['#6affb0', '#6ae0ff'],
-  'Photo Prompts': ['#ffd66a', '#ff9e6a'],
-  'Future Plans & Dreams': ['#6a8bff', '#6affe0'],
-  'Popular Community Questions': ['#ffe862', '#ff9e6a'],
-  default: ['#3d3d3d', '#1a1a1a'],
+  'Would You Rather': ['#FFC1CC', '#FFDCA8'],
+  'Deep Questions': ['#C7CFFF', '#E3C9FF'],
+  'Hot & Spicy': ['#FFB3C1', '#FFC9A0'],
+  Unhinged: ['#EAC1FF', '#FFC1E6'],
+  'Effective Communication': ['#B8F0E6', '#B8DDF0'],
+  'Money Matters': ['#C3F0CE', '#E4F0B8'],
+  'Parenting Perspectives': ['#FFDCB8', '#FFC9BE'],
+  Wellness: ['#C1F5DC', '#C1EAF5'],
+  'Photo Prompts': ['#FFE7B8', '#FFCBB8'],
+  'Future Plans & Dreams': ['#C1D4FF', '#C1FFEF'],
+  'Popular Community Questions': ['#FFE9A8', '#FFC9B8'],
+  default: ['#F0E7E3', '#E4D9D4'],
 };
 
 export function gradientForCategory(category) {
@@ -32,7 +39,8 @@ export function gradientForCategory(category) {
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
 
-export const radius = { sm: 8, md: 14, lg: 22, pill: 999 };
+// Slightly more rounded across the board for a softer, "sticker-like" feel.
+export const radius = { sm: 10, md: 16, lg: 24, xl: 30, pill: 999, icon: 14 };
 
 export const font = {
   wordmark: {
@@ -47,4 +55,16 @@ export const font = {
   muted: { fontSize: 13, color: colors.textMuted },
 };
 
-export default { colors, categoryGradients, gradientForCategory, spacing, radius, font };
+// Default liquid-glass tab bar intensity (0-100), overridden at runtime by
+// GlassContext once the user adjusts it in Settings.
+export const DEFAULT_GLASS_INTENSITY = 55;
+
+export default {
+  colors,
+  categoryGradients,
+  gradientForCategory,
+  spacing,
+  radius,
+  font,
+  DEFAULT_GLASS_INTENSITY,
+};

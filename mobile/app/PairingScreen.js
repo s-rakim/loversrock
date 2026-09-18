@@ -3,6 +3,8 @@ import { View, Text, TextInput, StyleSheet, Alert, Share } from 'react-native';
 import { apiFetch } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 export default function PairingScreen({ navigation }) {
   const [inviteCode, setInviteCode] = useState(null);
@@ -31,7 +33,7 @@ export default function PairingScreen({ navigation }) {
     setLoading(true);
     try {
       await apiFetch('/auth/invite/accept', { method: 'POST', body: { inviteCode: enteredCode.trim() } });
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     } catch (err) {
       Alert.alert('Could not pair', err.message);
     } finally {
@@ -41,6 +43,7 @@ export default function PairingScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="form" />
       <FadeInUp>
         <Text style={font.h1}>Pair with your partner</Text>
         <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.lg }]}>
@@ -59,6 +62,7 @@ export default function PairingScreen({ navigation }) {
                 onPress={() => Share.share({ message: `Pair with me on loversrock. — invite code: ${inviteCode}` })}
                 style={styles.secondaryButton}
               >
+                <Icon name="share-social-outline" size={16} color={colors.accent} />
                 <Text style={styles.secondaryButtonText}>Share code</Text>
               </MorphButton>
             </View>
@@ -113,7 +117,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   primaryButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center' },
-  primaryButtonText: { color: '#000', fontWeight: '700' },
-  secondaryButton: { marginTop: spacing.sm, alignItems: 'center' },
+  primaryButtonText: { color: '#fff', fontWeight: '700' },
+  secondaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, marginTop: spacing.sm },
   secondaryButtonText: { color: colors.accent, fontWeight: '600' },
 });

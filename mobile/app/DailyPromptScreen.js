@@ -3,6 +3,9 @@ import { View, Text, TextInput, StyleSheet, ActivityIndicator, Alert } from 'rea
 import { apiFetch } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
+import CelebrationBurst from '../components/Celebration';
 
 export default function DailyPromptScreen() {
   const [loading, setLoading] = useState(true);
@@ -13,6 +16,7 @@ export default function DailyPromptScreen() {
   const [streak, setStreak] = useState(0);
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [celebrateTrigger, setCelebrateTrigger] = useState(0);
 
   useEffect(() => {
     apiFetch('/daily-prompt/today')
@@ -36,6 +40,7 @@ export default function DailyPromptScreen() {
       setPartnerAnswer(data.partnerAnswer);
       setBothAnswered(data.bothAnswered);
       setStreak(data.streakCount);
+      if (data.bothAnswered) setCelebrateTrigger((n) => n + 1);
     } catch (err) {
       Alert.alert('Could not submit', err.message);
     } finally {
@@ -61,9 +66,16 @@ export default function DailyPromptScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant={bothAnswered ? 'celebrate' : 'form'} />
+      {bothAnswered && (
+        <View style={styles.celebrationLayer}>
+          <CelebrationBurst trigger={celebrateTrigger} />
+        </View>
+      )}
       <FadeInUp>
         <View style={styles.streakPill}>
-          <Text style={styles.streakText}>🔥 {streak} day streak</Text>
+          <Icon name="flame" size={16} color={colors.gold} />
+          <Text style={styles.streakText}>{streak} day streak</Text>
         </View>
         <Text style={styles.prompt}>{prompt.content}</Text>
       </FadeInUp>
@@ -96,6 +108,7 @@ export default function DailyPromptScreen() {
             </View>
           ) : (
             <View style={styles.waitingCard}>
+              <Icon name="hourglass-outline" size={16} color={colors.textMuted} />
               <Text style={font.muted}>Waiting for your partner to answer to reveal theirs…</Text>
             </View>
           )}
@@ -109,23 +122,28 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   streakPill: {
-    alignSelf: 'flex-start', backgroundColor: colors.surface, borderRadius: radius.pill,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start',
+    backgroundColor: colors.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs, marginBottom: spacing.md,
   },
-  streakText: { color: colors.accent, fontWeight: '700' },
+  streakText: { color: colors.text, fontWeight: '700' },
   prompt: { ...font.h1, marginBottom: spacing.lg },
   input: {
     backgroundColor: colors.surface, color: colors.text, borderRadius: radius.md, padding: spacing.md,
     minHeight: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,
   },
   primaryButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center' },
-  primaryButtonText: { color: '#000', fontWeight: '700' },
+  primaryButtonText: { color: '#fff', fontWeight: '700' },
   answerCard: {
     backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md,
     marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,
   },
   waitingCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.md,
     borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
+  },
+  celebrationLayer: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 220, alignItems: 'center', justifyContent: 'center', zIndex: 5,
   },
 });

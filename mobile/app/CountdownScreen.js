@@ -4,6 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 function timeLeft(targetDate) {
   const diff = new Date(targetDate).getTime() - Date.now();
@@ -59,6 +61,7 @@ export default function CountdownScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <View style={styles.form}>
         <TextInput
           placeholder="Label (e.g. Anniversary trip)"
@@ -86,13 +89,12 @@ export default function CountdownScreen() {
         renderItem={({ item, index }) => (
           <FadeInUp delay={index * 30}>
             <View style={styles.card}>
+              <Icon name="hourglass-outline" chip chipSize={36} style={{ marginRight: spacing.sm }} />
               <View style={{ flex: 1 }}>
                 <Text style={font.h2}>{item.label}</Text>
                 <Text style={styles.countdownText}>{timeLeft(item.target_date)}</Text>
               </View>
-              <MorphButton onPress={() => remove(item.id)} style={styles.removeButton}>
-                <Text style={{ color: colors.danger }}>Remove</Text>
-              </MorphButton>
+              <Icon name="trash-outline" chip={false} color={colors.danger} onPress={() => remove(item.id)} />
             </View>
           </FadeInUp>
         )}
@@ -110,7 +112,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,
   },
   addButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center' },
-  addButtonText: { color: '#000', fontWeight: '700' },
+  addButtonText: { color: '#fff', fontWeight: '700' },
   card: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md,
     padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,

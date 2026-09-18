@@ -4,6 +4,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 export default function DateIdeasScreen() {
   const [tab, setTab] = useState('browse');
@@ -39,6 +41,7 @@ export default function DateIdeasScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <View style={styles.tabs}>
         <MorphButton onPress={() => setTab('browse')} style={[styles.tab, tab === 'browse' && styles.tabActive]}>
           <Text style={font.body}>Browse</Text>
@@ -66,7 +69,10 @@ export default function DateIdeasScreen() {
                   <Text style={styles.actionButtonText}>Save</Text>
                 </MorphButton>
               ) : item.is_completed ? (
-                <Text style={[font.muted, { marginTop: spacing.sm }]}>✅ Done</Text>
+                <View style={styles.doneRow}>
+                  <Icon name="checkmark-circle" size={16} color={colors.success} />
+                  <Text style={font.muted}>Done</Text>
+                </View>
               ) : (
                 <MorphButton onPress={() => complete(item)} style={styles.actionButton}>
                   <Text style={styles.actionButtonText}>Mark complete</Text>
@@ -90,5 +96,6 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm },
   tag: { ...font.muted, backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   actionButton: { backgroundColor: colors.accent, borderRadius: radius.pill, alignSelf: 'flex-start', paddingHorizontal: spacing.md, paddingVertical: spacing.xs, marginTop: spacing.sm },
-  actionButtonText: { color: '#000', fontWeight: '700' },
+  actionButtonText: { color: '#fff', fontWeight: '700' },
+  doneRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
 });

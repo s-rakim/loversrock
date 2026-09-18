@@ -6,6 +6,8 @@ import Svg, { Polyline } from 'react-native-svg';
 import { apiFetch, connectSocket, mediaUrl } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 function Doodle({ strokeData }) {
   return (
@@ -81,11 +83,12 @@ export default function MessagesScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <FlatList
         ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
+        contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm, paddingBottom: 100 }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => (
           <View style={styles.bubble}>
@@ -94,16 +97,17 @@ export default function MessagesScreen({ navigation }) {
             {item.type === 'doodle' && <Doodle strokeData={item.stroke_data} />}
           </View>
         )}
-        ListEmptyComponent={<Text style={[font.muted, { padding: spacing.lg }]}>Say something 💬</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyRow}>
+            <Icon name="chatbubble-outline" chip chipSize={40} />
+            <Text style={font.muted}>Say something</Text>
+          </View>
+        }
       />
 
       <View style={styles.inputBar}>
-        <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.iconButton}>
-          <Text>✏️</Text>
-        </MorphButton>
-        <MorphButton onPress={sendPhoto} style={styles.iconButton}>
-          <Text>🖼️</Text>
-        </MorphButton>
+        <Icon name="brush-outline" chip chipColor={colors.surfaceAlt} onPress={() => navigation.navigate('Canvas')} />
+        <Icon name="image-outline" chip chipColor={colors.surfaceAlt} onPress={sendPhoto} />
         <TextInput
           placeholder="Message…"
           placeholderTextColor={colors.textMuted}
@@ -113,7 +117,7 @@ export default function MessagesScreen({ navigation }) {
           onSubmitEditing={sendText}
         />
         <MorphButton onPress={sendText} style={styles.sendButton}>
-          <Text style={{ color: '#000', fontWeight: '700' }}>Send</Text>
+          <Icon name="send" chip={false} color="#fff" size={18} />
         </MorphButton>
       </View>
     </View>
@@ -124,8 +128,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   bubble: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, maxWidth: '80%' },
   photo: { width: 180, height: 180, borderRadius: radius.sm },
-  inputBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  iconButton: { padding: spacing.sm },
+  inputBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 90 },
   input: { flex: 1, backgroundColor: colors.surface, color: colors.text, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border },
-  sendButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  sendButton: { backgroundColor: colors.accent, borderRadius: radius.icon, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  emptyRow: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg },
 });

@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, PanResponder, Vibration, Dimensions } from 'rea
 import { connectSocket } from '../services/api';
 import { colors, font, spacing } from '../theme';
 import { PulsingText } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 const { width, height } = Dimensions.get('window');
 const TOUCH_AREA_SIZE = Math.min(width - spacing.lg * 2, 420);
@@ -57,6 +59,7 @@ export default function ThumbKissScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="celebrate" />
       <Text style={[font.muted, { marginBottom: spacing.md, textAlign: 'center' }]}>
         Both partners touch the circle at the same time — hold your thumbs together to connect.
       </Text>
@@ -75,7 +78,12 @@ export default function ThumbKissScreen() {
         )}
       </View>
 
-      {connected && <PulsingText style={styles.connectedText}>💛 Connected</PulsingText>}
+      {connected && (
+        <View style={styles.connectedRow}>
+          <Icon name="heart" size={18} color={colors.accent} />
+          <PulsingText style={styles.connectedText}>Connected</PulsingText>
+        </View>
+      )}
     </View>
   );
 }
@@ -90,5 +98,6 @@ const styles = StyleSheet.create({
   dot: { position: 'absolute', width: 40, height: 40, borderRadius: 20, opacity: 0.85 },
   myDot: { backgroundColor: colors.accent },
   partnerDot: { backgroundColor: '#6affe0' },
-  connectedText: { ...font.h2, color: colors.accent, marginTop: spacing.lg },
+  connectedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.lg },
+  connectedText: { ...font.h2, color: colors.accent },
 });

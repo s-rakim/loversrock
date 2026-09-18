@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
+import StickerField from '../../components/Stickers';
 
 // Standard Scrabble letter point values.
 const LETTER_VALUES = {
@@ -50,6 +51,7 @@ export default function LoveLettersScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <FadeInUp>
         <Text style={font.muted}>Total score: {totalScore}</Text>
         {lastWordScore && (
@@ -77,7 +79,7 @@ export default function LoveLettersScreen() {
           <Text style={font.body}>Undo</Text>
         </MorphButton>
         <MorphButton onPress={submit} style={styles.primaryButton}>
-          <Text style={{ color: '#000', fontWeight: '700' }}>Submit word</Text>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Submit word</Text>
         </MorphButton>
       </View>
     </View>

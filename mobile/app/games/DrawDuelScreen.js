@@ -4,6 +4,7 @@ import Svg, { Polyline } from 'react-native-svg';
 import { connectSocket } from '../../services/api';
 import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
+import Icon from '../../components/Icon';
 
 const WORD_BANK = ['SUNSET', 'GUITAR', 'ROBOT', 'PIZZA', 'OCTOPUS', 'CASTLE', 'ROCKET', 'UMBRELLA'];
 
@@ -98,7 +99,7 @@ export default function DrawDuelScreen() {
             automatically switch to guessing.
           </Text>
           <MorphButton onPress={startDrawing} style={styles.primaryButton}>
-            <Text style={{ color: '#000', fontWeight: '700' }}>I'll draw</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>I'll draw</Text>
           </MorphButton>
         </FadeInUp>
       </View>
@@ -127,7 +128,12 @@ export default function DrawDuelScreen() {
         </Svg>
       </View>
 
-      {status === 'correct' && <Text style={{ color: colors.success, fontWeight: '700', marginTop: spacing.sm }}>Guessed correctly! 🎉</Text>}
+      {status === 'correct' && (
+        <View style={styles.correctRow}>
+          <Icon name="sparkles" color={colors.gold} size={16} />
+          <Text style={{ color: colors.success, fontWeight: '700' }}>Guessed correctly!</Text>
+        </View>
+      )}
 
       {role === 'drawer' ? (
         <MorphButton onPress={clearCanvas} style={styles.secondaryButton}>
@@ -144,7 +150,7 @@ export default function DrawDuelScreen() {
             style={styles.input}
           />
           <MorphButton onPress={submitGuess} style={styles.primaryButtonSmall}>
-            <Text style={{ color: '#000', fontWeight: '700' }}>Guess</Text>
+            <Text style={{ color: '#fff', fontWeight: '700' }}>Guess</Text>
           </MorphButton>
         </View>
       )}
@@ -160,5 +166,6 @@ const styles = StyleSheet.create({
   primaryButtonSmall: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.lg, justifyContent: 'center' },
   secondaryButton: { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center' },
   guessRow: { flexDirection: 'row', gap: spacing.sm },
+  correctRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
   input: { flex: 1, backgroundColor: colors.surface, color: colors.text, borderRadius: radius.pill, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border },
 });

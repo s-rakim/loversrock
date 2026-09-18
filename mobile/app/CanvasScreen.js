@@ -4,6 +4,7 @@ import Svg, { Polyline } from 'react-native-svg';
 import { apiFetch } from '../services/api';
 import { colors, spacing, radius } from '../theme';
 import { MorphButton } from '../components/Motion';
+import Icon from '../components/Icon';
 import { Text } from 'react-native';
 
 // Real freehand drawing via PanResponder — strokes are sent as an array of
@@ -94,10 +95,12 @@ export default function CanvasScreen({ navigation }) {
 
       <View style={styles.toolbar}>
         <MorphButton onPress={clear} style={styles.toolButton}>
-          <Text style={{ color: colors.text }}>Clear</Text>
+          <Icon name="refresh-outline" chip={false} color={colors.text} size={18} />
+          <Text style={{ color: colors.text, fontWeight: '600' }}>Clear</Text>
         </MorphButton>
         <MorphButton onPress={send} disabled={saving} style={[styles.toolButton, styles.sendButton]}>
-          <Text style={{ color: '#000', fontWeight: '700' }}>{saving ? 'Sending…' : 'Send'}</Text>
+          <Icon name="send" chip={false} color="#fff" size={18} />
+          <Text style={{ color: '#fff', fontWeight: '700' }}>{saving ? 'Sending…' : 'Send'}</Text>
         </MorphButton>
       </View>
     </View>
@@ -108,6 +111,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   canvas: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   toolbar: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  toolButton: { flex: 1, backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center' },
+  toolButton: { flex: 1, flexDirection: 'row', gap: spacing.xs, backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center' },
   sendButton: { backgroundColor: colors.accent },
 });

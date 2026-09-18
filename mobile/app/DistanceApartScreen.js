@@ -4,6 +4,8 @@ import * as Location from 'expo-location';
 import { apiFetch, connectSocket } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
 
 const UPDATE_INTERVAL_MS = 30000;
 
@@ -79,9 +81,13 @@ export default function DistanceApartScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
       <FadeInUp>
         <View style={styles.toggleRow}>
-          <Text style={font.h2}>Share my location</Text>
+          <View style={styles.toggleLabel}>
+            <Icon name="navigate-outline" chip chipSize={36} />
+            <Text style={font.h2}>Share my location</Text>
+          </View>
           <Switch value={enabled} onValueChange={toggle} trackColor={{ true: colors.accent }} />
         </View>
         <Text style={[font.muted, { marginBottom: spacing.xl }]}>
@@ -96,7 +102,10 @@ export default function DistanceApartScreen() {
               <Text style={font.muted}>apart right now</Text>
             </>
           ) : (
-            <Text style={font.muted}>{reason || 'Turn on sharing to see how far apart you are.'}</Text>
+            <>
+              <Icon name="heart-half-outline" chip chipSize={40} style={{ marginBottom: spacing.sm }} />
+              <Text style={font.muted}>{reason || 'Turn on sharing to see how far apart you are.'}</Text>
+            </>
           )}
         </View>
       </FadeInUp>
@@ -107,6 +116,7 @@ export default function DistanceApartScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  toggleLabel: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   distanceCard: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl,
     alignItems: 'center', borderWidth: 1, borderColor: colors.border,

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
+import Icon from '../../components/Icon';
+import StickerField from '../../components/Stickers';
 
 const ROWS = 6;
 const COLS = 7;
@@ -66,8 +68,12 @@ export default function FourInARowScreen() {
 
   return (
     <View style={styles.container}>
+      {winner && <StickerField variant="celebrate" />}
       <FadeInUp>
-        <Text style={font.h2}>{winner ? `${winner} wins! 🎉` : `${turn}'s turn`}</Text>
+        <View style={styles.statusRow}>
+          {winner && <Icon name="sparkles" color={colors.gold} size={18} />}
+          <Text style={font.h2}>{winner ? `${winner} wins!` : `${turn}'s turn`}</Text>
+        </View>
       </FadeInUp>
 
       <View style={styles.board}>
@@ -83,7 +89,7 @@ export default function FourInARowScreen() {
       </View>
 
       <MorphButton onPress={reset} style={styles.resetButton}>
-        <Text style={{ color: '#000', fontWeight: '700' }}>New game</Text>
+        <Text style={{ color: '#fff', fontWeight: '700' }}>New game</Text>
       </MorphButton>
     </View>
   );
@@ -91,6 +97,7 @@ export default function FourInARowScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   board: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.xs, marginVertical: spacing.lg },
   row: { flexDirection: 'row' },
   cell: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

@@ -3,12 +3,16 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 're
 import { apiFetch } from '../services/api';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton, ProgressDot } from '../components/Motion';
+import Icon from '../components/Icon';
+import StickerField from '../components/Stickers';
+import CelebrationBurst from '../components/Celebration';
 
 export default function QuizScreen() {
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
   const [index, setIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [celebrateTrigger, setCelebrateTrigger] = useState(0);
 
   useEffect(() => {
     apiFetch('/quiz/today')
@@ -32,6 +36,7 @@ export default function QuizScreen() {
             : q
         )
       );
+      if (result.correctnessState === 'computed' && result.isCorrect) setCelebrateTrigger((n) => n + 1);
     } catch (err) {
       Alert.alert('Could not submit answer', err.message);
     } finally {
@@ -59,6 +64,10 @@ export default function QuizScreen() {
 
   return (
     <View style={styles.container}>
+      <StickerField variant="minimal" />
+      <View style={styles.celebrationLayer}>
+        <CelebrationBurst trigger={celebrateTrigger} />
+      </View>
       <FadeInUp>
         <View style={styles.dots}>
           {questions.map((item, i) => (
@@ -92,12 +101,22 @@ export default function QuizScreen() {
         {q.myAnswer && (
           <View style={styles.resultCard}>
             {q.myCorrectnessState === 'waiting_for_partner' && (
-              <Text style={font.muted}>Waiting for your partner to answer…</Text>
+              <View style={styles.resultRow}>
+                <Icon name="hourglass-outline" size={16} color={colors.textMuted} />
+                <Text style={font.muted}>Waiting for your partner to answer…</Text>
+              </View>
             )}
             {q.myCorrectnessState === 'computed' && q.isCorrect !== null && (
-              <Text style={{ color: q.isCorrect ? colors.success : colors.danger, fontWeight: '700' }}>
-                {q.isCorrect ? '✅ Correct!' : '❌ Not quite'}
-              </Text>
+              <View style={styles.resultRow}>
+                <Icon
+                  name={q.isCorrect ? 'checkmark-circle' : 'close-circle'}
+                  color={q.isCorrect ? colors.success : colors.danger}
+                  size={18}
+                />
+                <Text style={{ color: q.isCorrect ? colors.success : colors.danger, fontWeight: '700' }}>
+                  {q.isCorrect ? 'Correct!' : 'Not quite'}
+                </Text>
+              </View>
             )}
             {q.myCorrectnessState === 'computed' && q.isCorrect === null && (
               <Text style={font.muted}>Answer locked in.</Text>
@@ -137,6 +156,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm,
   },
   resultCard: { marginTop: spacing.md, padding: spacing.md, backgroundColor: colors.surfaceAlt, borderRadius: radius.md },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   nav: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
   navButton: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  celebrationLayer: {
+    position: 'absolute', top: 60, left: 0, right: 0, height: 200, alignItems: 'center', justifyContent: 'center', zIndex: 5,
+  },
 });
