@@ -1,19 +1,19 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { pool } from "./db.js";
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import 'dotenv/config';
+import { pool } from './db.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function migrate() {
-  const schemaSql = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
-  console.log("Applying schema.sql...");
-  await pool.query(schemaSql);
-  console.log("Schema applied successfully.");
+  const sql = readFileSync(join(__dirname, 'schema.sql'), 'utf8');
+  await pool.query(sql);
+  console.log('[migrate] schema applied');
   await pool.end();
 }
 
 migrate().catch((err) => {
-  console.error("Migration failed:", err);
+  console.error('[migrate] failed:', err);
   process.exit(1);
 });

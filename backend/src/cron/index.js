@@ -1,70 +1,73 @@
-import cron from "node-cron";
-import { query } from "../config/db.js";
-import { minioClient, BUCKET } from "../config/storage.js";
-import { sendNotification } from "../config/firebase.js";
+import cron from 'node-cron';
+import { query } from '../config/db.js';
+import { deleteObject } from '../config/storage.js';
+import { sendNotification } from '../config/firebase.js';
+import { getUserDeviceTokens } from '../models/pairs.js';
 
-// NOTE: node-cron running inside the single backend process is fine for MVP.
-// If the container restarts mid-job or you need reliability guarantees beyond
-// "roughly once a day," migrate to BullMQ + Redis as a separate worker (SPEC.md 9.4).
+const MEMORY_RETENTION_DAYS = 30;
+const QUIZ_BANK_WARNING_DAYS = 7;
+
+// Hard-deletes memories soft-deleted more than 30 days ago, including their
+// MinIO objects. Runs nightly at 03:00 server time.
+async function cleanupExpiredMemories() {
+  const { rows } = await query(
+    `SELECT id, image_url FROM memories
+     WHERE deleted_at IS NOT NULL AND deleted_at < now() - interval '${MEMORY_RETENTION_DAYS} days'`
+  );
+
+  for (const row of rows) {
+    await deleteObject(row.image_url).catch((err) =>
+      console.error(`[cron] failed to delete storage object ${row.image_url}:`, err.message)
+    );
+    await query('DELETE FROM memories WHERE id = $1', [row.id]);
+  }
+
+  if (rows.length > 0) console.log(`[cron] purged ${rows.length} expired memories`);
+}
+
+// Warns (server log + push to all active pairs' devices would be excessive;
+// this is an operator-facing warning) when fewer than 7 days of quiz content
+// remain ahead of today.
+async function checkQuizBankLevel() {
+  const { rows } = await query(
+    `SELECT COUNT(DISTINCT scheduled_date) AS days_remaining
+     FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE`
+  );
+  const daysRemaining = Number(rows[0]?.days_remaining || 0);
+  if (daysRemaining < QUIZ_BANK_WARNING_DAYS) {
+    console.warn(
+      `[cron] quiz question bank is running low: only ${daysRemaining} day(s) of content left`
+    );
+  }
+}
+
+// Weekly random date-idea nudge to every active (non-unlinked) pair.
+async function pushWeeklyDateIdea() {
+  const { rows: pairs } = await query(
+    `SELECT id, user_a_id, user_b_id FROM pairs WHERE unlinked_at IS NULL`
+  );
+  const { rows: ideas } = await query(
+    `SELECT title FROM date_ideas WHERE pair_id IS NULL ORDER BY random() LIMIT 1`
+  );
+  const idea = ideas[0];
+  if (!idea) return;
+
+  for (const pair of pairs) {
+    const tokens = [
+      ...(await getUserDeviceTokens(pair.user_a_id)),
+      ...(await getUserDeviceTokens(pair.user_b_id)),
+    ];
+    if (tokens.length === 0) continue;
+    await sendNotification(tokens, {
+      title: 'Date idea of the week 💡',
+      body: idea.title,
+    }).catch((err) => console.error('[cron] weekly date idea push failed:', err.message));
+  }
+}
 
 export function startCronJobs() {
-  // Hard-delete memories soft-deleted more than 30 days ago, including their
-  // MinIO objects. Without this, storage leaks silently (SPEC.md 5.1).
-  cron.schedule("0 3 * * *", async () => {
-    const { rows } = await query(
-      `SELECT id, image_url FROM memories WHERE deleted_at < now() - interval '30 days'`
-    );
-    for (const row of rows) {
-      const key = row.image_url.split("/").pop();
-      await minioClient.removeObject(BUCKET, key).catch((err) => {
-        console.error(`Failed to remove MinIO object for memory ${row.id}:`, err.message);
-      });
-    }
-    if (rows.length > 0) {
-      await query(
-        `DELETE FROM memories WHERE deleted_at < now() - interval '30 days'`
-      );
-      console.log(`Cleaned up ${rows.length} expired soft-deleted memories.`);
-    }
-  });
-
-  // Warn if the quiz question bank is running low (SPEC.md 4.3 / seed 90 days ahead).
-  cron.schedule("0 4 * * *", async () => {
-    const { rows } = await query(
-      `SELECT COUNT(DISTINCT scheduled_date) AS days_remaining
-       FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE`
-    );
-    const daysRemaining = parseInt(rows[0]?.days_remaining || "0", 10);
-    if (daysRemaining < 7) {
-      console.warn(
-        `⚠️  Quiz question bank has only ${daysRemaining} day(s) of content left. ` +
-          `Add more rows to seed/quiz_questions.json and re-run npm run seed.`
-      );
-    }
-  });
-
-  // Weekly: push one random unsaved global date idea to every active pair (SPEC.md Feature 6).
-  cron.schedule("0 10 * * 1", async () => {
-    const { rows: pairs } = await query(`SELECT * FROM pairs WHERE unlinked_at IS NULL`);
-    for (const pair of pairs) {
-      const { rows: ideaRows } = await query(
-        `SELECT * FROM date_ideas WHERE pair_id IS NULL ORDER BY random() LIMIT 1`
-      );
-      const idea = ideaRows[0];
-      if (!idea) continue;
-      const { rows: devices } = await query(
-        `SELECT ud.fcm_token FROM user_devices ud
-         JOIN users u ON u.id = ud.user_id
-         WHERE u.id = $1 OR u.id = $2`,
-        [pair.user_a_id, pair.user_b_id]
-      );
-      await sendNotification(
-        devices.map((d) => d.fcm_token),
-        "New date idea 💡",
-        idea.title
-      );
-    }
-  });
-
-  console.log("Cron jobs scheduled: memory cleanup (3am), quiz bank check (4am), weekly date idea (Mon 10am).");
+  cron.schedule('0 3 * * *', cleanupExpiredMemories);
+  cron.schedule('0 6 * * *', checkQuizBankLevel);
+  cron.schedule('0 9 * * 1', pushWeeklyDateIdea);
+  console.log('[cron] jobs scheduled: memory cleanup (nightly), quiz bank check (daily), weekly date idea (Mondays)');
 }

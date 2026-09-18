@@ -1,43 +1,48 @@
-import admin from "firebase-admin";
-import dotenv from "dotenv";
+import admin from 'firebase-admin';
 
-dotenv.config();
+let app = null;
 
-let initialized = false;
+// FCM is the app's only cloud dependency, required even for fully local
+// deployments (there is no self-hostable equivalent of platform push).
+function getApp() {
+  if (app) return app;
 
-export function initFirebase() {
-  if (initialized) return;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) {
     console.warn(
-      "FIREBASE_SERVICE_ACCOUNT_JSON not set — push notifications are disabled. " +
-        "Create a free Firebase project and set this env var to enable FCM."
+      '[firebase] FIREBASE_SERVICE_ACCOUNT_JSON not set — push notifications are disabled.'
     );
-    return;
+    return null;
   }
+
   const serviceAccount = JSON.parse(raw);
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  initialized = true;
+  app = admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  return app;
 }
 
-// Sends a data message (not a notification message) so Android can wake the app
-// in background to refresh the widget. See docs/SPEC.md Feature 8 reliability caveats —
-// this is NOT guaranteed delivery, callers must design for graceful degradation.
-export async function sendDataMessage(fcmTokens, dataPayload) {
-  if (!initialized || fcmTokens.length === 0) return;
+export async function sendToTokens(tokens, { notification, data } = {}) {
+  const firebaseApp = getApp();
+  if (!firebaseApp || tokens.length === 0) return { successCount: 0, failureCount: 0 };
+
   const message = {
-    tokens: fcmTokens,
-    data: dataPayload, // all values must be strings
+    tokens,
+    ...(notification ? { notification } : {}),
+    ...(data ? { data } : {}),
   };
-  return admin.messaging().sendEachForMulticast(message);
+
+  return admin.messaging(firebaseApp).sendEachForMulticast(message);
 }
 
-export async function sendNotification(fcmTokens, title, body, dataPayload = {}) {
-  if (!initialized || fcmTokens.length === 0) return;
-  const message = {
-    tokens: fcmTokens,
-    notification: { title, body },
-    data: dataPayload,
-  };
-  return admin.messaging().sendEachForMulticast(message);
+// Data-only message: no `notification` block, so Android delivers it to the
+// app's background handler instead of auto-drawing a tray notification —
+// used by widget-photo delivery so a future widget/background receiver can
+// wake and refresh even if the app isn't foregrounded.
+export async function sendDataMessage(tokens, data) {
+  return sendToTokens(tokens, { data });
+}
+
+export async function sendNotification(tokens, notification, data) {
+  return sendToTokens(tokens, { notification, data });
 }

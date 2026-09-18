@@ -1,22 +1,48 @@
-import { Client } from "minio";
-import dotenv from "dotenv";
+import { Client } from 'minio';
+import { randomUUID } from 'crypto';
 
-dotenv.config();
+const BUCKET = process.env.STORAGE_BUCKET || 'loversrock';
 
-export const minioClient = new Client({
-  endPoint: process.env.MINIO_ENDPOINT || "localhost",
-  port: parseInt(process.env.MINIO_PORT || "9000", 10),
-  useSSL: process.env.MINIO_USE_SSL === "true",
-  accessKey: process.env.MINIO_ACCESS_KEY,
-  secretKey: process.env.MINIO_SECRET_KEY,
+// MinIO by default, swappable for AWS S3 by pointing these env vars at
+// s3.amazonaws.com with useSSL:true and real AWS credentials — the MinIO JS
+// client speaks the S3 API, so no code change is needed to switch providers.
+export const storageClient = new Client({
+  endPoint: process.env.STORAGE_ENDPOINT || 'localhost',
+  port: Number(process.env.STORAGE_PORT || 9000),
+  useSSL: process.env.STORAGE_USE_SSL === 'true',
+  accessKey: process.env.STORAGE_ACCESS_KEY,
+  secretKey: process.env.STORAGE_SECRET_KEY,
 });
 
-export const BUCKET = process.env.MINIO_BUCKET || "candleapp-media";
-
-export async function ensureBucketExists() {
-  const exists = await minioClient.bucketExists(BUCKET).catch(() => false);
+export async function ensureBucket() {
+  const exists = await storageClient.bucketExists(BUCKET).catch(() => false);
   if (!exists) {
-    await minioClient.makeBucket(BUCKET);
-    console.log(`Created MinIO bucket: ${BUCKET}`);
+    await storageClient.makeBucket(BUCKET);
   }
 }
+
+export async function uploadBase64Image(base64Data, { prefix = 'uploads' } = {}) {
+  const match = /^data:(image\/\w+);base64,(.+)$/.exec(base64Data);
+  if (!match) throw new Error('Expected a base64 data URL image');
+
+  const [, mimeType, data] = match;
+  const ext = mimeType.split('/')[1] || 'jpg';
+  const key = `${prefix}/${randomUUID()}.${ext}`;
+  const buffer = Buffer.from(data, 'base64');
+
+  await storageClient.putObject(BUCKET, key, buffer, buffer.length, {
+    'Content-Type': mimeType,
+  });
+
+  return key;
+}
+
+export async function getObjectStream(key) {
+  return storageClient.getObject(BUCKET, key);
+}
+
+export async function deleteObject(key) {
+  return storageClient.removeObject(BUCKET, key);
+}
+
+export { BUCKET };

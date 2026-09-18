@@ -1,69 +1,123 @@
-# CandleApp (open-source)
+# loversrock.
 
-A private daily-connection app for couples — daily prompt, 5-question daily quiz,
-shared memories feed, bucket list, date ideas, countdowns, doodle messages, and
-(later) an Android live-photo widget.
+A private, self-hosted couples app for exactly two people. Runs on your own
+PC, reached from your phone over a private [Tailscale](https://tailscale.com)
+network — no public cloud hosting, no ads, no third party ever sees your
+data. MIT licensed.
 
-This is a from-scratch open-source build inspired by the *feature set* of apps like
-Candle and Locket. No code, assets, or content from those apps is used here.
+Originally scaffolded as a free, self-hosted alternative to the Candle app.
 
-## Stack
-- **Backend:** Node.js / Express / PostgreSQL / Socket.io / node-cron
-- **Storage:** MinIO (S3-compatible, local) — swap for AWS S3 in prod via env vars
-- **Push:** Firebase Cloud Messaging (only cloud dependency — required even for local dev)
-- **Mobile:** React Native (Expo, dev-client / bare workflow — needed later for the Android widget)
+## Why self-hosted + Tailscale instead of a public server
 
-## Local development (fully on your PC except push notifications)
+This app is built for exactly one couple, forever. There's no multi-tenant
+account system, no public sign-up flow, and no reason to expose a server to
+the internet. Tailscale gives the two paired devices a private mesh network
+with a stable address — it works off any network (not just shared Wi-Fi, the
+way an `ngrok`/LAN-only setup would), and nothing is reachable by anyone who
+isn't on the tailnet.
+
+## Tech stack
+
+- **Backend:** Node.js (ESM) + Express + PostgreSQL + Socket.io + node-cron
+- **Storage:** MinIO (self-hosted, S3-compatible) — swap for AWS S3 via env vars, no code changes
+- **Push:** Firebase Cloud Messaging (the one cloud dependency; required even for local-only use)
+- **Mobile:** React Native via Expo
+- **Auth:** Bearer JWT access + refresh tokens in `expo-secure-store` (not cookies — see `docs/SPEC.md`)
+- **Animation:** a small custom `Animated`-API wrapper (`mobile/components/Motion.js`) — no Moti/reanimated, see below
+
+## Setup
+
+1. Install Docker Desktop, Node.js LTS, Git, [Tailscale](https://tailscale.com/download) (on both your PC and phone), and [Expo Go](https://expo.dev/client) (on your phone).
+2. **Backend config:**
+   ```bash
+   cd backend
+   cp .env.example .env
+   ```
+   Fill in `FIREBASE_SERVICE_ACCOUNT_JSON` with the full service-account JSON from a free Firebase project (as a single-line string). This is required even for a fully local setup, since FCM is the only piece that has to be cloud-hosted.
+3. **Start Postgres + MinIO:**
+   ```bash
+   cd docker
+   docker compose up -d
+   ```
+4. **Install, migrate, seed:**
+   ```bash
+   cd backend
+   npm install
+   npm run migrate
+   npm run seed
+   ```
+5. **Tailscale:** sign into the same Tailscale account on your PC and your phone, then get your PC's tailnet IP:
+   ```bash
+   tailscale ip -4
+   ```
+6. **Mobile config:**
+   ```bash
+   cd mobile
+   cp .env.example .env
+   # set EXPO_PUBLIC_API_URL=http://<tailscale-ip>:4000
+   npm install
+   npx expo start
+   ```
+7. Scan the QR code with Expo Go on your phone (with Tailscale connected on both ends). This works from anywhere Tailscale reaches — not just the same Wi-Fi — since it's a private mesh VPN, not a LAN trick.
+8. If direct Tailscale binding has interface issues, fall back to:
+   ```bash
+   npx expo start --tunnel
+   ```
+
+### Pushing this repo to your own GitHub
 
 ```bash
-cp backend/.env.example backend/.env
-# fill in DATABASE_URL (already set for docker-compose), MinIO keys (already set),
-# and FIREBASE_SERVICE_ACCOUNT_JSON (from a free Firebase project)
-
-docker compose -f docker/docker-compose.yml up -d
-cd backend && npm install
-npm run seed      # loads daily prompts, quiz questions, date ideas from /seed
-npm run dev        # starts API on :4000
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/s-rakim/loversrock.git
+git push -u origin main
 ```
 
-Mobile app:
-```bash
-cd mobile && npm install
-npx expo start
-# scan QR with Expo Go on Android, or run on an emulator
-# set EXPO_PUBLIC_API_URL in mobile/.env to your PC's local IP, e.g. http://192.168.1.50:4000
-```
+(On Windows, if `git` isn't installed: `winget install --id Git.Git -e --source winget`.)
 
-If testing on a partner's phone off your home network, tunnel the backend with ngrok
-and point `EXPO_PUBLIC_API_URL` at the ngrok URL.
+## Pinned architectural decisions
 
-## Repo layout
+See [`docs/SPEC.md`](docs/SPEC.md) for the full rationale on each of these —
+they're load-bearing and shouldn't be casually reversed:
 
-```
-backend/          Express API, Postgres models, cron jobs, Socket.io server
-  src/routes/      REST endpoints, one file per feature
-  src/models/      DB access layer (plain SQL / query builder, see db.js)
-  src/cron/        daily prompt rollover, streak calc, memory cleanup, etc.
-  src/sockets/     Socket.io room auth + bucket-list live sync
-  seed/            JSON content for daily prompts, quiz questions, date ideas
-mobile/           Expo React Native app
-docker/           docker-compose.yml + init SQL
-```
+1. Bearer JWT tokens for mobile auth, never httpOnly cookies.
+2. Daily prompt/quiz "today" is computed from the **pair's** pinned timezone, not either device's.
+3. Pair data is scoped by `pair_id` forever; unlinking never deletes or reassigns history, and re-pairing always creates a brand-new `pair_id`.
+4. Location sharing is opt-in, off by default, and instantly revocable by either partner.
 
-## Build order
+## Feature status
 
-See `/docs/SPEC.md` for the full feature spec and MVP build order:
-1. Auth + pairing
-2. Daily prompt + streak
-3. Daily quiz (5/day) + calendar archive
-4. Memories feed
-5. Bucket list
-6. Push notifications
-7. Unified message feed (text/photo/doodle)
-8. Date ideas
-9. Countdown
-10. Android live-photo widget (native, last)
+| Area | Status |
+|---|---|
+| Auth (signup/login/refresh/pairing/unlink) | ✅ Fully implemented |
+| Daily Prompt (reveal-after-both, streaks) | ✅ Fully implemented |
+| Daily Quiz (trivia/guess-partner/this-or-that, archive) | ✅ Fully implemented |
+| Memories (upload, soft-delete, 30-day restore) | ✅ Fully implemented |
+| Bucket List (live sync via Socket.io) | ✅ Fully implemented |
+| Date Ideas (curated + saved) | ✅ Fully implemented |
+| Countdowns (auto-archive) | ✅ Fully implemented |
+| Messages (text/photo/doodle unified feed) | ✅ Fully implemented |
+| Widget Photos (mirrors into Memories, FCM data message) | ✅ Fully implemented |
+| Community Question Decks (27 decks / 10 categories) | ✅ Fully implemented |
+| Thumb Kiss (live two-device touch sync) | ✅ Fully implemented |
+| Distance Apart (real `expo-location`, opt-in) | ✅ Fully implemented |
+| Games: Four in a Row, Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All 7 genuinely playable |
+| **Native Android home-screen widgets** | ❌ Not built — every underlying feature exists as an in-app screen; the native Kotlin/Expo-config-plugin layer needs a real Android build environment to compile and verify. See `docs/ANDROID_WIDGET.md`. |
+| **Web marketing landing page** | ❌ Out of scope — mobile-only by design; the reference design's effects (WebGL, DOM SVG filters) don't map to React Native anyway. |
+
+## A note on the animation library
+
+Moti + `react-native-reanimated` were tried first and then **removed** after
+causing a crash (`Cannot read property 'useContext' of null` / "Invalid hook
+call"), traced to Moti pulling in a second, conflicting React context tree.
+`mobile/components/Motion.js` reimplements the parts of Moti's
+`from`/`animate`/`transition` API this app actually uses, on top of nothing
+but React Native's built-in `Animated.Value` + `Animated.timing`/`spring` —
+zero extra dependencies, and structurally unable to hit that crash class
+again.
 
 ## License
-MIT — this is meant to be a genuinely open, community-extendable project.
-Content in `seed/` (prompts/quiz questions) is CC0 — add your own via PR.
+
+MIT — see [`LICENSE`](LICENSE).

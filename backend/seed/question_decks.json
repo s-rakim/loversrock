@@ -1,0 +1,39 @@
+[
+  { "slug": "would-you-rather-classic", "category": "Would You Rather", "emoji": "help-circle-outline", "title": "Classic Would You Rather", "isLocked": false, "sortOrder": 1 },
+  { "slug": "would-you-rather-spicy", "category": "Would You Rather", "emoji": "flame-outline", "title": "Spicy Would You Rather", "isLocked": true, "sortOrder": 2 },
+  { "slug": "would-you-rather-family", "category": "Would You Rather", "emoji": "people-outline", "title": "Family Edition", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "deep-questions-getting-serious", "category": "Deep Questions", "emoji": "chatbubbles-outline", "title": "Getting Serious", "isLocked": false, "sortOrder": 1 },
+  { "slug": "deep-questions-life-goals", "category": "Deep Questions", "emoji": "flag-outline", "title": "Life Goals", "isLocked": true, "sortOrder": 2 },
+  { "slug": "deep-questions-fears", "category": "Deep Questions", "emoji": "moon-outline", "title": "Facing Fears", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "spicy-heat-check", "category": "Hot & Spicy", "emoji": "flame-outline", "title": "Heat Check", "isLocked": true, "sortOrder": 1 },
+  { "slug": "spicy-truth-or-dare", "category": "Hot & Spicy", "emoji": "flash-outline", "title": "Truth or Dare", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "unhinged-chaos-questions", "category": "Unhinged", "emoji": "planet-outline", "title": "Chaos Questions", "isLocked": false, "sortOrder": 1 },
+  { "slug": "unhinged-would-you-rather", "category": "Unhinged", "emoji": "shuffle-outline", "title": "Unhinged Would You Rather", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "communication-love-languages", "category": "Effective Communication", "emoji": "heart-circle-outline", "title": "Love Languages Check-In", "isLocked": false, "sortOrder": 1 },
+  { "slug": "communication-conflict-styles", "category": "Effective Communication", "emoji": "hand-left-outline", "title": "Conflict Styles", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "money-matters-basics", "category": "Money Matters", "emoji": "cash-outline", "title": "Money Basics", "isLocked": false, "sortOrder": 1 },
+  { "slug": "money-matters-future", "category": "Money Matters", "emoji": "trending-up-outline", "title": "Planning Ahead", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "parenting-someday", "category": "Parenting Perspectives", "emoji": "happy-outline", "title": "Someday, Maybe Kids", "isLocked": true, "sortOrder": 1 },
+  { "slug": "parenting-values", "category": "Parenting Perspectives", "emoji": "book-outline", "title": "Parenting Values", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "wellness-check-in", "category": "Wellness", "emoji": "leaf-outline", "title": "Wellness Check-In", "isLocked": false, "sortOrder": 1 },
+  { "slug": "wellness-self-care", "category": "Wellness", "emoji": "water-outline", "title": "Self-Care Habits", "isLocked": true, "sortOrder": 2 },
+  { "slug": "wellness-mental-health", "category": "Wellness", "emoji": "sunny-outline", "title": "Mental Health Check-In", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "photo-prompts-throwback", "category": "Photo Prompts", "emoji": "camera-outline", "title": "Throwback Photos", "isLocked": false, "sortOrder": 1 },
+  { "slug": "photo-prompts-silly", "category": "Photo Prompts", "emoji": "happy-outline", "title": "Silly Selfies", "isLocked": true, "sortOrder": 2 },
+
+  { "slug": "future-five-year-plan", "category": "Future Plans & Dreams", "emoji": "rocket-outline", "title": "Five Year Plan", "isLocked": false, "sortOrder": 1 },
+  { "slug": "future-bucket-dreams", "category": "Future Plans & Dreams", "emoji": "star-outline", "title": "Bucket List Dreams", "isLocked": true, "sortOrder": 2 },
+  { "slug": "future-travel-goals", "category": "Future Plans & Dreams", "emoji": "airplane-outline", "title": "Travel Goals", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "popular-most-asked", "category": "Popular Community Questions", "emoji": "trophy-outline", "title": "Most Asked Questions", "isLocked": false, "sortOrder": 1 },
+  { "slug": "popular-newlywed-game", "category": "Popular Community Questions", "emoji": "heart-outline", "title": "The Newlywed Game", "isLocked": false, "sortOrder": 2 },
+  { "slug": "popular-late-night", "category": "Popular Community Questions", "emoji": "moon-outline", "title": "Late Night Talks", "isLocked": true, "sortOrder": 3 }
+]

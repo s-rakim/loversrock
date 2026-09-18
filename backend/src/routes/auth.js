@@ -1,174 +1,156 @@
-import { Router } from "express";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import { query } from "../config/db.js";
-import { requireAuth, signAccessToken, signRefreshToken } from "../middleware/auth.js";
+import { Router } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
+import { query } from '../config/db.js';
+import { requireAuth, requirePair } from '../middleware/auth.js';
+import { getActivePairForUser } from '../models/pairs.js';
 
-export const authRouter = Router();
+const router = Router();
 
-// --- Signup ---
-authRouter.post("/signup", async (req, res) => {
+function issueTokens(userId) {
+  const accessToken = jwt.sign({ sub: userId }, process.env.JWT_ACCESS_SECRET, {
+    expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+  });
+  const refreshToken = jwt.sign({ sub: userId, type: 'refresh' }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+  });
+  return { accessToken, refreshToken };
+}
+
+router.post('/signup', async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) {
-    return res.status(400).json({ error: "name, email, and password are required" });
+    return res.status(400).json({ error: 'name, email, password are required' });
   }
 
-  const existing = await query("SELECT id FROM users WHERE email = $1", [email]);
+  const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
   if (existing.rows.length > 0) {
-    return res.status(409).json({ error: "An account with this email already exists" });
+    return res.status(409).json({ error: 'Email already registered' });
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
   const { rows } = await query(
     `INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3)
-     RETURNING id, name, email, avatar_url, partner_id, created_at`,
-    [name, email, passwordHash]
+     RETURNING id, name, email, avatar_url, created_at`,
+    [name, email.toLowerCase(), passwordHash]
   );
-  const user = rows[0];
 
-  return res.status(201).json({
-    user,
-    accessToken: signAccessToken(user.id),
-    refreshToken: signRefreshToken(user.id),
-  });
+  const user = rows[0];
+  const tokens = issueTokens(user.id);
+  res.status(201).json({ user, ...tokens });
 });
 
-// --- Login ---
-authRouter.post("/login", async (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-  const { rows } = await query("SELECT * FROM users WHERE email = $1", [email]);
+  if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
+
+  const { rows } = await query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
   const user = rows[0];
+  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
-    return res.status(401).json({ error: "Invalid email or password" });
-  }
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const { password_hash, ...safeUser } = user;
-  return res.json({
-    user: safeUser,
-    accessToken: signAccessToken(user.id),
-    refreshToken: signRefreshToken(user.id),
+  const tokens = issueTokens(user.id);
+  res.json({
+    user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatar_url },
+    ...tokens,
   });
 });
 
-// --- Refresh access token ---
-authRouter.post("/refresh", async (req, res) => {
+// Rotates both access and refresh tokens on every use.
+router.post('/refresh', async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(400).json({ error: "refreshToken is required" });
+  if (!refreshToken) return res.status(400).json({ error: 'refreshToken is required' });
 
   try {
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    // Rotate: issue a brand new refresh token alongside the new access token.
-    return res.json({
-      accessToken: signAccessToken(payload.sub),
-      refreshToken: signRefreshToken(payload.sub),
-    });
+    if (payload.type !== 'refresh') throw new Error('wrong token type');
+    const tokens = issueTokens(payload.sub);
+    res.json(tokens);
   } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired refresh token" });
+    res.status(401).json({ error: 'Invalid or expired refresh token' });
   }
 });
 
-// --- Register / refresh a push token for this device ---
-authRouter.post("/fcm-token", requireAuth, async (req, res) => {
+router.post('/fcm-token', requireAuth, async (req, res) => {
   const { fcmToken, platform } = req.body;
-  if (!fcmToken || !platform) {
-    return res.status(400).json({ error: "fcmToken and platform are required" });
-  }
+  if (!fcmToken) return res.status(400).json({ error: 'fcmToken is required' });
+
   await query(
     `INSERT INTO user_devices (user_id, fcm_token, platform, last_seen_at)
      VALUES ($1, $2, $3, now())
-     ON CONFLICT (user_id, fcm_token)
-     DO UPDATE SET last_seen_at = now(), platform = EXCLUDED.platform`,
-    [req.userId, fcmToken, platform]
+     ON CONFLICT (user_id, fcm_token) DO UPDATE SET last_seen_at = now(), platform = EXCLUDED.platform`,
+    [req.userId, fcmToken, platform || 'android']
   );
-  return res.status(204).send();
+
+  res.status(204).end();
 });
 
-// --- Generate an invite code for pairing ---
-authRouter.post("/invite", requireAuth, async (req, res) => {
-  const { rows: userRows } = await query("SELECT partner_id FROM users WHERE id = $1", [req.userId]);
-  if (userRows[0]?.partner_id) {
-    return res.status(400).json({ error: "You already have a partner linked" });
-  }
+function generateInviteCode() {
+  return randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
+}
 
-  const code = Math.random().toString(36).slice(2, 8).toUpperCase();
-  const timezone = req.body.timezone || "UTC"; // client should send Intl.DateTimeFormat().resolvedOptions().timeZone
+// Pins the pair's timezone to the inviter's device timezone — see
+// docs/SPEC.md #2. deviceTimezone must be an IANA name (e.g. "America/Denver").
+router.post('/invite', requireAuth, async (req, res) => {
+  const { deviceTimezone } = req.body;
+  if (!deviceTimezone) return res.status(400).json({ error: 'deviceTimezone is required' });
+
+  const existingPair = await getActivePairForUser(req.userId);
+  if (existingPair) return res.status(409).json({ error: 'Already paired — unlink first' });
+
+  const inviteCode = generateInviteCode();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   const { rows } = await query(
-    `INSERT INTO pairs (user_a_id, user_b_id, timezone, invite_code, invite_expires_at)
-     VALUES ($1, $1, $2, $3, now() + interval '7 days')
+    `INSERT INTO pairs (user_a_id, timezone, invite_code, invite_expires_at)
+     VALUES ($1, $2, $3, $4)
      RETURNING id, invite_code, invite_expires_at`,
-    [req.userId, timezone, code]
+    [req.userId, deviceTimezone, inviteCode, expiresAt]
   );
-  // Note: user_b_id is temporarily set to user_a_id as a placeholder until the
-  // invite is accepted below, since the column is NOT NULL. Accepting the invite
-  // overwrites it with the real partner.
 
-  return res.status(201).json(rows[0]);
+  res.status(201).json({
+    inviteCode: rows[0].invite_code,
+    expiresAt: rows[0].invite_expires_at,
+  });
 });
 
-// --- Accept an invite code ---
-authRouter.post("/invite/accept", requireAuth, async (req, res) => {
-  const { code } = req.body;
-  if (!code) return res.status(400).json({ error: "code is required" });
+router.post('/invite/accept', requireAuth, async (req, res) => {
+  const { inviteCode } = req.body;
+  if (!inviteCode) return res.status(400).json({ error: 'inviteCode is required' });
 
-  const { rows: userRows } = await query("SELECT partner_id FROM users WHERE id = $1", [req.userId]);
-  if (userRows[0]?.partner_id) {
-    return res.status(400).json({ error: "You already have a partner linked" });
-  }
+  const existingPair = await getActivePairForUser(req.userId);
+  if (existingPair) return res.status(409).json({ error: 'Already paired — unlink first' });
 
-  const { rows: pairRows } = await query(
-    `SELECT * FROM pairs
-     WHERE invite_code = $1 AND unlinked_at IS NULL AND invite_expires_at > now()`,
-    [code]
+  const { rows } = await query(
+    `SELECT * FROM pairs WHERE invite_code = $1 AND user_b_id IS NULL AND invite_expires_at > now()`,
+    [inviteCode.toUpperCase()]
   );
-  const pair = pairRows[0];
-  if (!pair) return res.status(404).json({ error: "Invalid or expired invite code" });
-  if (pair.user_a_id === req.userId) {
-    return res.status(400).json({ error: "You can't accept your own invite code" });
-  }
+  const pair = rows[0];
+  if (!pair) return res.status(404).json({ error: 'Invite code invalid or expired' });
+  if (pair.user_a_id === req.userId) return res.status(400).json({ error: 'Cannot accept your own invite' });
 
-  await query("BEGIN");
-  try {
-    await query(`UPDATE pairs SET user_b_id = $1, invite_code = NULL WHERE id = $2`, [
-      req.userId,
-      pair.id,
-    ]);
-    await query(`UPDATE users SET partner_id = $1 WHERE id = $2`, [req.userId, pair.user_a_id]);
-    await query(`UPDATE users SET partner_id = $1 WHERE id = $2`, [pair.user_a_id, req.userId]);
-    await query("COMMIT");
-  } catch (err) {
-    await query("ROLLBACK");
-    throw err;
-  }
+  const { rows: updated } = await query(
+    `UPDATE pairs SET user_b_id = $1, invite_code = NULL, invite_expires_at = NULL
+     WHERE id = $2 RETURNING *`,
+    [req.userId, pair.id]
+  );
 
-  return res.json({ pairId: pair.id, timezone: pair.timezone });
+  await query('UPDATE users SET partner_id = $1 WHERE id = $2', [req.userId, pair.user_a_id]);
+  await query('UPDATE users SET partner_id = $1 WHERE id = $2', [pair.user_a_id, req.userId]);
+
+  res.status(200).json({ pair: updated[0] });
 });
 
-// --- Unlink partner ---
-// Privacy rule (docs/SPEC.md pinned decision #3): this NEVER deletes pair data.
-// It only clears the live partner_id link and stamps unlinked_at. Re-pairing later
-// (with anyone) always creates a brand-new pairs row, so old history is never
-// visible under a new pairing.
-authRouter.post("/unlink", requireAuth, async (req, res) => {
-  const { rows: userRows } = await query("SELECT partner_id FROM users WHERE id = $1", [req.userId]);
-  const partnerId = userRows[0]?.partner_id;
-  if (!partnerId) return res.status(400).json({ error: "You don't have a partner linked" });
-
-  await query("BEGIN");
-  try {
-    await query(
-      `UPDATE pairs SET unlinked_at = now()
-       WHERE (user_a_id = $1 AND user_b_id = $2) OR (user_a_id = $2 AND user_b_id = $1)
-       AND unlinked_at IS NULL`,
-      [req.userId, partnerId]
-    );
-    await query(`UPDATE users SET partner_id = NULL WHERE id IN ($1, $2)`, [req.userId, partnerId]);
-    await query("COMMIT");
-  } catch (err) {
-    await query("ROLLBACK");
-    throw err;
-  }
-
-  return res.status(204).send();
+// Clears partner_id on both users but never deletes or reassigns historical
+// rows tied to the old pair_id — see docs/SPEC.md #3. Re-pairing always
+// creates a brand-new pairs row.
+router.post('/unlink', requireAuth, requirePair, async (req, res) => {
+  await query('UPDATE pairs SET unlinked_at = now() WHERE id = $1', [req.pair.id]);
+  await query('UPDATE users SET partner_id = NULL WHERE id IN ($1, $2)', [req.userId, req.partnerId]);
+  res.status(204).end();
 });
+
+export default router;

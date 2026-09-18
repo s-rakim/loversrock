@@ -1,19 +1,39 @@
 {
   "expo": {
-    "name": "CandleApp",
-    "slug": "candleapp",
-    "scheme": "candleapp",
-    "version": "0.1.0",
+    "name": "loversrock.",
+    "slug": "loversrock",
+    "scheme": "loversrock",
+    "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F7F4F2",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.loversrock.app"
+    },
     "android": {
-      "package": "com.candleapp.mobile",
-      "intentFilters": [
+      "package": "com.loversrock.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
         {
-          "action": "VIEW",
-          "data": [{ "scheme": "candleapp" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "locationAlwaysAndWhenInUsePermission": "loversrock uses your location to show how far apart you and your partner are, only while sharing is turned on."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "loversrock needs access to your photos to add them to your shared Memories."
         }
       ]
-    }
+    ]
   }
 }

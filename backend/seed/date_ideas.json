@@ -1,12 +1,12 @@
 [
-  { "title": "Cook a new recipe together", "description": "Pick a cuisine you've never made at home and follow a recipe together, mistakes and all.", "category": "indoor", "cost_tier": "$" },
-  { "title": "Sunset walk with no phones", "description": "Leave phones at home and take a walk somewhere with a good view as the sun goes down.", "category": "outdoor", "cost_tier": "free" },
-  { "title": "Try a board game night", "description": "Pick a new board or card game neither of you has played and learn it together.", "category": "indoor", "cost_tier": "free" },
-  { "title": "Visit a local market you've never been to", "description": "Explore stalls, try a snack you've never had, people-watch.", "category": "outdoor", "cost_tier": "$" },
-  { "title": "Stargazing", "description": "Find a spot away from city lights, bring a blanket, and just talk under the stars.", "category": "outdoor", "cost_tier": "free" },
-  { "title": "Recreate your first date", "description": "Go back to wherever you had your first date, or recreate it as closely as you can.", "category": "outdoor", "cost_tier": "$$" },
-  { "title": "Take a dance class together", "description": "Salsa, swing, anything neither of you knows — laugh through the awkward parts.", "category": "indoor", "cost_tier": "$$" },
-  { "title": "Build a joint playlist", "description": "Each add 10 songs that mean something to you and explain why, over a slow evening in.", "category": "indoor", "cost_tier": "free" },
-  { "title": "Day trip to somewhere neither of you has been", "description": "Pick somewhere within an hour's drive or matatu ride and just go.", "category": "outdoor", "cost_tier": "$$" },
-  { "title": "Write letters to future you two", "description": "Each write a letter to open together in a year. Seal it, put a date on the calendar.", "category": "indoor", "cost_tier": "free" }
+  { "title": "Cook a new recipe together", "description": "Pick a cuisine neither of you has tried cooking before and follow a recipe from scratch.", "category": "at_home", "costTier": "$" },
+  { "title": "Sunset picnic", "description": "Pack snacks and find a spot to watch the sunset together, phones away.", "category": "outdoors", "costTier": "free" },
+  { "title": "Museum or gallery afternoon", "description": "Wander a local museum or art gallery and rate each exhibit out of 10.", "category": "culture", "costTier": "$" },
+  { "title": "Recreate your first date", "description": "Go back to where you had your first date, or recreate it as closely as you can.", "category": "sentimental", "costTier": "$$" },
+  { "title": "Stargazing drive", "description": "Drive somewhere with low light pollution, bring blankets, and just look up.", "category": "outdoors", "costTier": "free" },
+  { "title": "Two-player video game night", "description": "Pick a co-op or competitive game neither of you has played and learn it together.", "category": "at_home", "costTier": "free" },
+  { "title": "Local trivia night", "description": "Find a bar or venue hosting trivia and team up.", "category": "going_out", "costTier": "$" },
+  { "title": "Build a blanket fort and marathon a show", "description": "Full blanket fort, snacks, and a season of something you've both been meaning to watch.", "category": "at_home", "costTier": "free" },
+  { "title": "Weekend farmers market crawl", "description": "Visit a farmers market, try samples, and cook whatever looks best that night.", "category": "outdoors", "costTier": "$" },
+  { "title": "Book a couples massage or spa hour", "description": "Treat yourselves to an hour of side-by-side relaxation.", "category": "splurge", "costTier": "$$$" }
 ]
