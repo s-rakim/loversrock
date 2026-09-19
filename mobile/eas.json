@@ -34,6 +34,13 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "http://100.x.x.x:4000"
       }
+    },
+    "preview-widgets": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://100.x.x.x:4000",
+        "LOVERSROCK_WIDGETS": "1"
+      }
     }
   }
 }

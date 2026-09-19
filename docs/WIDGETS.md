@@ -52,6 +52,26 @@ mood or notes.
 Widgets are native code, so **they cannot run in Expo Go.** You need a real
 build.
 
+### Widgets are off by default
+
+The two widget config plugins inject Kotlin and Swift that has never been
+through a compiler, and a failure in either blocks the *entire* APK — the
+tested, working parts of the app included. So `app.config.js` filters them out
+unless `LOVERSROCK_WIDGETS=1` is set.
+
+```bash
+# The normal build: no widgets, no hand-written native code.
+eas build --profile preview --platform android
+
+# With widgets, once the native code is known to compile.
+eas build --profile preview-widgets --platform android
+```
+
+Nothing breaks with them off: `services/widgetBridge.js` degrades to a no-op
+when `NativeModules.WidgetBridge` is absent, and Settings says widgets need a
+dev-client build. Verified by prebuild — with the flag off, the only Kotlin in
+the generated project is Expo's own `MainApplication.kt` and `MainActivity.kt`.
+
 ### Easiest: EAS Build (no local toolchain)
 
 Expo compiles it in the cloud and hands you an installable file. This is the
