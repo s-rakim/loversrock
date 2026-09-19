@@ -79,6 +79,43 @@ eas build --profile preview --platform ios
 a download link/QR, no Play Store involved. Use `--profile development` plus
 `expo-dev-client` when you want to iterate on native code with fast refresh.
 
+### Compiling the widget Kotlin without waiting on EAS
+
+A cloud build takes ~7 minutes to tell you about a typo. Compiling locally
+takes seconds after the first run, and `compileReleaseKotlin` skips packaging
+entirely — it type-checks the Kotlin and stops.
+
+You need a JDK and the Android SDK. Installing **Android Studio** gets you
+both; it ships JDK 17 (`jbr`) and an SDK, and Gradle 8.8 / AGP 8.x need
+**JDK 17** — Java 8 or 11 will fail with an unsupported class file version.
+
+```powershell
+# One-time, adjust paths if you installed elsewhere
+setx ANDROID_HOME "$env:LOCALAPPDATA\Android\Sdk"
+setx JAVA_HOME "C:\Program Files\Android\Android Studio\jbr"
+# reopen the terminal so they take effect
+```
+
+```powershell
+cd mobile
+npx expo prebuild --clean --platform android
+cd android
+.\gradlew :app:compileReleaseKotlin        # Kotlin only, no APK
+.\gradlew :app:assembleRelease             # or the whole APK
+```
+
+Errors come out as `file:line: error:` — the same output EAS shows, minutes
+sooner.
+
+**The catch that will bite you:** the widget sources live in
+`mobile/widgets/android/`, and `withAndroidWidgets.js` *copies* them into
+`android/app/src/main/java/com/loversrock/app/widgets/` at prebuild time.
+Editing the originals and re-running Gradle changes nothing — Gradle compiles
+the copies. Either re-run `expo prebuild` after each edit, or edit the copies
+while iterating and port the fix back to `mobile/widgets/android/` before
+committing. `android/` is gitignored and regenerated, so anything you leave
+only in there is lost.
+
 ### Local build (Android only, needs the Android SDK)
 
 ```bash
