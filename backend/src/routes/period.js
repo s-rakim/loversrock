@@ -135,13 +135,14 @@ const ENERGY_VALUES = ['low', 'medium', 'high', 'energized'];
 const TEST_VALUES = ['positive', 'negative'];
 const PREGNANCY_TEST_VALUES = ['positive', 'faint', 'negative'];
 const MUCUS_VALUES = ['dry', 'sticky', 'creamy', 'watery', 'egg_white'];
+const SEX_DRIVE_VALUES = ['none', 'low', 'medium', 'high'];
 const SHARING_CATEGORIES = ['share_phase', 'share_symptoms', 'share_mood', 'share_flow', 'share_sex_drive', 'share_notes'];
 
 router.post('/log', async (req, res) => {
   const {
     date, flow, symptoms, moods, mood, notes, energy, intercourse, medicine,
     breastSelfExam, ovulationTest, pregnancyTest, cervicalMucus,
-    weightKg, temperatureC, waterMl,
+    weightKg, temperatureC, waterMl, sexDrive, moment,
   } = req.body;
 
   if (!date) return res.status(400).json({ error: 'date is required' });
@@ -156,7 +157,8 @@ router.post('/log', async (req, res) => {
     oneOf(energy, ENERGY_VALUES, 'energy') ||
     oneOf(ovulationTest, TEST_VALUES, 'ovulationTest') ||
     oneOf(pregnancyTest, PREGNANCY_TEST_VALUES, 'pregnancyTest') ||
-    oneOf(cervicalMucus, MUCUS_VALUES, 'cervicalMucus');
+    oneOf(cervicalMucus, MUCUS_VALUES, 'cervicalMucus') ||
+    oneOf(sexDrive, SEX_DRIVE_VALUES, 'sexDrive');
   if (problem) return res.status(400).json({ error: problem });
 
   for (const [field, value] of [['symptoms', symptoms], ['moods', moods], ['medicine', medicine]]) {
@@ -183,8 +185,8 @@ router.post('/log', async (req, res) => {
     `INSERT INTO period_daily_logs (
        user_id, log_date, flow, symptoms, moods, mood, notes, energy, intercourse,
        medicine, breast_self_exam, ovulation_test, pregnancy_test, cervical_mucus,
-       weight_kg, temperature_c, water_ml
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       weight_kg, temperature_c, water_ml, sex_drive, moment
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      ON CONFLICT (user_id, log_date) DO UPDATE SET
        flow             = COALESCE(EXCLUDED.flow, period_daily_logs.flow),
        symptoms         = COALESCE(EXCLUDED.symptoms, period_daily_logs.symptoms),
@@ -201,6 +203,8 @@ router.post('/log', async (req, res) => {
        weight_kg        = COALESCE(EXCLUDED.weight_kg, period_daily_logs.weight_kg),
        temperature_c    = COALESCE(EXCLUDED.temperature_c, period_daily_logs.temperature_c),
        water_ml         = COALESCE(EXCLUDED.water_ml, period_daily_logs.water_ml),
+       sex_drive        = COALESCE(EXCLUDED.sex_drive, period_daily_logs.sex_drive),
+       moment           = COALESCE(EXCLUDED.moment, period_daily_logs.moment),
        updated_at       = now()
      RETURNING *`,
     [
@@ -212,6 +216,7 @@ router.post('/log', async (req, res) => {
       medicine ? JSON.stringify(medicine) : null,
       breastSelfExam ?? null, ovulationTest ?? null, pregnancyTest ?? null,
       cervicalMucus ?? null, weightKg ?? null, temperatureC ?? null, waterMl ?? null,
+      sexDrive ?? null, moment ?? null,
     ]
   );
 
@@ -250,7 +255,16 @@ router.get('/calendar', async (req, res) => {
   res.json({
     month,
     cycles: cycles.map((c) => ({ startDate: c.start_date, endDate: c.end_date })),
-    logs: logs.map((l) => ({ date: l.log_date, flow: l.flow, symptoms: l.symptoms, mood: l.mood, hasNotes: Boolean(l.notes) })),
+    logs: logs.map((l) => ({
+      date: l.log_date,
+      flow: l.flow,
+      symptoms: l.symptoms || [],
+      moods: l.moods || (l.mood ? [l.mood] : []),
+      mood: l.mood,
+      sexDrive: l.sex_drive,
+      hasIntercourse: Boolean(l.intercourse),
+      hasNotes: Boolean(l.notes),
+    })),
     predictions,
   });
 });
@@ -393,9 +407,13 @@ router.get('/partner', requirePair, async (req, res) => {
     if (sharing.share_notes) todayView.notes = log.notes || null;
     if (sharing.share_sex_drive) {
       // Derived, never the raw intercourse record: a partner sees "there was
-      // activity logged", not protection, orgasm or counts.
+      // activity logged", not protection, orgasm or counts. The self-reported
+      // level rides the same switch - it is the same category of information.
       todayView.sexDriveLogged = Boolean(log.intercourse);
+      todayView.sexDrive = log.sex_drive || null;
     }
+    // The one-word "Moment" is a feeling, so it follows the mood switch.
+    if (sharing.share_mood) todayView.moment = log.moment || null;
     if (Object.keys(todayView).length) todayView.updatedAt = log.updated_at || log.created_at;
   }
 
