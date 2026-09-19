@@ -1,14 +1,27 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Alert } from 'react-native';
+// The arcade.
+//
+// Two sections, because they are genuinely different things and pretending
+// otherwise was the old screen's problem: the multiplayer games carry a
+// win/loss record against your partner and can have a match already waiting,
+// while the solo ones are just something to play.
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../services/api';
 import { spacing, radius } from '../theme';
-import { FadeInUp, MorphButton } from '../components/Motion';
+import { Stagger, MorphButton, Pop } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 
 const ROUTE_BY_SLUG = {
+  'tic-tac-toe': 'TicTacToe',
   'four-in-a-row': 'FourInARow',
+  checkers: 'Checkers',
+  chess: 'Chess',
+  'uno-reverse': 'UnoReverse',
+  'block-blitz': 'BlockBlitz',
   anagrams: 'Anagrams',
   'love-golf': 'LoveGolf',
   'draw-duel': 'DrawDuel',
@@ -19,49 +32,140 @@ const ROUTE_BY_SLUG = {
 
 export default function GamesScreen({ navigation }) {
   const { colors, font } = useTheme();
-  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
-  const [games, setGames] = useState([]);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [catalog, setCatalog] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    apiFetch('/games').then((d) => setGames(d.games)).catch((err) => Alert.alert('Error', err.message));
+  const load = useCallback(async () => {
+    const [cat, live] = await Promise.allSettled([
+      apiFetch('/games'),
+      apiFetch('/games/matches'),
+    ]);
+    if (cat.status === 'fulfilled') setCatalog(cat.value.games || []);
+    // /games/matches needs a pair; solo accounts just see the catalogue.
+    setMatches(live.status === 'fulfilled' ? live.value.games || [] : []);
+    setError(cat.status === 'rejected' ? cat.reason?.message : null);
+    setRefreshing(false);
   }, []);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const matchBySlug = Object.fromEntries(matches.map((m) => [m.game, m]));
+  const multiplayer = catalog.filter((g) => matchBySlug[g.slug]);
+  const solo = catalog.filter((g) => !matchBySlug[g.slug]);
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <StickerField variant="minimal" />
-      <FlatList
-        style={styles.container}
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 140, gap: spacing.sm }}
-        data={games}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={{ gap: spacing.sm }}
-        ListHeaderComponent={<Text style={[font.h1, { marginBottom: spacing.md }]}>Arcade</Text>}
-        renderItem={({ item, index }) => (
-          <FadeInUp delay={index * 30} style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load(); }}
+            tintColor={colors.accentPink}
+          />
+        }
+      >
+        <Text style={font.h1}>Arcade</Text>
+        {error && <Text style={[font.muted, { marginTop: spacing.xs }]}>{error}</Text>}
+
+        {multiplayer.length > 0 && (
+          <>
+            <View style={styles.sectionHead}>
+              <Ionicons name="people" size={18} color={colors.accentPink} />
+              <Text style={[font.h2, { marginLeft: spacing.sm }]}>Against your partner</Text>
+            </View>
+
+            <Stagger delayStep={45}>
+              {multiplayer.map((game) => {
+                const live = matchBySlug[game.slug];
+                const active = live.active;
+                const yourMove = active?.yourTurn && active?.status === 'active';
+                return (
+                  <MorphButton
+                    key={game.slug}
+                    onPress={() => navigation.navigate(ROUTE_BY_SLUG[game.slug])}
+                    style={[styles.row, yourMove && styles.rowHighlighted]}
+                  >
+                    <Icon name={game.emoji} chip chipSize={44} />
+                    <View style={styles.rowText}>
+                      <Text style={font.h2}>{game.title}</Text>
+                      <Text style={font.muted} numberOfLines={1}>
+                        {active
+                          ? (active.freeplay
+                            ? 'In progress — go whenever'
+                            : yourMove ? 'Your move' : 'Waiting on them')
+                          : game.subtitle}
+                      </Text>
+                      <Text style={[font.muted, styles.record]}>
+                        {live.record.wins}W · {live.record.draws}D · {live.record.losses}L
+                      </Text>
+                    </View>
+                    {yourMove ? (
+                      <Pop active>
+                        <View style={styles.turnDot} />
+                      </Pop>
+                    ) : (
+                      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                    )}
+                  </MorphButton>
+                );
+              })}
+            </Stagger>
+          </>
+        )}
+
+        <View style={styles.sectionHead}>
+          <Ionicons name="game-controller" size={18} color={colors.accentIndigo} />
+          <Text style={[font.h2, { marginLeft: spacing.sm }]}>
+            {multiplayer.length > 0 ? 'On your own' : 'Games'}
+          </Text>
+        </View>
+
+        <View style={styles.grid}>
+          {solo.map((game) => (
             <MorphButton
-              onPress={() => navigation.navigate(ROUTE_BY_SLUG[item.slug])}
-              disabled={!item.is_implemented}
+              key={game.slug}
+              onPress={() => navigation.navigate(ROUTE_BY_SLUG[game.slug])}
+              disabled={!game.is_implemented}
               style={styles.card}
             >
-              <Icon name={item.emoji} chip chipSize={44} style={{ marginBottom: spacing.sm }} />
-              <Text style={font.h2}>{item.title}</Text>
-              {item.subtitle ? <Text style={font.muted}>{item.subtitle}</Text> : null}
-              {!item.is_implemented && <Text style={styles.comingSoon}>Coming soon</Text>}
+              <Icon name={game.emoji} chip chipSize={44} style={{ marginBottom: spacing.sm }} />
+              <Text style={font.h2}>{game.title}</Text>
+              {game.subtitle ? <Text style={font.muted}>{game.subtitle}</Text> : null}
+              {!game.is_implemented && <Text style={font.muted}>Coming soon</Text>}
             </MorphButton>
-          </FadeInUp>
-        )}
-      />
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
-const makeStyles = (colors, font) =>
+const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1 },
-  card: {
-    flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
-    minHeight: 150, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm,
-  },
-  comingSoon: { ...font.muted, marginTop: spacing.xs, color: colors.textMuted },
-});
+    content: { padding: spacing.lg, paddingBottom: 140 },
+    sectionHead: {
+      flexDirection: 'row', alignItems: 'center',
+      marginTop: spacing.lg, marginBottom: spacing.sm,
+    },
+    row: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: colors.surface, borderRadius: radius.card,
+      padding: spacing.md, marginBottom: spacing.sm,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    rowHighlighted: { borderColor: colors.accentPink, borderWidth: 2 },
+    rowText: { flex: 1, marginLeft: spacing.md },
+    record: { fontSize: 11, marginTop: 2 },
+    turnDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.accentPink },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    card: {
+      width: '48%', backgroundColor: colors.surface, borderRadius: radius.card,
+      padding: spacing.md, minHeight: 148,
+      borderWidth: 1, borderColor: colors.border,
+    },
+  });

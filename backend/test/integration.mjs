@@ -315,8 +315,17 @@ check('countdown deletes', (await req(`/countdowns/${cdFuture.data.countdown.id}
 check('countdown requires label+date', (await req('/countdowns', { method: 'POST', token: A.token, body: { label: 'x' } })).status === 400);
 
 const games = await req('/games', { token: A.token });
-check('7 games in catalog', games.data.games.length === 7, games.data.games.length);
-check('all 7 games marked implemented', games.data.games.every((g) => g.is_implemented === true));
+// Not a magic count - the catalogue grows. What matters is that every game
+// the server can actually play has a row to tap, and that no row promises a
+// game that does not exist.
+const slugs = games.data.games.map((g) => g.slug);
+check('the catalogue is not empty', slugs.length > 0, slugs.length);
+check('every playable multiplayer game has a catalogue row',
+  games.data.multiplayer.every((slug) => slugs.includes(slug)),
+  games.data.multiplayer.filter((slug) => !slugs.includes(slug)));
+check('every catalogue row is marked implemented', games.data.games.every((g) => g.is_implemented === true),
+  games.data.games.filter((g) => !g.is_implemented).map((g) => g.slug));
+check('no duplicate slugs', new Set(slugs).size === slugs.length, slugs);
 check('game icons are Ionicons names (not emoji)', games.data.games.every((g) => /^[a-z-]+$/.test(g.emoji)), games.data.games.map((g) => g.emoji));
 
 // ---------------------------------------------------------------- LOCATION

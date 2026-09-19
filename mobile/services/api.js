@@ -177,7 +177,16 @@ export async function apiFetch(path, { method = 'GET', body, isRetry = false } =
   if (res.status === 204) return null;
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    // Keep the status and the parsed body on the error. Several endpoints
+    // answer a rejection with something the caller needs - a 409 from a game
+    // move carries the current board - and re-fetching to get it back is
+    // both slower and racier than reading what was already sent.
+    const error = new Error(data?.error || `Request failed (${res.status})`);
+    error.status = res.status;
+    error.body = data;
+    throw error;
+  }
   return data;
 }
 

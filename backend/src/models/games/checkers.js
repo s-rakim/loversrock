@@ -157,6 +157,16 @@ export default {
     return { state: next, result: null, nextSeat: opponent };
   },
 
+  /**
+   * Legal moves for one seat. Worth exposing here above all: the compulsory
+   * capture rule means a board that highlights "every empty diagonal" is
+   * actively misleading, and reimplementing the rule on the phone would mean
+   * two copies that can drift apart.
+   */
+  legalMovesFor(state, seat) {
+    return legalMoves(state, seat);
+  },
+
   redactFor(state) {
     return state;
   },
