@@ -255,6 +255,37 @@ CREATE TABLE IF NOT EXISTS game_scores (
   PRIMARY KEY (pair_id, game, user_id)
 );
 
+-- Voice and video calls.
+--
+-- Only the CALL is recorded here - who rang whom, when, how it ended, how
+-- long it lasted. Media never touches the server: WebRTC connects the two
+-- phones directly and the audio and video go peer to peer. The server's
+-- whole job is to carry the offer, the answer and the ICE candidates until
+-- the two sides have found each other, and then to get out of the way.
+--
+-- That is also why there is no recording, and no column that could hold one.
+CREATE TABLE IF NOT EXISTS call_sessions (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id      UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  caller_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  callee_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind         TEXT NOT NULL CHECK (kind IN ('voice', 'video')),
+  status       TEXT NOT NULL DEFAULT 'ringing'
+               CHECK (status IN ('ringing', 'connected', 'ended', 'missed', 'declined', 'failed')),
+  started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  answered_at  TIMESTAMPTZ,
+  ended_at     TIMESTAMPTZ,
+  end_reason   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS call_sessions_pair_idx
+  ON call_sessions (pair_id, started_at DESC);
+
+-- At most one call ringing or connected per pair, so a second tap on the
+-- call button joins or is refused rather than starting a rival call.
+CREATE UNIQUE INDEX IF NOT EXISTS call_sessions_one_live_idx
+  ON call_sessions (pair_id) WHERE status IN ('ringing', 'connected');
+
 CREATE TABLE IF NOT EXISTS games_catalog (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   slug             TEXT NOT NULL UNIQUE,

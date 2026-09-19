@@ -86,5 +86,51 @@ check('PeriodTrackerScreen partner card: sharingEnabled + predictions keys', 'sh
 const wp = await req('/widget-photos/latest', { token: A.token });
 check('HomeScreen widget card: widgetPhoto key present (may be null)', 'widgetPhoto' in wp.data);
 
+// --- what the game boards and the call screen read off the wire ---
+const hub = await req('/games/matches', { token: A.token });
+check('GamesScreen: every row has game/title/record.wins',
+  hub.data.games.every((g) => g.game && g.title && typeof g.record?.wins === 'number'),
+  hub.data.games?.[0]);
+check('GamesScreen: a game with no match reports active: null',
+  hub.data.games.every((g) => g.active === null || typeof g.active === 'object'));
+
+const ttt = await req('/games/tic-tac-toe/start', { method: 'POST', token: A.token });
+const match = ttt.data.match;
+check('board screens: seat/yourTurn/status/moveCount/state present',
+  ['seat', 'yourTurn', 'status', 'moveCount', 'state', 'freeplay', 'outcome']
+    .every((k) => k in match), Object.keys(match));
+check('TicTacToeScreen: state.board is nine cells',
+  Array.isArray(match.state.board) && match.state.board.length === 9, match.state);
+check('MatchFrame: outcome is null while a match is live', match.outcome === null);
+await req('/games/tic-tac-toe/resign', { method: 'POST', token: A.token });
+
+const blitz = await req('/games/block-blitz/start', { method: 'POST', token: A.token });
+check('BlockBlitzScreen: board/opponentBoard/current/upNext/score present',
+  ['board', 'opponentBoard', 'current', 'upNext', 'score', 'opponentScore', 'alive']
+    .every((k) => k in blitz.data.match.state), Object.keys(blitz.data.match.state));
+await req('/games/block-blitz/resign', { method: 'POST', token: A.token });
+
+const uno = await req('/games/uno-reverse/start', { method: 'POST', token: A.token });
+check('UnoReverseScreen: hand/opponentCardCount/discardTop/currentColour present',
+  ['hand', 'opponentCardCount', 'discardTop', 'currentColour', 'currentValue', 'pendingDraw']
+    .every((k) => k in uno.data.match.state), Object.keys(uno.data.match.state));
+check('UnoReverseScreen: cards carry id/colour/value as the card renderer needs',
+  uno.data.match.state.hand.every((c) => 'id' in c && 'value' in c && 'colour' in c),
+  uno.data.match.state.hand?.[0]);
+await req('/games/uno-reverse/resign', { method: 'POST', token: A.token });
+
+const iceConfig = await req('/calls/config', { token: A.token });
+check('CallContext: iceServers is an array of { urls }',
+  Array.isArray(iceConfig.data.iceServers)
+  && iceConfig.data.iceServers.every((srv) => 'urls' in srv), iceConfig.data);
+
+const ringing = await req('/calls/start', { method: 'POST', token: A.token, body: { kind: 'video' } });
+check('CallScreen: id/kind/status/role present',
+  ['id', 'kind', 'status', 'role'].every((k) => k in ringing.data.call), ringing.data.call);
+check('CallScreen: role tells each end which it is without comparing ids',
+  ringing.data.call.role === 'caller'
+  && (await req('/calls/current', { token: B.token })).data.call.role === 'callee');
+await req(`/calls/${ringing.data.call.id}/end`, { method: 'POST', token: A.token });
+
 console.log(`\nCONTRACT RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 process.exit(fails.length ? 1 : 0);

@@ -7,6 +7,7 @@ import { FadeInUp, MorphButton, PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
+import CallButtons from '../components/calls/CallButtons';
 
 const QUICK_LINKS = [
   ['BucketList', 'Bucket List', 'checkbox-outline'],
@@ -92,6 +93,12 @@ export default function HomeScreen({ navigation }) {
             <Icon name="finger-print-outline" color={colors.accent} size={18} />
             <PulsingText style={styles.thumbKissText}>Thumb Kiss — touch to connect</PulsingText>
           </MorphButton>
+        </FadeInUp>
+
+        <FadeInUp delay={130}>
+          <View style={{ marginTop: spacing.md }}>
+            <CallButtons />
+          </View>
         </FadeInUp>
 
         <FadeInUp delay={140}>

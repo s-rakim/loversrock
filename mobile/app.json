@@ -5,7 +5,7 @@
     "scheme": "loversrock",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#F7F4F2",
     "assetBundlePatterns": [
       "**/*"
@@ -39,7 +39,8 @@
         {
           "photosPermission": "loversrock needs access to your photos to add them to your shared Memories."
         }
-      ]
+      ],
+      "@config-plugins/react-native-webrtc"
     ],
     "extra": {
       "eas": {

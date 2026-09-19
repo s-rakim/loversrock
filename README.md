@@ -213,7 +213,9 @@ they're load-bearing and shouldn't be casually reversed:
 | Partner cycle mode (read-only, per-category sharing, pregnancy-chance curve) | ✅ Fully implemented |
 | Nicknames (each partner names the other, independently) | ✅ Fully implemented |
 | Daily prompts refreshed nightly from a random topic (Claude / any URL / local bank) | ✅ Fully implemented |
-| Games: Four in a Row, Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All 7 genuinely playable |
+| Multiplayer games: Tic Tac Toe, Four in a Row, Checkers, Chess, Uno Reverse, Block Blitz | ✅ Server-authoritative, played against your partner. Chess verified by perft. |
+| Solo games: Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All playable |
+| Voice and video calls (WebRTC, peer to peer) | ⚠️ Signalling tested end to end; the media itself needs a two-device pass. See `docs/CALLS.md`. |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
 | Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |
 | **Web marketing landing page** | ❌ Out of scope — mobile-only by design; the reference design's effects (WebGL, DOM SVG filters) don't map to React Native anyway. |
