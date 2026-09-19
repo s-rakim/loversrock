@@ -100,9 +100,14 @@ setx JAVA_HOME "C:\Program Files\Android\Android Studio\jbr"
 cd mobile
 npx expo prebuild --clean --platform android
 cd android
-.\gradlew :app:compileReleaseKotlin        # Kotlin only, no APK
-.\gradlew :app:assembleRelease             # or the whole APK
+.\gradlew.bat :app:compileReleaseKotlin    # Kotlin only, no APK
+.\gradlew.bat :app:assembleRelease         # or the whole APK
 ```
+
+On Windows it is `gradlew.bat` — the extensionless `gradlew` is the Unix
+shell script and PowerShell will not run it. Check that `JAVA_HOME` points at
+a JDK that actually exists (`Test-Path $env:JAVA_HOME`): Gradle's error names
+the directory but not the fact that it is simply absent.
 
 Errors come out as `file:line: error:` — the same output EAS shows, minutes
 sooner.
