@@ -10,6 +10,7 @@ import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
 import Doodle from '../components/Doodle';
+import Wallpaper from '../components/Wallpaper';
 
 
 export default function MessagesScreen({ navigation }) {
@@ -22,6 +23,17 @@ export default function MessagesScreen({ navigation }) {
   const load = useCallback(() => {
     apiFetch('/messages').then((d) => setMessages(d.messages)).catch((err) => Alert.alert('Error', err.message));
   }, []);
+
+  // The wallpaper is a per-account preference, so it is read from the
+  // profile rather than kept on the device.
+  const [wallpaper, setWallpaper] = useState('none');
+  useFocusEffect(
+    useCallback(() => {
+      apiFetch('/profile')
+        .then((d) => setWallpaper(d?.me?.chatWallpaper || 'none'))
+        .catch(() => {});
+    }, [])
+  );
 
   useFocusEffect(load);
 
@@ -69,13 +81,20 @@ export default function MessagesScreen({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-      <StickerField variant="minimal" />
+    <Wallpaper value={wallpaper} style={styles.container}>
+      {/* The decorative stickers only make sense over the app's own
+          background; on a chosen wallpaper they are clutter. */}
+      {(!wallpaper || wallpaper === 'none') && <StickerField variant="minimal" />}
 
       {/* Calling from the conversation you are already having is the point. */}
       <View style={styles.callBar}>
         <Text style={font.h2}>Messages</Text>
-        <CallButtons compact />
+        <View style={styles.barActions}>
+          <MorphButton onPress={() => navigation.navigate('Wallpaper')} style={styles.barButton}>
+            <Icon name="image-outline" chip={false} size={20} color={colors.accent} />
+          </MorphButton>
+          <CallButtons compact />
+        </View>
       </View>
 
       <FlatList
@@ -114,7 +133,7 @@ export default function MessagesScreen({ navigation }) {
           <Icon name="send" chip={false} color="#fff" size={18} />
         </MorphButton>
       </View>
-    </View>
+    </Wallpaper>
   );
 }
 
@@ -124,6 +143,12 @@ const makeStyles = (colors) =>
   callBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: spacing.lg, paddingTop: spacing.md,
+  },
+  barActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  barButton: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.accentSoft,
   },
   bubble: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, maxWidth: '80%' },
   photo: { width: 180, height: 180, borderRadius: radius.sm },

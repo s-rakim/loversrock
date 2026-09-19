@@ -107,5 +107,66 @@ check('re-pairing starts from a blank nickname', rePaired.data.partner.nickname 
 check('the new partner shows their real name', rePaired.data.partner.displayName === 'Cass', rePaired.data.partner);
 check('and no nickname from the old pairing leaks back', rePaired.data.me.nickname === null, rePaired.data.me);
 
+console.log('\n=== CHAT WALLPAPER IS A PERSONAL PREFERENCE ===');
+// A fresh pairing: the section above deliberately unlinks A and B, so there
+// would be no partner left to check the personal-vs-shared boundary against.
+const W1 = await signup('Wren');
+const W2 = await signup('Wynn');
+const wInvite = await req('/auth/invite', { method: 'POST', token: W1.token, body: { deviceTimezone: 'UTC' } });
+await req('/auth/invite/accept', { method: 'POST', token: W2.token, body: { inviteCode: wInvite.data.inviteCode, deviceTimezone: 'UTC' } });
+// Personal, not pair-shared: the two of you having different taste in
+// backgrounds is not a conflict, and it must not behave like one.
+const setPaper = (token, value) =>
+  req('/profile/preferences', { method: 'PATCH', token, body: { chatWallpaper: value } });
+
+check('a built-in id is accepted', (await setPaper(W1.token, 'blush')).status === 200);
+check('and read back on the profile',
+  (await req('/profile', { token: W1.token })).data.me.chatWallpaper === 'blush');
+check("it does NOT change the partner's",
+  (await req('/profile', { token: W2.token })).data.me.chatWallpaper !== 'blush',
+  (await req('/profile', { token: W2.token })).data.me.chatWallpaper);
+check("and your wallpaper is not in your partner's view of you",
+  (await req('/profile', { token: W2.token })).data.partner.chatWallpaper === null,
+  (await req('/profile', { token: W2.token })).data.partner);
+
+await setPaper(W2.token, 'ink');
+check('each keeps their own',
+  (await req('/profile', { token: W1.token })).data.me.chatWallpaper === 'blush'
+  && (await req('/profile', { token: W2.token })).data.me.chatWallpaper === 'ink');
+
+check('one of their own photos is accepted',
+  (await setPaper(W1.token, 'photo:memories/abc/123.jpg')).status === 200);
+check('and comes back intact',
+  (await req('/profile', { token: W1.token })).data.me.chatWallpaper === 'photo:memories/abc/123.jpg');
+
+check('null clears it', (await setPaper(W1.token, null)).status === 200);
+check('and it reads back as nothing',
+  (await req('/profile', { token: W1.token })).data.me.chatWallpaper === null,
+  (await req('/profile', { token: W1.token })).data.me.chatWallpaper);
+
+console.log('\n=== AND IT CANNOT BE POINTED SOMEWHERE ELSE ===');
+// The photo form carries a storage key. If that were taken on trust it
+// would become a way to make the app load an arbitrary address.
+check('an http URL is refused',
+  (await setPaper(W1.token, 'photo:http://evil.example/x.jpg')).status === 400);
+check('a protocol-relative URL is refused',
+  (await setPaper(W1.token, 'photo://evil.example/x.jpg')).status === 400);
+check('a traversal attempt is refused',
+  (await setPaper(W1.token, 'photo:../../etc/passwd')).status === 400);
+check('an empty photo key is refused', (await setPaper(W1.token, 'photo:')).status === 400);
+check('a junk id is refused', (await setPaper(W1.token, 'DROP TABLE users')).status === 400);
+check('an absurdly long value is refused',
+  (await setPaper(W1.token, `photo:${'x'.repeat(400)}`)).status === 400);
+check('a non-string is refused', (await setPaper(W1.token, 42)).status === 400);
+check('a rejected value leaves the old one alone',
+  (await req('/profile', { token: W1.token })).data.me.chatWallpaper === null);
+
+check('setting the theme still works alongside it',
+  (await req('/profile/preferences', { method: 'PATCH', token: W1.token,
+    body: { themePreference: 'dark', chatWallpaper: 'mint' } })).status === 200);
+const both = await req('/profile', { token: W1.token });
+check('and both land', both.data.me.themePreference === 'dark' && both.data.me.chatWallpaper === 'mint',
+  both.data.me);
+
 console.log(`\nNICKNAME RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
