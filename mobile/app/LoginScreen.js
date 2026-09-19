@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { apiFetch, setTokens } from '../services/api';
+import { apiFetch, apiUrlProblem, setTokens } from '../services/api';
 import { provisionWidgets } from '../services/widgetBridge';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
@@ -13,7 +13,10 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showServer, setShowServer] = useState(false);
+  // If the build shipped the eas.json placeholder (or points at localhost),
+  // nothing can work until the address is corrected — so open that card
+  // straight away rather than hiding the only useful control behind a tap.
+  const [showServer, setShowServer] = useState(Boolean(apiUrlProblem()));
 
   async function submit() {
     if (!email || !password || (mode === 'signup' && !name)) {
