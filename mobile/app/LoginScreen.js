@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { apiFetch, apiUrlProblem, setTokens } from '../services/api';
+import Constants from 'expo-constants';
+import { apiFetch, apiUrlProblem, getApiUrl, setTokens } from '../services/api';
 import { provisionWidgets } from '../services/widgetBridge';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
@@ -105,6 +106,14 @@ export default function LoginScreen({ navigation }) {
         </MorphButton>
 
         {showServer && <ServerAddress compact />}
+
+        {/* Always visible, deliberately. Without it there is no way to tell
+            from a screenshot which build is installed or where it is pointed,
+            and "it still fails" is ambiguous between a stale APK and a real
+            fault. */}
+        <Text style={styles.buildStamp}>
+          v{Constants.expoConfig?.version || '?'} · {getApiUrl().replace(/^https?:\/\//, '')}
+        </Text>
       </FadeInUp>
     </KeyboardAvoidingView>
   );
@@ -132,4 +141,5 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   switchButton: { alignItems: 'center', marginTop: spacing.md },
   diagnostic: { fontSize: 12, textAlign: 'center' },
+  buildStamp: { fontSize: 10, textAlign: 'center', color: colors.textMuted, marginTop: spacing.md, opacity: 0.7 },
 });
