@@ -77,6 +77,47 @@ export function normalizeQuestions(raw, { limit = 6 } = {}) {
   return out;
 }
 
+const ENTITIES = {
+  '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
+  '&nbsp;': ' ', '&rsquo;': "'", '&lsquo;': "'", '&ldquo;': '"', '&rdquo;': '"',
+  '&mdash;': '\u2014', '&ndash;': '\u2013', '&hellip;': '\u2026',
+};
+
+function decodeEntities(text) {
+  return text
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&[a-z]+;/gi, (entity) => ENTITIES[entity.toLowerCase()] ?? entity);
+}
+
+/**
+ * Turns a web page into candidate questions.
+ *
+ * Most "100 questions to ask your partner" pages put one question per list
+ * item or paragraph, so block-level tags become line breaks and each line is a
+ * candidate. Pages that run questions together inside prose are covered by a
+ * second pass that pulls out any sentence ending in a question mark.
+ */
+export function htmlToQuestions(html) {
+  const text = decodeEntities(
+    String(html)
+      .replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      // Block-level ends become line breaks so list items stay separate.
+      .replace(/<\s*(br|\/p|\/li|\/h[1-6]|\/div|\/td|\/tr|\/blockquote)[^>]*>/gi, '\n')
+      .replace(/<[^>]*>/g, ' ')
+  );
+
+  const lines = text.split('\n').map((line) => line.replace(/\s+/g, ' ').trim());
+  const fromLines = lines.filter((line) => line.endsWith('?'));
+
+  // Sentence pass: catches questions embedded in running prose.
+  const fromProse = (text.replace(/\s+/g, ' ').match(/[^.!?]{15,200}\?/g) || [])
+    .map((sentence) => sentence.trim());
+
+  return [...fromLines, ...fromProse];
+}
+
 const SCHEMA = {
   type: 'object',
   properties: {
@@ -151,6 +192,7 @@ export async function fetchFromHttp(url, count, { fetchImpl = fetch } = {}) {
   if (!response.ok) return [];
 
   const body = await response.text();
+  const contentType = response.headers?.get?.('content-type') || '';
 
   let candidates;
   try {
@@ -159,7 +201,12 @@ export async function fetchFromHttp(url, count, { fetchImpl = fetch } = {}) {
       ? json
       : json?.questions || json?.prompts || json?.data || [];
   } catch {
-    candidates = body.split('\n'); // plain-text source, one per line
+    // Not JSON. A web page needs its markup stripped first; anything else is
+    // treated as one question per line.
+    candidates =
+      /html/i.test(contentType) || /<\s*(html|body|ul|ol|li|p|div)\b/i.test(body)
+        ? htmlToQuestions(body)
+        : body.split('\n');
   }
 
   // Shuffle so a static list doesn't yield the same six every day.
@@ -191,6 +238,17 @@ export function fetchFromLocal(count, { exclude = [] } = {}) {
   return normalizeQuestions(shuffle(fresh), { limit: count });
 }
 
+/** PROMPT_SOURCE_URL may hold several comma-separated URLs; try them in a
+ *  random order so one page isn't always the source. */
+export function sourceUrls() {
+  return shuffle(
+    (process.env.PROMPT_SOURCE_URL || '')
+      .split(',')
+      .map((url) => url.trim())
+      .filter(Boolean)
+  );
+}
+
 function shuffle(list) {
   const copy = [...list];
   for (let i = copy.length - 1; i > 0; i--) {
@@ -210,8 +268,8 @@ export async function fetchQuestions({ count = 6, exclude = [], topic } = {}) {
 
   const hasKey = Boolean(process.env.PROMPT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
   if (hasKey) attempts.push(['claude', () => fetchFromClaude(chosenTopic, count)]);
-  if (process.env.PROMPT_SOURCE_URL) {
-    attempts.push(['http', () => fetchFromHttp(process.env.PROMPT_SOURCE_URL, count)]);
+  for (const url of sourceUrls()) {
+    attempts.push([`http:${url}`, () => fetchFromHttp(url, count)]);
   }
   attempts.push(['local', async () => fetchFromLocal(count, { exclude })]);
 

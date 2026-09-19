@@ -10,13 +10,30 @@ import 'dotenv/config';
 import http from 'node:http';
 import { query } from '../src/config/db.js';
 import {
-  TOPICS, pickTopic, normalizeQuestions,
+  TOPICS, pickTopic, normalizeQuestions, htmlToQuestions, sourceUrls,
   fetchFromHttp, fetchFromLocal, fetchFromClaude, fetchQuestions,
 } from '../src/services/promptSources.js';
 import { refreshDailyPrompts } from '../src/cron/index.js';
 
 let pass = 0; const fails = [];
 const check = (n, c, d) => { if (c) { pass++; console.log(`  PASS  ${n}`); } else { fails.push(n); console.log(`  FAIL  ${n} :: ${JSON.stringify(d)}`); } };
+
+const ARTICLE = `<!doctype html><html><head><title>50 Questions</title>
+<style>.q{color:red}</style><script>var x = "What is this?";</script></head>
+<body>
+<nav><a href="/">Home</a></nav>
+<h1>50 questions to ask your partner</h1>
+<p>Here is our list. Enjoy them together.</p>
+<ol>
+  <li>What&rsquo;s a small thing I do that makes you feel loved?</li>
+  <li>Where would you want to live if money didn&#39;t matter?</li>
+  <li>What&amp;nbsp;memory of us do you return to most?</li>
+  <li>Short</li>
+  <li>This one is not a question at all.</li>
+</ol>
+<div>Running prose can hide them too. What scares you most about the future? And we carry on afterwards.</div>
+<footer>Copyright 2026</footer>
+</body></html>`;
 
 console.log('=== NORMALISATION ===');
 check('strips list numbering', normalizeQuestions(['1. What made you smile today?'])[0] === 'What made you smile today?');
@@ -62,6 +79,32 @@ check('unparseable body yields nothing, no throw', (await fetchFromHttp(`${base}
 check('non-200 yields nothing, no throw', (await fetchFromHttp(`${base}/500`, 6)).length === 0);
 check('empty url yields nothing', (await fetchFromHttp('', 6)).length === 0);
 
+console.log('\n=== HTML SCRAPING (a normal web page) ===');
+const scraped = normalizeQuestions(htmlToQuestions(ARTICLE), { limit: 20 });
+check('pulls questions out of list items', scraped.some((q) => q.startsWith("What's a small thing")), scraped);
+check('decodes named entities (&rsquo;)', scraped.some((q) => q.includes("What's a small thing")));
+check('decodes numeric entities (&#39;)', scraped.some((q) => q.includes("didn't matter")));
+check('finds questions buried in prose', scraped.some((q) => q.includes('scares you most about the future')), scraped);
+check('ignores script contents', !scraped.some((q) => q.includes('What is this')), scraped);
+check('drops non-questions and too-short lines', !scraped.some((q) => /^Short$|not a question/.test(q)));
+check('no markup survives', scraped.every((q) => !/[<>]/.test(q)), scraped);
+check('every scraped item is a question', scraped.every((q) => q.endsWith('?')));
+
+payloads['/page'] = ARTICLE;
+const viaPage = await fetchFromHttp(`${base}/page`, 6);
+check('fetchFromHttp handles an HTML page end to end', viaPage.length >= 3, viaPage);
+
+console.log('\n=== MULTIPLE SOURCES ===');
+process.env.PROMPT_SOURCE_URL = ' https://a.example/one , https://b.example/two ';
+const urls = sourceUrls();
+check('splits and trims a comma-separated list', urls.length === 2 && urls.every((u) => u.startsWith('https://')), urls);
+process.env.PROMPT_SOURCE_URL = '';
+check('empty setting yields no urls', sourceUrls().length === 0);
+process.env.PROMPT_SOURCE_URL = `${base}/500,${base}/page`;
+const failover = await fetchQuestions({ count: 6 });
+check('a dead url falls through to the next one', failover.source.startsWith('http:') && failover.questions.length > 0, failover.source);
+delete process.env.PROMPT_SOURCE_URL;
+
 console.log('\n=== LOCAL PROVIDER ===');
 const local = fetchFromLocal(6);
 check('local bank returns the asked-for count', local.length === 6, local.length);
@@ -88,7 +131,7 @@ console.log('\n=== PROVIDER SELECTION / FALLBACK ===');
 delete process.env.ANTHROPIC_API_KEY; delete process.env.PROMPT_ANTHROPIC_API_KEY;
 process.env.PROMPT_SOURCE_URL = `${base}/array`;
 const viaHttp = await fetchQuestions({ count: 6 });
-check('uses the http source when configured', viaHttp.source === 'http', viaHttp);
+check('uses the http source when configured', viaHttp.source.startsWith('http:'), viaHttp.source);
 process.env.PROMPT_SOURCE_URL = `${base}/500`;
 const viaLocal = await fetchQuestions({ count: 6 });
 check('falls back to local when the source fails', viaLocal.source === 'local', viaLocal.source);
