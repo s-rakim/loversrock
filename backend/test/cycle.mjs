@@ -132,6 +132,46 @@ check('unknown category rejected',
 check('non-boolean category rejected',
   (await req('/period/sharing', { method: 'PATCH', token: OWNER.token, body: { share_mood: 'yes' } })).status === 400);
 
+console.log('\n=== SEX DRIVE, MOMENT AND THE CALENDAR PAYLOAD ===');
+// The UI writes these from the daily log sheet and the Add Mood grid; the
+// partner cards read them back, so both halves need to hold.
+await req('/period/sharing', { method: 'PATCH', token: OWNER.token, body: {
+  sharingEnabled: true, share_phase: true, share_sex_drive: true, share_mood: true,
+}});
+const drive = await req('/period/log', { method: 'POST', token: OWNER.token, body: {
+  date: today, sexDrive: 'low', moment: 'feeling_low',
+}});
+check('sexDrive and moment accepted', drive.status === 200, drive.data);
+check('sexDrive stored', drive.data.log.sex_drive === 'low', drive.data.log.sex_drive);
+check('moment stored', drive.data.log.moment === 'feeling_low', drive.data.log.moment);
+check('a partial save did not blank the flow set earlier',
+  drive.data.log.flow === 'disaster', drive.data.log.flow);
+check('an invalid sexDrive is rejected',
+  (await req('/period/log', { method: 'POST', token: OWNER.token, body: { date: today, sexDrive: 'enormous' } })).status === 400);
+
+view = await req('/period/partner', { token: PARTNER.token });
+check('partner sees the sex drive level', view.data.today.sexDrive === 'low', view.data.today);
+check('partner sees the moment', view.data.today.moment === 'feeling_low', view.data.today);
+
+await req('/period/sharing', { method: 'PATCH', token: OWNER.token, body: { share_sex_drive: false } });
+view = await req('/period/partner', { token: PARTNER.token });
+check('sex drive hidden again the moment it is switched off',
+  view.data.today.sexDrive === undefined && view.data.today.sexDriveLogged === undefined, view.data.today);
+
+await req('/period/sharing', { method: 'PATCH', token: OWNER.token, body: { share_mood: false } });
+view = await req('/period/partner', { token: PARTNER.token });
+check('moment hidden with the mood switch', view.data.today?.moment === undefined, view.data.today);
+
+const month = today.slice(0, 7);
+const cal = await req(`/period/calendar?month=${month}`, { token: OWNER.token });
+const dayRow = cal.data.logs.find((l) => String(l.date).slice(0, 10) === today);
+check('calendar returns the day', Boolean(dayRow), cal.data.logs);
+check('calendar carries moods for the grid', Array.isArray(dayRow.moods), dayRow);
+check('calendar flags intercourse without detailing it',
+  dayRow.hasIntercourse === true && dayRow.intercourse === undefined, dayRow);
+check('calendar flags a note without its text',
+  dayRow.hasNotes === true && dayRow.notes === undefined, dayRow);
+
 console.log(`\nCYCLE RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
 process.exit(0);

@@ -124,3 +124,24 @@ only the person who set a nickname can change or clear it.
   product direction. The reference design's web-only effects (WebGL shaders,
   DOM SVG filters, `ResizeObserver`-driven liquid layouts) don't have direct
   React Native equivalents anyway.
+
+## 7. The cycle tracker's chip artwork is vector, not illustration
+
+The reference period app draws every symptom and mood chip with its own
+illustrated face. This app draws the same chips, in the same four-column
+grid, with Ionicons vector glyphs on a pale circle instead.
+
+Why: `components/Icon.js` already pinned "vector glyphs, not emoji" for the
+whole app, and the same two reasons apply with more force here. Sixty-odd
+illustrations would be sixty-odd bitmaps to ship, scale and re-cut for dark
+mode, and a glyph is the only option that can take a chip background and an
+animated pressed state. `mobile/test/cycleCatalog.mjs` asserts that every
+glyph name in the catalogue actually resolves in the Ionicons font, because
+a typo there renders as a silent blank box rather than an error.
+
+The layout, grouping, wording and tap behaviour are the reference app's.
+Only the artwork medium differs. Swapping in illustrations later is a change
+to `data/cycleCatalog.js` and `components/cycle/ChipGrid.js` and nothing
+else — the ids stored in `period_daily_logs.symptoms` / `.moods` do not
+change with the artwork, which is why the catalogue keeps `id` and `label`
+separate.

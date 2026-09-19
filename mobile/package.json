@@ -8,7 +8,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "test:server-url": "node test/serverUrl.mjs",
-    "test:theme": "node test/theme.mjs"
+    "test:theme": "node test/theme.mjs",
+    "test:parse": "node test/parse-check.mjs .",
+    "test:catalog": "node test/cycleCatalog.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",

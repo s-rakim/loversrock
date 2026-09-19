@@ -251,6 +251,15 @@ ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS temperature_c NUMERIC(4,2
 ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS water_ml INTEGER;
 ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
+-- Self-reported, not derived from the intercourse record: the partner view
+-- shows "Sex drive: Low" and a one-word "Moment" the owner picked, which is a
+-- different thing from "there was activity logged today".
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS sex_drive TEXT;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS moment TEXT;
+ALTER TABLE period_daily_logs DROP CONSTRAINT IF EXISTS period_daily_logs_sex_drive_check;
+ALTER TABLE period_daily_logs ADD CONSTRAINT period_daily_logs_sex_drive_check
+  CHECK (sex_drive IS NULL OR sex_drive IN ('none', 'low', 'medium', 'high'));
+
 -- The original CHECK only allowed spotting/light/medium/heavy; the daily log
 -- offers Light/Medium/Heavy/Disaster. Dropped and rebuilt as a superset so no
 -- existing row becomes invalid.

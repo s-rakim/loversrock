@@ -14,6 +14,7 @@ import LavaLamp from './components/LavaLamp';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification } from './services/notifications';
 import GlassTabBar from './components/GlassTabBar';
+import { fadeOnFocus } from './components/Motion';
 
 import LoginScreen from './app/LoginScreen';
 import PairingScreen from './app/PairingScreen';
@@ -51,7 +52,7 @@ const Tab = createBottomTabNavigator();
 // Navigation and the status bar have to be told about the theme separately —
 // they render outside the React tree the tokens normally reach.
 function useNavTheme() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, reduceMotion } = useTheme();
   const base = isDark ? DarkTheme : DefaultTheme;
   return {
     navTheme: {
@@ -70,21 +71,35 @@ function useNavTheme() {
       headerTintColor: colors.textPrimary,
       headerShadowVisible: false,
       contentStyle: { backgroundColor: 'transparent' },
+      // Screen-to-screen motion, set once for the whole stack. react-native-screens
+      // runs these on the UI thread, so they stay smooth while a screen is still
+      // fetching. Anyone who asked the OS for reduced motion gets a plain fade.
+      animation: reduceMotion ? 'fade' : 'slide_from_right',
+      animationDuration: 260,
+      gestureEnabled: true,
+      // The lava lamp lives behind the navigator, so a transparent card during
+      // the transition is what stops a grey flash between screens.
+      freezeOnBlur: true,
     },
   };
 }
 
 function MainTabs() {
   return (
+    // bottom-tabs v6 does not animate the scene change at all — it swaps the
+    // view outright. fadeOnFocus() gives each tab its own entrance so the
+    // switch glides; upgrading the navigator for its built-in animation would
+    // be a much larger change than the effect is worth.
     <Tab.Navigator
       screenOptions={{ headerShown: false }}
+      sceneContainerStyle={{ backgroundColor: 'transparent' }}
       tabBar={(props) => <GlassTabBar {...props} />}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Games" component={GamesScreen} />
-      <Tab.Screen name="Messages" component={MessagesScreen} />
-      <Tab.Screen name="Memories" component={MemoriesScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Home" component={fadeOnFocus(HomeScreen)} />
+      <Tab.Screen name="Games" component={fadeOnFocus(GamesScreen)} />
+      <Tab.Screen name="Messages" component={fadeOnFocus(MessagesScreen)} />
+      <Tab.Screen name="Memories" component={fadeOnFocus(MemoriesScreen)} />
+      <Tab.Screen name="Settings" component={fadeOnFocus(SettingsScreen)} />
     </Tab.Navigator>
   );
 }
