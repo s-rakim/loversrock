@@ -10,25 +10,8 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
+import Doodle from '../components/Doodle';
 
-function Doodle({ strokeData }) {
-  const { colors } = useTheme();
-  return (
-    <Svg width={160} height={120} style={{ backgroundColor: colors.surfaceAlt, borderRadius: radius.sm }}>
-      {(strokeData || []).map((stroke, i) => (
-        <Polyline
-          key={i}
-          points={stroke.map((p) => `${p.x},${p.y}`).join(' ')}
-          fill="none"
-          stroke={colors.accent}
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ))}
-    </Svg>
-  );
-}
 
 export default function MessagesScreen({ navigation }) {
   const { colors, font } = useTheme();

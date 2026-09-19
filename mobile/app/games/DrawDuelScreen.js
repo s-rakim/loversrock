@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, TextInput, StyleSheet, PanResponder, Alert } from 'react-native';
-import Svg, { Polyline } from 'react-native-svg';
+import { View, Text, TextInput, StyleSheet, PanResponder, Alert, Pressable, ScrollView } from 'react-native';
+import Svg from 'react-native-svg';
 import { connectSocket } from '../../services/api';
 import { spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import Icon from '../../components/Icon';
 import { useTheme } from '../../components/ThemeContext';
+import { StrokePath, PALETTE, WIDTHS, TOOLS } from '../../components/Doodle';
 
 const WORD_BANK = ['SUNSET', 'GUITAR', 'ROBOT', 'PIZZA', 'OCTOPUS', 'CASTLE', 'ROCKET', 'UMBRELLA'];
 
@@ -21,6 +22,13 @@ export default function DrawDuelScreen() {
   const [wordLength, setWordLength] = useState(null);
   const [guess, setGuess] = useState('');
   const [status, setStatus] = useState(null); // null | 'correct'
+  const [color, setColor] = useState('#FF5C8D');
+  const [width, setWidth] = useState(6);
+  const [tool, setTool] = useState('pen');
+  // PanResponder is built once, so it needs a ref to see the current role
+  // rather than the one it closed over on first render.
+  const roleRef = useRef(null);
+  roleRef.current = role;
   const secretWord = useRef(null);
   const currentStroke = useRef([]);
   const socketRef = useRef(null);
@@ -61,10 +69,16 @@ export default function DrawDuelScreen() {
     socketRef.current?.emit('drawduel:start', { wordLength: word.length });
   }
 
+  // Same stroke format as the canvas, so the guessing phone renders a neon
+  // squiggle as a neon squiggle. PanResponder is built once and would
+  // otherwise capture the first render's tool forever, hence the ref.
+  const styleRef = useRef({ color: '#FF5C8D', width: 6, tool: 'pen' });
+  styleRef.current = { color, width, tool };
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => role === 'drawer',
-      onMoveShouldSetPanResponder: () => role === 'drawer',
+      onStartShouldSetPanResponder: () => roleRef.current === 'drawer',
+      onMoveShouldSetPanResponder: () => roleRef.current === 'drawer',
       onPanResponderGrant: (evt) => {
         currentStroke.current = [{ x: evt.nativeEvent.locationX, y: evt.nativeEvent.locationY }];
       },
@@ -74,8 +88,9 @@ export default function DrawDuelScreen() {
       },
       onPanResponderRelease: () => {
         if (currentStroke.current.length > 1) {
-          setStrokes((prev) => [...prev, currentStroke.current]);
-          socketRef.current?.emit('drawduel:stroke', { stroke: currentStroke.current });
+          const stroke = { points: currentStroke.current, ...styleRef.current };
+          setStrokes((prev) => [...prev, stroke]);
+          socketRef.current?.emit('drawduel:stroke', { stroke });
         }
         currentStroke.current = [];
       },
@@ -118,18 +133,55 @@ export default function DrawDuelScreen() {
       <View style={styles.canvas} {...panResponder.panHandlers}>
         <Svg style={StyleSheet.absoluteFill}>
           {strokes.map((stroke, i) => (
-            <Polyline
-              key={i}
-              points={stroke.map((p) => `${p.x},${p.y}`).join(' ')}
-              fill="none"
-              stroke={colors.accent}
-              strokeWidth={4}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <StrokePath key={i} stroke={stroke} index={i} canvasColor={colors.surface} />
           ))}
+          {currentStroke.current.length > 1 && (
+            <StrokePath
+              stroke={{ points: currentStroke.current, color, width, tool }}
+              index={strokes.length}
+              canvasColor={colors.surface}
+            />
+          )}
         </Svg>
       </View>
+
+      {/* Only the drawer gets tools; the guesser gets a clean board. */}
+      {role === 'drawer' && (
+        <View style={styles.drawTools}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {PALETTE.slice(0, 10).map((swatch) => (
+              <Pressable key={swatch} onPress={() => setColor(swatch)}>
+                <View
+                  style={[
+                    styles.miniSwatch,
+                    { backgroundColor: swatch },
+                    color === swatch && styles.miniSwatchActive,
+                  ]}
+                />
+              </Pressable>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.xs }}>
+            {TOOLS.filter((t) => t.id !== 'eraser').map((t) => (
+              <Pressable key={t.id} onPress={() => setTool(t.id)}>
+                <View style={[styles.miniTool, tool === t.id && styles.miniToolActive]}>
+                  <Icon name={t.icon} chip={false} size={16} color={tool === t.id ? '#fff' : colors.text} />
+                </View>
+              </Pressable>
+            ))}
+            {WIDTHS.map((w) => (
+              <Pressable key={w} onPress={() => setWidth(w)}>
+                <View style={[styles.miniTool, width === w && styles.miniToolActive]}>
+                  <View style={{
+                    width: Math.min(w, 16), height: Math.min(w, 16), borderRadius: 8,
+                    backgroundColor: width === w ? '#fff' : colors.text,
+                  }} />
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {status === 'correct' && (
         <View style={styles.correctRow}>
@@ -166,6 +218,22 @@ const makeStyles = (colors) =>
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   centered: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   canvas: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: spacing.md },
+  drawTools: {
+    marginTop: spacing.sm, backgroundColor: colors.surface,
+    borderRadius: radius.md, padding: spacing.sm,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  miniSwatch: {
+    width: 28, height: 28, borderRadius: 14, marginRight: 6,
+    borderWidth: 2, borderColor: colors.border,
+  },
+  miniSwatchActive: { borderColor: colors.accent, borderWidth: 3 },
+  miniTool: {
+    width: 32, height: 32, borderRadius: 16, marginRight: 6,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surfaceAlt,
+  },
+  miniToolActive: { backgroundColor: colors.accent },
   primaryButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, alignSelf: 'center' },
   primaryButtonSmall: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.lg, justifyContent: 'center' },
   secondaryButton: { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center' },
