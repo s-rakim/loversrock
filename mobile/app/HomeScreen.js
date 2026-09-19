@@ -76,15 +76,28 @@ export default function HomeScreen({ navigation }) {
             </MorphButton>
           </View>
 
-          <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.widgetWide}>
+          <MorphButton onPress={() => navigation.navigate('WidgetPhoto')} style={styles.widgetWide}>
             {widgetPhoto ? (
-              <Image source={{ uri: mediaUrl(widgetPhoto.imageUrl || widgetPhoto.image_url) }} style={styles.widgetPhoto} />
+              <>
+                <Image source={{ uri: mediaUrl(widgetPhoto.imageUrl || widgetPhoto.image_url) }} style={styles.widgetPhoto} />
+                <View style={styles.widgetPhotoOverlay}>
+                  <Icon name="camera" chip={false} size={14} color="#fff" />
+                  <Text style={styles.widgetPhotoOverlayText}>
+                    {widgetPhoto.caption || 'Tap to send a new one'}
+                  </Text>
+                </View>
+              </>
             ) : (
               <View style={styles.widgetWideEmpty}>
-                <Icon name="brush-outline" chip chipSize={36} />
-                <Text style={font.muted}>Send a doodle or photo drop</Text>
+                <Icon name="camera-outline" chip chipSize={36} />
+                <Text style={font.muted}>Send a photo to their home screen</Text>
               </View>
             )}
+          </MorphButton>
+
+          <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.doodleRow}>
+            <Icon name="brush-outline" chip={false} size={16} color={colors.accent} />
+            <Text style={font.body}>Send a doodle instead</Text>
           </MorphButton>
         </FadeInUp>
 
@@ -178,6 +191,19 @@ const makeStyles = (colors, font) =>
   },
   widgetWideEmpty: { alignItems: 'center', gap: spacing.xs },
   widgetPhoto: { width: '100%', height: 140, borderRadius: radius.md },
+  widgetPhotoOverlay: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: spacing.sm, paddingVertical: 6,
+    borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md,
+  },
+  widgetPhotoOverlayText: { color: '#fff', fontSize: 12, flex: 1 },
+  doodleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginTop: spacing.sm, paddingVertical: spacing.sm,
+    justifyContent: 'center',
+  },
   thumbKissBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
     backgroundColor: colors.accentSoft, borderRadius: radius.lg, padding: spacing.md,
