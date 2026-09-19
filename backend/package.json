@@ -17,7 +17,9 @@
     "test:prompts": "node test/prompts.mjs",
     "prompts:probe": "node scripts/probe-prompt-sources.mjs",
     "test:push": "node test/push.mjs",
-    "test:cycle": "node test/cycle.mjs"
+    "test:cycle": "node test/cycle.mjs",
+    "test:games": "node test/games.mjs",
+    "test:engines": "node test/gameEngines.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

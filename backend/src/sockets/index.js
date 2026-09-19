@@ -2,6 +2,16 @@ import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { getActivePairForUser } from '../models/pairs.js';
 
+// Held so the REST routes can push to a pair room after they change state.
+// A game move arrives as an HTTP POST, not a socket event - the socket is
+// how the *other* phone finds out about it.
+let ioRef = null;
+
+/** The live Server, or null before initSockets() has run (e.g. in tests). */
+export function getIo() {
+  return ioRef;
+}
+
 export function initSockets(httpServer, corsOrigins) {
   const io = new Server(httpServer, {
     cors: { origin: corsOrigins, credentials: true },
@@ -28,6 +38,8 @@ export function initSockets(httpServer, corsOrigins) {
     }
   });
 
+  ioRef = io;
+
   io.on('connection', (socket) => {
     const room = `pair:${socket.pairId}`;
     socket.join(room);
@@ -50,6 +62,18 @@ export function initSockets(httpServer, corsOrigins) {
     socket.on('drawduel:clear', (payload) => broadcast('drawduel:clear', payload));
     socket.on('drawduel:guess', (payload) => broadcast('drawduel:guess', payload));
     socket.on('drawduel:correct', (payload) => broadcast('drawduel:correct', payload));
+
+    // Multiplayer games deliberately have NO move events here. A move is a
+    // POST that the server validates; the server then emits 'game:moved' to
+    // the room and each phone re-fetches its own redacted view. Accepting a
+    // move over the socket would mean trusting the client's word for whose
+    // turn it is, and pushing full state would mean emitting one player's
+    // Uno hand into a room the other is sitting in.
+    //
+    // What does belong here is presence: letting your partner see you are
+    // looking at the board.
+    socket.on('game:watching', (payload) => broadcast('game:watching', payload));
+    socket.on('game:left', (payload) => broadcast('game:left', payload));
   });
 
   return io;

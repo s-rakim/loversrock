@@ -189,6 +189,72 @@ CREATE TABLE IF NOT EXISTS deck_question_responses (
   UNIQUE(pair_id, deck_question_id, user_id)
 );
 
+-- Server-authoritative match state for the two-player games.
+--
+-- The board lives here, not on either phone. A move is a POST that the server
+-- validates against the current state; an illegal move is a 400 and changes
+-- nothing. That is the whole point: neither device can desync, replay an old
+-- move, or move on the other's turn, because neither device is ever asked.
+--
+-- Scoped by pair_id like every other content table (docs/SPEC.md #3), so a
+-- match belongs to the pairing it was played in and does not survive a
+-- re-pairing into a new one.
+CREATE TABLE IF NOT EXISTS game_matches (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id        UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  game           TEXT NOT NULL,
+  -- Seat assignment. Both are users in this pair; seat 1 moves first.
+  player1_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  player2_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- Whose turn it is, as a user id. NULL once the match is over.
+  turn_user_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+  -- The full game state, shape defined by each game's engine. Includes
+  -- information one player must not see (Uno hands), which is why the API
+  -- never returns this column raw - see redactFor() in models/gameEngines.
+  state          JSONB NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'active'
+                 CHECK (status IN ('active', 'finished', 'abandoned')),
+  -- 'player1' | 'player2' | 'draw', set only when status = 'finished'.
+  result         TEXT CHECK (result IS NULL OR result IN ('player1', 'player2', 'draw')),
+  move_count     INTEGER NOT NULL DEFAULT 0,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- The lookup every request makes: this pair's live match of this game.
+CREATE INDEX IF NOT EXISTS game_matches_pair_game_idx
+  ON game_matches (pair_id, game, status);
+
+-- One live match per game per pair. Partial, so finished matches pile up as
+-- history without blocking a rematch.
+CREATE UNIQUE INDEX IF NOT EXISTS game_matches_one_active_idx
+  ON game_matches (pair_id, game) WHERE status = 'active';
+
+-- Every move, in order. Kept separate from the state blob so a match can be
+-- replayed, and so "who did what" survives even after the board is overwritten.
+CREATE TABLE IF NOT EXISTS game_moves (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id     UUID NOT NULL REFERENCES game_matches(id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ply          INTEGER NOT NULL,
+  move         JSONB NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(match_id, ply)
+);
+
+-- Running tally per pair, so the games hub can show "you 4 - 2 them" without
+-- walking every match.
+CREATE TABLE IF NOT EXISTS game_scores (
+  pair_id    UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  game       TEXT NOT NULL,
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  wins       INTEGER NOT NULL DEFAULT 0,
+  draws      INTEGER NOT NULL DEFAULT 0,
+  losses     INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (pair_id, game, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS games_catalog (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   slug             TEXT NOT NULL UNIQUE,

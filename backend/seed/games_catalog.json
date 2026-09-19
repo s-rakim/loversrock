@@ -1,9 +1,110 @@
 [
-  { "slug": "four-in-a-row", "emoji": "grid-outline", "title": "Four in a Row", "subtitle": "Classic connect-four, pass and play", "isLocked": false, "isImplemented": true, "sortOrder": 1 },
-  { "slug": "anagrams", "emoji": "text-outline", "title": "Anagrams", "subtitle": "Unscramble the letters before time runs out", "isLocked": false, "isImplemented": true, "sortOrder": 2 },
-  { "slug": "love-golf", "emoji": "golf-outline", "title": "Love Golf", "subtitle": "Tilt your phone to putt into the hole", "isLocked": false, "isImplemented": true, "sortOrder": 3 },
-  { "slug": "draw-duel", "emoji": "brush-outline", "title": "Draw Duel", "subtitle": "One draws live, the other guesses in real time", "isLocked": false, "isImplemented": true, "sortOrder": 4 },
-  { "slug": "what-you-saying", "emoji": "chatbox-ellipses-outline", "title": "What You Saying", "subtitle": "Guess the word as letters reveal", "isLocked": false, "isImplemented": true, "sortOrder": 5 },
-  { "slug": "perfect-pair", "emoji": "link-outline", "title": "Perfect Pair", "subtitle": "Word association chain — don't break it", "isLocked": false, "isImplemented": true, "sortOrder": 6 },
-  { "slug": "love-letters", "emoji": "albums-outline", "title": "Love Letters", "subtitle": "Scrabble-style tile scoring word game", "isLocked": false, "isImplemented": true, "sortOrder": 7 }
+  {
+    "slug": "tic-tac-toe",
+    "emoji": "close-outline",
+    "title": "Tic Tac Toe",
+    "subtitle": "Three in a row, live against your partner",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 1
+  },
+  {
+    "slug": "four-in-a-row",
+    "emoji": "grid-outline",
+    "title": "Four in a Row",
+    "subtitle": "Connect four, live against your partner",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 2
+  },
+  {
+    "slug": "checkers",
+    "emoji": "ellipse-outline",
+    "title": "Checkers",
+    "subtitle": "Forced captures, multi-jumps, kings",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 3
+  },
+  {
+    "slug": "chess",
+    "emoji": "trophy-outline",
+    "title": "Chess",
+    "subtitle": "Full rules — castling, en passant, promotion",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 4
+  },
+  {
+    "slug": "uno-reverse",
+    "emoji": "layers-outline",
+    "title": "Uno Reverse",
+    "subtitle": "Your hand stays yours — they only see the count",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 5
+  },
+  {
+    "slug": "block-blitz",
+    "emoji": "apps-outline",
+    "title": "Block Blitz",
+    "subtitle": "Same pieces, two boards, race for the high score",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 6
+  },
+  {
+    "slug": "anagrams",
+    "emoji": "text-outline",
+    "title": "Anagrams",
+    "subtitle": "Unscramble the letters before time runs out",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 7
+  },
+  {
+    "slug": "love-golf",
+    "emoji": "golf-outline",
+    "title": "Love Golf",
+    "subtitle": "Tilt your phone to putt into the hole",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 8
+  },
+  {
+    "slug": "draw-duel",
+    "emoji": "brush-outline",
+    "title": "Draw Duel",
+    "subtitle": "One draws live, the other guesses in real time",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 9
+  },
+  {
+    "slug": "what-you-saying",
+    "emoji": "chatbox-ellipses-outline",
+    "title": "What You Saying",
+    "subtitle": "Guess the word as letters reveal",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 10
+  },
+  {
+    "slug": "perfect-pair",
+    "emoji": "link-outline",
+    "title": "Perfect Pair",
+    "subtitle": "Word association chain — don't break it",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 11
+  },
+  {
+    "slug": "love-letters",
+    "emoji": "albums-outline",
+    "title": "Love Letters",
+    "subtitle": "Scrabble-style tile scoring word game",
+    "isLocked": false,
+    "isImplemented": true,
+    "sortOrder": 12
+  }
 ]
