@@ -186,8 +186,15 @@ export async function fetchFromHttp(url, count, { fetchImpl = fetch } = {}) {
   if (!url) return [];
 
   const response = await fetchImpl(url, {
-    headers: { Accept: 'application/json, text/plain' },
-    signal: AbortSignal.timeout(15000),
+    headers: {
+      Accept: 'text/html,application/json,text/plain',
+      // Plenty of sites reject a request with no User-Agent outright. This is
+      // one request a day for two people's own use, not a crawl.
+      'User-Agent': 'Mozilla/5.0 (compatible; loversrock/1.0; +self-hosted couples app)',
+      'Accept-Language': 'en',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20000),
   });
   if (!response.ok) return [];
 

@@ -14,7 +14,8 @@
     "test:widget": "node test/widget.mjs",
     "test:nicknames": "node test/nicknames.mjs",
     "test:storage": "node test/local-s3.js",
-    "test:prompts": "node test/prompts.mjs"
+    "test:prompts": "node test/prompts.mjs",
+    "prompts:probe": "node scripts/probe-prompt-sources.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",
