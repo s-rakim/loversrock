@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { View, Text, TextInput, StyleSheet, FlatList, Image, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import Svg, { Polyline } from 'react-native-svg';
 import { apiFetch, connectSocket, mediaUrl } from '../services/api';
 import { spacing, radius } from '../theme';
 import { MorphButton } from '../components/Motion';
