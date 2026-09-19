@@ -226,12 +226,51 @@ CREATE TABLE IF NOT EXISTS period_daily_logs (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   log_date      DATE NOT NULL,
-  flow          TEXT CHECK (flow IN ('spotting', 'light', 'medium', 'heavy')),
+  flow          TEXT,
   symptoms      JSONB,
   mood          TEXT,
   notes         TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(user_id, log_date)
+);
+
+-- The daily log grew well past flow/symptoms/mood/notes. Added as ALTERs
+-- rather than in the CREATE so existing installs pick them up on migrate;
+-- every one is nullable, because a day with one field filled in is the normal
+-- case and a half-filled log must never be rejected.
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS moods JSONB;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS energy TEXT;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS intercourse JSONB;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS medicine JSONB;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS breast_self_exam BOOLEAN;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS ovulation_test TEXT;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS pregnancy_test TEXT;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS cervical_mucus TEXT;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS weight_kg NUMERIC(5,2);
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS temperature_c NUMERIC(4,2);
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS water_ml INTEGER;
+ALTER TABLE period_daily_logs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+-- The original CHECK only allowed spotting/light/medium/heavy; the daily log
+-- offers Light/Medium/Heavy/Disaster. Dropped and rebuilt as a superset so no
+-- existing row becomes invalid.
+ALTER TABLE period_daily_logs DROP CONSTRAINT IF EXISTS period_daily_logs_flow_check;
+ALTER TABLE period_daily_logs ADD CONSTRAINT period_daily_logs_flow_check
+  CHECK (flow IS NULL OR flow IN ('spotting', 'light', 'medium', 'heavy', 'disaster'));
+
+-- What the partner is allowed to see, per category (docs/SPEC.md #5, amended).
+-- Everything but the phase defaults to false: someone who never opens the
+-- sharing screen shares exactly what they shared before this table existed.
+-- period_settings.sharing_enabled remains the master switch above all of these.
+CREATE TABLE IF NOT EXISTS period_sharing (
+  user_id          UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  share_phase      BOOLEAN NOT NULL DEFAULT TRUE,
+  share_symptoms   BOOLEAN NOT NULL DEFAULT FALSE,
+  share_mood       BOOLEAN NOT NULL DEFAULT FALSE,
+  share_flow       BOOLEAN NOT NULL DEFAULT FALSE,
+  share_sex_drive  BOOLEAN NOT NULL DEFAULT FALSE,
+  share_notes      BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- Home/lock screen widgets run in a separate OS process on a 15-30 minute

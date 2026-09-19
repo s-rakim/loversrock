@@ -65,8 +65,30 @@ defaults to `false`, exactly like `location_sharing_enabled` (see decision
 /period/partner` only ever returns the *computed* cycle phase and predicted
 dates (e.g. "luteal phase, next period in 4 days") — it never exposes raw
 daily logs, flow intensity, symptoms, mood, or notes, regardless of the
-sharing flag. There is no setting that unlocks that detail to a partner;
-that data is not this app's to share.
+sharing flag.
+
+**Amended (partner view).** The owner may now opt in to sharing more,
+per category, through `period_sharing`. The shape of the rule is unchanged -
+nothing leaves the owner's account unless they switch it on - but the
+granularity is finer than "phase only".
+
+- Every category except `share_phase` defaults to **false**. A person who
+  never opens the sharing screen shares exactly what they shared before.
+- Sharing is per category, not one switch: symptoms, mood, flow, sex drive
+  and notes are each independent, and each is revocable instantly.
+- `period_settings.sharing_enabled` is still the master switch. With it off,
+  no category is shared regardless of its own flag - so turning sharing off
+  stays a single action that cannot be half-done.
+- Partner mode is read-only. There is no endpoint through which a partner can
+  write, amend or acknowledge the owner's log.
+- Raw daily-log rows are still never returned wholesale. The partner endpoint
+  returns only the categories that are switched on, assembled field by field.
+
+Why the change: the original rule was written when the partner view showed a
+single phase card. A partner view with symptom and mood context is what the
+product is for, and refusing it outright would have meant the feature could
+not exist. The protection that matters - the owner decides, per category,
+and can revoke instantly - is preserved.
 
 ## 6. Nicknames belong to a pairing, not to a person
 

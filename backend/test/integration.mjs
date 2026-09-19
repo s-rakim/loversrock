@@ -166,12 +166,16 @@ const qThisOr = quiz.data.questions.find((q) => q.type === 'this_or_that');
 const qGuess = quiz.data.questions.filter((q) => q.type === 'guess_partner');
 check('all three question types present in seed', !!qTrivia && !!qThisOr && qGuess.length > 0);
 
-const trivRight = await req(`/quiz/${qTrivia.id}/respond`, { method: 'POST', token: A.token, body: { answer: 'Paris' } });
+// Read the expected answer instead of hardcoding one: the bank serves a
+// different trivia question each day, so a literal 'Paris' only passes on the
+// day that question happens to be scheduled.
+const triviaAnswer = sql(`SELECT correct_answer FROM quiz_questions WHERE id = '${qTrivia.id}'`).trim();
+const trivRight = await req(`/quiz/${qTrivia.id}/respond`, { method: 'POST', token: A.token, body: { answer: triviaAnswer } });
 check('trivia scores IMMEDIATELY (no partner wait)', trivRight.data.correctnessState === 'computed', trivRight.data);
 check('trivia correct answer marked correct', trivRight.data.isCorrect === true, trivRight.data);
 const trivWrong = await req(`/quiz/${qTrivia.id}/respond`, { method: 'POST', token: B.token, body: { answer: 'Lyon' } });
 check('trivia wrong answer marked incorrect', trivWrong.data.isCorrect === false, trivWrong.data);
-const trivCase = await req(`/quiz/${qTrivia.id}/respond`, { method: 'POST', token: B.token, body: { answer: '  pArIs  ' } });
+const trivCase = await req(`/quiz/${qTrivia.id}/respond`, { method: 'POST', token: B.token, body: { answer: `  ${triviaAnswer.toUpperCase()}  ` } });
 check('trivia matching is case/whitespace insensitive', trivCase.data.isCorrect === true, trivCase.data);
 
 const torA = await req(`/quiz/${qThisOr.id}/respond`, { method: 'POST', token: A.token, body: { answer: qThisOr.choices[0] } });
@@ -386,8 +390,18 @@ check('partner cycle HIDDEN while sharing off', partnerBlocked.data.sharingEnabl
 await req('/period/settings', { method: 'PATCH', token: A.token, body: { sharingEnabled: true } });
 const partnerShared = await req('/period/partner', { token: B.token });
 check('partner sees phase + dates once sharing enabled', partnerShared.data.sharingEnabled === true && !!partnerShared.data.predictions?.phase, partnerShared.data);
-const leaked = JSON.stringify(partnerShared.data);
-check('partner view leaks NO raw flow/symptoms/mood/notes (SPEC #5)', !/flow|symptom|mood|notes|rough day|Cramps/i.test(leaked), leaked);
+// docs/SPEC.md #5 (amended): sharing is per category and every category but
+// the phase defaults to false, so with nothing switched on the partner must
+// see predictions and nothing else. Asserted on the *values* - the response
+// now also names the switches themselves (share_symptoms: false), and
+// matching on those key names would flag a response that leaks nothing.
+const leakedValues = JSON.stringify({ today: partnerShared.data.today });
+check('partner view leaks NO raw flow/symptoms/mood/notes (SPEC #5)',
+  partnerShared.data.today === null && !/rough day|Cramps/i.test(leakedValues), partnerShared.data);
+check('partner view reports every category as off by default',
+  Object.entries(partnerShared.data.shared || {})
+    .filter(([key]) => key !== 'share_phase')
+    .every(([, on]) => on === false), partnerShared.data.shared);
 check('period settings are per-user, not shared', (await req('/period/settings', { token: B.token })).data.settings.averageCycleLength === 28);
 check('third party cannot read pair period data', (await req('/period/partner', { token: C.token })).status === 403);
 check('period cycle delete works', (await req(`/period/cycles/${c2.data.cycle.id}`, { method: 'DELETE', token: A.token })).status === 204);
