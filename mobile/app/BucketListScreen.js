@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, Alert, AppState } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch, connectSocket } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 export default function BucketListScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [items, setItems] = useState([]);
   const [draft, setDraft] = useState('');
 
@@ -105,7 +108,8 @@ export default function BucketListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   addRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   input: {

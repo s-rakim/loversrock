@@ -1,10 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../services/api';
 import Icon from './Icon';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { MorphButton } from './Motion';
+import { useTheme } from './ThemeContext';
 
 const MAX_LENGTH = 30; // matches the backend's validator
 
@@ -14,6 +15,8 @@ const MAX_LENGTH = 30; // matches the backend's validator
  * read-only. Clearing yours falls back to their real name.
  */
 export default function NicknameCard() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [profile, setProfile] = useState(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -147,7 +150,8 @@ export default function NicknameCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
     borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,

@@ -1,16 +1,19 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { View, StyleSheet, PanResponder, Alert } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 import { apiFetch } from '../services/api';
-import { colors, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import { Text } from 'react-native';
+import { useTheme } from '../components/ThemeContext';
 
 // Real freehand drawing via PanResponder — strokes are sent as an array of
 // {x,y} point lists (stroke_data), never rasterized to an image, so the
 // receiving side can re-render them as real react-native-svg paths.
 export default function CanvasScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [strokes, setStrokes] = useState([]);
   const currentStroke = useRef([]);
   const [, forceRender] = useState(0);
@@ -107,7 +110,8 @@ export default function CanvasScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   canvas: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   toolbar: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },

@@ -1,16 +1,17 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, Switch } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 const PHASE_META = {
-  menstrual: { label: 'Menstrual', color: colors.accent, icon: 'water' },
-  follicular: { label: 'Follicular', color: colors.success, icon: 'leaf' },
-  ovulation: { label: 'Ovulation', color: colors.gold, icon: 'sparkles' },
+  menstrual: { label: 'Menstrual', tone: 'period', icon: 'water' },
+  follicular: { label: 'Follicular', tone: 'success', icon: 'leaf' },
+  ovulation: { label: 'Ovulation', tone: 'fertility', icon: 'sparkles' },
   luteal: { label: 'Luteal', color: '#8f6aff', icon: 'moon' },
 };
 
@@ -52,6 +53,8 @@ function todayDateString() {
 }
 
 export default function PeriodTrackerScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [month, setMonth] = useState(todayDateString().slice(0, 7));
   const [calendar, setCalendar] = useState(null);
   const [cycles, setCycles] = useState([]);
@@ -350,7 +353,8 @@ export default function PeriodTrackerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   phaseCard: {

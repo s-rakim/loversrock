@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import {
   getApiUrl,
@@ -9,8 +9,9 @@ import {
 } from '../services/api';
 import { provisionWidgets } from '../services/widgetBridge';
 import Icon from './Icon';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { MorphButton } from './Motion';
+import { useTheme } from './ThemeContext';
 
 /**
  * Lets the address of the self-hosted backend be corrected on the device.
@@ -21,6 +22,8 @@ import { MorphButton } from './Motion';
  * address and re-pings immediately, so a bad address is a ten-second fix.
  */
 export default function ServerAddress({ compact = false }) {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [value, setValue] = useState(getApiUrl());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null); // 'ok' | 'fail' | null
@@ -122,7 +125,8 @@ export default function ServerAddress({ compact = false }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
     borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,

@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, Alert, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 function timeLeft(targetDate) {
   const diff = new Date(targetDate).getTime() - Date.now();
@@ -16,6 +17,8 @@ function timeLeft(targetDate) {
 }
 
 export default function CountdownScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [countdowns, setCountdowns] = useState([]);
   const [label, setLabel] = useState('');
   const [dateInput, setDateInput] = useState(''); // YYYY-MM-DD
@@ -104,7 +107,8 @@ export default function CountdownScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   form: { marginBottom: spacing.lg },
   input: {

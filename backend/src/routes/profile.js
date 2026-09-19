@@ -7,6 +7,7 @@ const router = asyncRouter();
 // Long enough for "my ridiculous little bear", short enough that it still fits
 // a widget line and a chat header.
 const MAX_NICKNAME_LENGTH = 30;
+const THEME_PREFERENCES = ['system', 'light', 'dark'];
 
 /**
  * Nicknames are free text typed by one partner and rendered to the other, so
@@ -41,6 +42,7 @@ function present(user, nickname) {
     nickname: nickname || null,
     // Resolved server-side so no screen has to re-implement the fallback.
     displayName: nickname || user.name,
+    themePreference: user.theme_preference || 'system',
   };
 }
 
@@ -63,7 +65,7 @@ router.get('/', requireAuth, async (req, res) => {
   const partnerId = pair ? (pair.user_a_id === req.userId ? pair.user_b_id : pair.user_a_id) : null;
 
   const { rows: users } = await query(
-    'SELECT id, name, avatar_url FROM users WHERE id = ANY($1::uuid[])',
+    'SELECT id, name, avatar_url, theme_preference FROM users WHERE id = ANY($1::uuid[])',
     [partnerId ? [req.userId, partnerId] : [req.userId]]
   );
   const byId = new Map(users.map((u) => [u.id, u]));
@@ -88,6 +90,24 @@ router.get('/', requireAuth, async (req, res) => {
     me: present(byId.get(req.userId), nicknameTheyGaveMe),
     partner: present(partnerId ? byId.get(partnerId) : null, nicknameIGaveThem),
   });
+});
+
+/**
+ * Device-level preferences mirrored onto the account. Deliberately takes no
+ * `userId` — a client can only ever write its own row.
+ */
+router.patch('/preferences', requireAuth, async (req, res) => {
+  const { themePreference } = req.body || {};
+
+  if (themePreference !== undefined) {
+    if (!THEME_PREFERENCES.includes(themePreference)) {
+      return res.status(400).json({ error: `themePreference must be one of ${THEME_PREFERENCES.join(', ')}` });
+    }
+    await query('UPDATE users SET theme_preference = $1 WHERE id = $2', [themePreference, req.userId]);
+  }
+
+  const { rows } = await query('SELECT theme_preference FROM users WHERE id = $1', [req.userId]);
+  res.json({ themePreference: rows[0].theme_preference });
 });
 
 /** Sets what *I* call my partner. Only ever writes my own row. */

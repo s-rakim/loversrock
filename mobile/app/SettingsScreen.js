@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Alert, Switch, ScrollView } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useNavigation } from '@react-navigation/native';
@@ -15,10 +15,13 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import ServerAddress from '../components/ServerAddress';
 import NicknameCard from '../components/NicknameCard';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
+import { useTheme, THEME_PREFERENCES } from '../components/ThemeContext';
 
 export default function SettingsScreen() {
+  const { colors, font, preference, setPreference } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { intensity, setIntensity } = useGlass();
   const navigation = useNavigation();
   const [lockScreenOn, setLockScreenOn] = useState(false);
@@ -61,6 +64,37 @@ export default function SettingsScreen() {
         <View style={styles.headerRow}>
           <Icon name="settings-outline" chip chipSize={44} />
           <Text style={font.h1}>Settings</Text>
+        </View>
+      </FadeInUp>
+
+      <FadeInUp delay={40}>
+        <View style={styles.card}>
+          <Text style={font.h2}>Appearance</Text>
+          <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.md }]}>
+            System follows your phone and changes with it.
+          </Text>
+          <View style={styles.themeRow}>
+            {THEME_PREFERENCES.map((option) => {
+              const active = preference === option;
+              return (
+                <View key={option} style={{ flex: 1 }}>
+                  <MorphButton
+                    onPress={() => setPreference(option)}
+                    style={[styles.themeOption, active && styles.themeOptionActive]}
+                  >
+                    <Icon
+                      name={option === 'system' ? 'phone-portrait-outline' : option === 'light' ? 'sunny-outline' : 'moon-outline'}
+                      size={16}
+                      color={active ? colors.accentPink : colors.textSecondary}
+                    />
+                    <Text style={[styles.themeLabel, active && styles.themeLabelActive]}>
+                      {option[0].toUpperCase() + option.slice(1)}
+                    </Text>
+                  </MorphButton>
+                </View>
+              );
+            })}
+          </View>
         </View>
       </FadeInUp>
 
@@ -150,7 +184,8 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   // Bottom padding clears the floating glass tab bar.
   scrollContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3 },
@@ -164,6 +199,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,
   },
   settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  themeRow: { flexDirection: 'row', gap: spacing.sm },
+  themeOption: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+    paddingVertical: spacing.sm, borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt,
+  },
+  themeOptionActive: { backgroundColor: colors.tabBarActivePill, borderColor: colors.accentPink },
+  themeLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
+  themeLabelActive: { color: colors.accentPink },
   refreshButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
     backgroundColor: colors.accentSoft, borderRadius: radius.pill, paddingVertical: spacing.sm, marginTop: spacing.md,

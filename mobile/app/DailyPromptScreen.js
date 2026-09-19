@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { apiFetch } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import CelebrationBurst from '../components/Celebration';
+import { useTheme } from '../components/ThemeContext';
 
 export default function DailyPromptScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [loading, setLoading] = useState(true);
   const [prompt, setPrompt] = useState(null);
   const [myAnswer, setMyAnswer] = useState(null);
@@ -118,7 +121,8 @@ export default function DailyPromptScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors, font) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   streakPill: {

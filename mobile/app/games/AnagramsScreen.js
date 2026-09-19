@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { colors, font, spacing, radius } from '../../theme';
+import { spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import Icon from '../../components/Icon';
 import StickerField from '../../components/Stickers';
+import { useTheme } from '../../components/ThemeContext';
 
 const WORD_BANK = [
   'LOVE', 'HEART', 'KISS', 'HUGS', 'DATE', 'SWEET', 'DREAM', 'TOGETHER',
@@ -21,6 +22,8 @@ function shuffle(word) {
 }
 
 export default function AnagramsScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [wordIndex, setWordIndex] = useState(0);
   const [scrambled, setScrambled] = useState(() => shuffle(WORD_BANK[0]));
   const [picked, setPicked] = useState([]);
@@ -111,7 +114,8 @@ export default function AnagramsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
   correctRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
   answerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 56, marginVertical: spacing.lg, justifyContent: 'center' },

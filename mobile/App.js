@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { getAccessToken, loadApiUrl } from './services/api';
 import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
+import { ThemeProvider, useTheme } from './components/ThemeContext';
 import GlassTabBar from './components/GlassTabBar';
 
 import LoginScreen from './app/LoginScreen';
@@ -39,22 +40,37 @@ import LoveLettersScreen from './app/games/LoveLettersScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const navTheme = {
-  ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, border: colors.border, primary: colors.accent },
-};
-
-const screenOptions = {
-  headerStyle: { backgroundColor: colors.surface },
-  headerTintColor: colors.text,
-  headerShadowVisible: false,
-  contentStyle: { backgroundColor: colors.bg },
-};
 
 // The five primary destinations live behind the floating liquid-glass tab
 // bar (components/GlassTabBar.js); everything else is pushed on top of it
 // as a normal stack screen so the glass bar stays visible on the tabs but
 // out of the way on deep/focused screens (quiz, canvas, games, etc).
+// Navigation and the status bar have to be told about the theme separately —
+// they render outside the React tree the tokens normally reach.
+function useNavTheme() {
+  const { colors, isDark } = useTheme();
+  const base = isDark ? DarkTheme : DefaultTheme;
+  return {
+    navTheme: {
+      ...base,
+      colors: {
+        ...base.colors,
+        background: colors.background,
+        card: colors.surface,
+        text: colors.textPrimary,
+        border: colors.cardBorder,
+        primary: colors.accentPink,
+      },
+    },
+    screenOptions: {
+      headerStyle: { backgroundColor: colors.surface },
+      headerTintColor: colors.textPrimary,
+      headerShadowVisible: false,
+      contentStyle: { backgroundColor: colors.background },
+    },
+  };
+}
+
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -70,7 +86,9 @@ function MainTabs() {
   );
 }
 
-export default function App() {
+function Root() {
+  const { navTheme, screenOptions } = useNavTheme();
+  const { colors, statusBarStyle } = useTheme();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [hasToken, setHasToken] = useState(false);
 
@@ -86,17 +104,15 @@ export default function App() {
 
   if (checkingAuth) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.accent} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.accentPink} size="large" />
       </View>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <GlassProvider>
-        <NavigationContainer theme={navTheme}>
-          <StatusBar style="dark" />
+    <NavigationContainer theme={navTheme}>
+          <StatusBar style={statusBarStyle} />
           <Stack.Navigator initialRouteName={hasToken ? 'MainTabs' : 'Login'} screenOptions={screenOptions}>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
@@ -119,8 +135,18 @@ export default function App() {
             <Stack.Screen name="PerfectPair" component={PerfectPairScreen} options={{ title: 'Perfect Pair' }} />
             <Stack.Screen name="LoveLetters" component={LoveLettersScreen} options={{ title: 'Love Letters' }} />
           </Stack.Navigator>
-        </NavigationContainer>
-      </GlassProvider>
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <GlassProvider>
+          <Root />
+        </GlassProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

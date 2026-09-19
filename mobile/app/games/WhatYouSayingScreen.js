@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
-import { colors, font, spacing, radius } from '../../theme';
+import { spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import StickerField from '../../components/Stickers';
+import { useTheme } from '../../components/ThemeContext';
 
 const WORD_BANK = ['ANNIVERSARY', 'CHOCOLATE', 'FIREWORKS', 'VACATION', 'PROPOSAL', 'SERENADE', 'MOONLIGHT', 'BOUQUET'];
 const REVEAL_INTERVAL_MS = 2500;
@@ -15,6 +16,8 @@ function maskWord(word, revealedCount) {
 }
 
 export default function WhatYouSayingScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [wordIndex, setWordIndex] = useState(0);
   const [revealedCount, setRevealedCount] = useState(1);
   const [guess, setGuess] = useState('');
@@ -82,7 +85,8 @@ export default function WhatYouSayingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   masked: { fontSize: 30, fontWeight: '800', letterSpacing: 4, color: colors.accent, marginVertical: spacing.lg, textAlign: 'center' },
   guessRow: { flexDirection: 'row', gap: spacing.sm, width: '100%' },

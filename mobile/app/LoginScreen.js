@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import Constants from 'expo-constants';
 import { apiFetch, apiUrlProblem, getApiUrl, setTokens } from '../services/api';
 import { provisionWidgets } from '../services/widgetBridge';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import StickerField, { HeartShape } from '../components/Stickers';
 import ServerAddress from '../components/ServerAddress';
+import { useTheme } from '../components/ThemeContext';
 
 export default function LoginScreen({ navigation }) {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -120,7 +123,8 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', padding: spacing.lg },
   wordmarkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   input: {

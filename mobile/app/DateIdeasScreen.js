@@ -1,13 +1,16 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 export default function DateIdeasScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [tab, setTab] = useState('browse');
   const [browseIdeas, setBrowseIdeas] = useState([]);
   const [savedIdeas, setSavedIdeas] = useState([]);
@@ -87,7 +90,8 @@ export default function DateIdeasScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors, font) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   tabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   tab: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.border },

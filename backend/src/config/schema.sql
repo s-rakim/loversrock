@@ -12,8 +12,12 @@ CREATE TABLE IF NOT EXISTS users (
   last_lng                   DOUBLE PRECISION,
   location_shared_at         TIMESTAMPTZ,
   location_sharing_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
+  -- 'system' | 'light' | 'dark'. Mirrored from the device so a reinstall or a
+  -- second device starts in the theme the person actually chose.
+  theme_preference           TEXT NOT NULL DEFAULT 'system',
   created_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS theme_preference TEXT NOT NULL DEFAULT 'system';
 
 CREATE TABLE IF NOT EXISTS user_devices (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),

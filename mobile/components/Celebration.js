@@ -5,7 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 import { HeartShape, SparkleShape } from './Stickers';
-import { colors } from '../theme';
+import { useTheme } from './ThemeContext';
 
 const PARTICLE_COUNT = 8;
 
@@ -23,6 +23,7 @@ function buildParticles() {
 }
 
 export default function CelebrationBurst({ trigger, size = 160 }) {
+  const { colors } = useTheme();
   const particlesRef = useRef(buildParticles());
 
   useEffect(() => {

@@ -4,8 +4,9 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing } from '../theme';
+import { radius, spacing } from '../theme';
 import { MorphButton } from './Motion';
+import { useTheme } from './ThemeContext';
 
 // `name` is any Ionicons glyph name, e.g. "heart-outline", "flame".
 export default function Icon({
@@ -18,6 +19,7 @@ export default function Icon({
   onPress,
   style,
 }) {
+  const { colors } = useTheme();
   const glyph = <Ionicons name={name} size={size} color={color} />;
 
   const wrapperStyle = chip

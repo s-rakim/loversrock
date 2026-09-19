@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
-import { colors, font, spacing, radius } from '../../theme';
+import { spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import StickerField from '../../components/Stickers';
+import { useTheme } from '../../components/ThemeContext';
 
 // Standard Scrabble letter point values.
 const LETTER_VALUES = {
@@ -21,6 +22,8 @@ function randomRack() {
 }
 
 export default function LoveLettersScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [rack, setRack] = useState(randomRack);
   const [usedIdx, setUsedIdx] = useState([]);
   const [totalScore, setTotalScore] = useState(0);
@@ -86,7 +89,8 @@ export default function LoveLettersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   wordDisplay: { fontSize: 32, fontWeight: '800', color: colors.accent, letterSpacing: 4, marginVertical: spacing.lg, minHeight: 40 },
   rack: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center', marginBottom: spacing.xl },

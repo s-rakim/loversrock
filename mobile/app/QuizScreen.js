@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { apiFetch } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton, ProgressDot } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import CelebrationBurst from '../components/Celebration';
+import { useTheme } from '../components/ThemeContext';
 
 export default function QuizScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
   const [index, setIndex] = useState(0);
@@ -145,7 +148,8 @@ export default function QuizScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors, font) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', marginBottom: spacing.xl },

@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
-import { colors, font, spacing, radius } from '../../theme';
+import { spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import Icon from '../../components/Icon';
+import { useTheme } from '../../components/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const FIELD_SIZE = Math.min(width - spacing.lg * 2, 380);
@@ -24,6 +25,8 @@ function randomHole() {
 // integrated into position every frame with friction damping — not a
 // canned animation.
 export default function LoveGolfScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [hole, setHole] = useState(randomHole);
   const [strokes, setStrokes] = useState(0);
   const [holedOut, setHoledOut] = useState(false);
@@ -97,7 +100,8 @@ export default function LoveGolfScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
   field: {
     width: FIELD_SIZE, height: FIELD_SIZE, backgroundColor: '#123a1f', borderRadius: radius.lg,

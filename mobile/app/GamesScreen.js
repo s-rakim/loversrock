@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert } from 'react-native';
 import { apiFetch } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 const ROUTE_BY_SLUG = {
   'four-in-a-row': 'FourInARow',
@@ -17,6 +18,8 @@ const ROUTE_BY_SLUG = {
 };
 
 export default function GamesScreen({ navigation }) {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [games, setGames] = useState([]);
 
   useEffect(() => {
@@ -53,7 +56,8 @@ export default function GamesScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors, font) =>
+  StyleSheet.create({
   container: { flex: 1 },
   card: {
     flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,

@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, PanResponder, Alert } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 import { connectSocket } from '../../services/api';
-import { colors, font, spacing, radius } from '../../theme';
+import { spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import Icon from '../../components/Icon';
+import { useTheme } from '../../components/ThemeContext';
 
 const WORD_BANK = ['SUNSET', 'GUITAR', 'ROBOT', 'PIZZA', 'OCTOPUS', 'CASTLE', 'ROCKET', 'UMBRELLA'];
 
@@ -13,6 +14,8 @@ const WORD_BANK = ['SUNSET', 'GUITAR', 'ROBOT', 'PIZZA', 'OCTOPUS', 'CASTLE', 'R
 // Socket.io room (backend/src/sockets/index.js) to the other device, which
 // renders them as they arrive and guesses via text.
 export default function DrawDuelScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [role, setRole] = useState(null); // 'drawer' | 'guesser'
   const [strokes, setStrokes] = useState([]);
   const [wordLength, setWordLength] = useState(null);
@@ -158,7 +161,8 @@ export default function DrawDuelScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   canvas: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginVertical: spacing.md },

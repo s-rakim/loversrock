@@ -1,15 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, Image, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import Svg, { Polyline } from 'react-native-svg';
 import { apiFetch, connectSocket, mediaUrl } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 function Doodle({ strokeData }) {
+  const { colors } = useTheme();
   return (
     <Svg width={160} height={120} style={{ backgroundColor: colors.surfaceAlt, borderRadius: radius.sm }}>
       {(strokeData || []).map((stroke, i) => (
@@ -28,6 +30,8 @@ function Doodle({ strokeData }) {
 }
 
 export default function MessagesScreen({ navigation }) {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const listRef = useRef(null);
@@ -124,7 +128,8 @@ export default function MessagesScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   bubble: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, maxWidth: '80%' },
   photo: { width: 180, height: 180, borderRadius: radius.sm },

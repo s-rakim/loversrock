@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { colors, font, spacing, radius } from '../../theme';
+import { spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import Icon from '../../components/Icon';
 import StickerField from '../../components/Stickers';
+import { useTheme } from '../../components/ThemeContext';
 
 const ROWS = 6;
 const COLS = 7;
@@ -41,6 +42,8 @@ function checkWinner(board) {
 
 // Local pass-and-play, full win-detection across all four directions.
 export default function FourInARowScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [board, setBoard] = useState(emptyBoard);
   const [turn, setTurn] = useState('P1');
   const [winner, setWinner] = useState(null);
@@ -95,7 +98,8 @@ export default function FourInARowScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   board: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.xs, marginVertical: spacing.lg },

@@ -5,9 +5,11 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
-import { colors } from '../theme';
+import { useTheme } from './ThemeContext';
 
-export function HeartShape({ size = 28, color = colors.accent }) {
+export function HeartShape({ size = 28, color }) {
+  const { colors } = useTheme();
+  color = color || colors.accentPink;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -18,7 +20,9 @@ export function HeartShape({ size = 28, color = colors.accent }) {
   );
 }
 
-export function SparkleShape({ size = 24, color = colors.gold }) {
+export function SparkleShape({ size = 24, color }) {
+  const { colors } = useTheme();
+  color = color || colors.gold;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
@@ -29,7 +33,9 @@ export function SparkleShape({ size = 24, color = colors.gold }) {
   );
 }
 
-export function FlowerShape({ size = 26, color = colors.accent }) {
+export function FlowerShape({ size = 26, color }) {
+  const { colors } = useTheme();
+  color = color || colors.accentPink;
   const petals = [0, 72, 144, 216, 288];
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -48,7 +54,9 @@ export function FlowerShape({ size = 26, color = colors.accent }) {
   );
 }
 
-export function RibbonShape({ size = 26, color = colors.accent }) {
+export function RibbonShape({ size = 26, color }) {
+  const { colors } = useTheme();
+  color = color || colors.accentPink;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M12 4L4 10L12 14L20 10L12 4Z" fill={color} />
@@ -118,6 +126,7 @@ const LAYOUTS = {
 };
 
 export default function StickerField({ variant = 'minimal' }) {
+  const { colors } = useTheme();
   const layout = LAYOUTS[variant] || LAYOUTS.minimal;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">

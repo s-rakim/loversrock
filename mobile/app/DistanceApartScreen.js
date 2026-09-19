@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, Switch, Alert } from 'react-native';
 import * as Location from 'expo-location';
 import { apiFetch, connectSocket } from '../services/api';
-import { colors, font, spacing, radius } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 const UPDATE_INTERVAL_MS = 30000;
 
 export default function DistanceApartScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [enabled, setEnabled] = useState(false);
   const [distanceKm, setDistanceKm] = useState(null);
   const [reason, setReason] = useState(null);
@@ -113,7 +116,8 @@ export default function DistanceApartScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   toggleLabel: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

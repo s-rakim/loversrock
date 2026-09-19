@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from './Icon';
 import { useGlass } from './GlassContext';
-import { colors, radius, spacing, font } from '../theme';
+import { radius, spacing } from '../theme';
+import { useTheme } from './ThemeContext';
 
 const TAB_META = {
   Home: { icon: 'home-outline', iconActive: 'home', label: 'Home' },
@@ -18,6 +19,8 @@ const TAB_META = {
 // blur intensity is user-adjustable (see SettingsScreen + GlassContext),
 // so the opacity of the glass effect is a real, persisted preference.
 export default function GlassTabBar({ state, navigation }) {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const insets = useSafeAreaInsets();
   const { intensity } = useGlass();
 
@@ -56,7 +59,8 @@ export default function GlassTabBar({ state, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors, font) =>
+  StyleSheet.create({
   wrapper: {
     position: 'absolute',
     left: spacing.lg,

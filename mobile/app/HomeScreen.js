@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch, mediaUrl } from '../services/api';
-import { colors, font, spacing, radius, gradientForCategory } from '../theme';
+import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton, PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 const QUICK_LINKS = [
   ['BucketList', 'Bucket List', 'checkbox-outline'],
@@ -16,6 +17,8 @@ const QUICK_LINKS = [
 ];
 
 export default function HomeScreen({ navigation }) {
+  const { colors, font, gradientForCategory } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [streak, setStreak] = useState(0);
   const [decksByCategory, setDecksByCategory] = useState({});
   const [games, setGames] = useState([]);
@@ -145,7 +148,8 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors, font) =>
+  StyleSheet.create({
   container: { flex: 1, padding: spacing.lg },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   greeting: { fontSize: 15, color: colors.textMuted, marginTop: -spacing.xs, marginBottom: spacing.lg },

@@ -1,16 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, PanResponder, Vibration, Dimensions } from 'react-native';
 import { connectSocket } from '../services/api';
-import { colors, font, spacing } from '../theme';
+import { spacing } from '../theme';
 import { PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { useTheme } from '../components/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 const TOUCH_AREA_SIZE = Math.min(width - spacing.lg * 2, 420);
 const CONNECT_THRESHOLD = 0.12; // normalized distance (0..1 space)
 
 export default function ThumbKissScreen() {
+  const { colors, font } = useTheme();
+  const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [myPos, setMyPos] = useState(null);
   const [partnerPos, setPartnerPos] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -88,7 +91,8 @@ export default function ThumbKissScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors, font) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   touchArea: {
     width: TOUCH_AREA_SIZE, height: TOUCH_AREA_SIZE, borderRadius: TOUCH_AREA_SIZE / 2,
