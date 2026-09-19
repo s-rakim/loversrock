@@ -35,7 +35,8 @@ console.log('=== THE HUB LISTS EVERY GAME ===');
 const hub = await req('/games/matches', { token: A.token });
 check('hub responds', hub.status === 200, hub.data);
 const slugs = (hub.data.games || []).map((g) => g.game);
-for (const game of ['tic-tac-toe', 'four-in-a-row', 'checkers', 'chess', 'uno-reverse', 'block-blitz']) {
+for (const game of ['tic-tac-toe', 'four-in-a-row', 'checkers', 'chess', 'uno-reverse', 'block-blitz',
+  'anagrams', 'what-you-saying', 'perfect-pair', 'love-letters', 'love-golf']) {
   check(`${game} is listed`, slugs.includes(game), slugs);
 }
 check('every game carries a win/draw/loss record',
@@ -240,6 +241,84 @@ await req('/games/chess/resign', { method: 'POST', token: A.token });
 check('a freeplay game offers no move list it cannot compute',
   (await req('/games/block-blitz/start', { method: 'POST', token: A.token })).data.match.legalMoves === null);
 await req('/games/block-blitz/resign', { method: 'POST', token: A.token });
+
+console.log('\n=== NOTHING IN THE ARCADE IS SOLO ANY MORE ===');
+// The five that used to be single-player are races now. What has to hold
+// for each: both players get identical content, neither waits for a turn,
+// and one finishing does not end it for the other.
+for (const game of ['anagrams', 'what-you-saying', 'perfect-pair', 'love-letters', 'love-golf']) {
+  const mine = await start(game, A.token);
+  const theirs = await start(game, B.token);
+  check(`${game}: both join one match`,
+    mine.data.match.id === theirs.data.match.id, { a: mine.data.match.id, b: theirs.data.match.id });
+  check(`${game}: neither is made to wait for a turn`,
+    mine.data.match.yourTurn === true && theirs.data.match.yourTurn === true,
+    { a: mine.data.match.yourTurn, b: theirs.data.match.yourTurn });
+  check(`${game}: it is flagged freeplay`, mine.data.match.freeplay === true);
+  check(`${game}: each side sees its own score and theirs`,
+    'score' in mine.data.match.state || 'total' in mine.data.match.state,
+    Object.keys(mine.data.match.state));
+}
+
+const anA = (await req('/games/anagrams/match', { token: A.token })).data.match;
+const anB = (await req('/games/anagrams/match', { token: B.token })).data.match;
+check('anagrams: the same scramble on both phones',
+  anA.state.scrambled === anB.state.scrambled, { a: anA.state.scrambled, b: anB.state.scrambled });
+check('anagrams: the word list is not in the payload',
+  !('words' in anA.state) && !('scrambles' in anA.state), Object.keys(anA.state));
+const anaWrong = await move('anagrams', A.token, { guess: 'DEFINITELYWRONG' });
+check('anagrams: a wrong guess is accepted but does not advance',
+  anaWrong.status === 200 && anaWrong.data.match.state.round === 1, anaWrong.data.match?.state);
+const anaSkip = await move('anagrams', A.token, { action: 'skip' });
+check('anagrams: skipping advances you alone',
+  anaSkip.data.match.state.round === 2 && anaSkip.data.match.state.opponentRound === 1,
+  anaSkip.data.match.state);
+check('anagrams: their score is visible, their answers are not',
+  typeof anaSkip.data.match.state.opponentScore === 'number');
+await req('/games/anagrams/resign', { method: 'POST', token: A.token });
+
+const ll = (await req('/games/love-letters/match', { token: A.token })).data.match;
+const llB = (await req('/games/love-letters/match', { token: B.token })).data.match;
+check('love-letters: identical rack',
+  JSON.stringify(ll.state.rack) === JSON.stringify(llB.state.rack), { a: ll.state.rack, b: llB.state.rack });
+check('love-letters: their words are hidden mid-match', ll.state.opponentWords === null);
+check('love-letters: an unspellable word is refused',
+  (await move('love-letters', A.token, { word: 'QQQQQQ' })).status === 400);
+const good = await move('love-letters', A.token, { word: ll.state.rack.slice(0, 2).join('') });
+check('love-letters: a spellable one scores', good.data.match.state.score > 0, good.data.match?.state);
+await req('/games/love-letters/resign', { method: 'POST', token: A.token });
+
+const golf = (await req('/games/love-golf/match', { token: A.token })).data.match;
+const golfB = (await req('/games/love-golf/match', { token: B.token })).data.match;
+check('love-golf: the same hole layout for both',
+  JSON.stringify(golf.state.hole) === JSON.stringify(golfB.state.hole));
+check('love-golf: an absurd stroke count is refused',
+  (await move('love-golf', A.token, { hole: 0, strokes: 500 })).status === 400);
+check('love-golf: reporting a hole you are not on is refused',
+  (await move('love-golf', A.token, { hole: 4, strokes: 2 })).status === 400);
+const putted = await move('love-golf', A.token, { hole: 0, strokes: 3 });
+check('love-golf: a plausible score is recorded',
+  putted.data.match.state.total === 3 && putted.data.match.state.holeNumber === 2,
+  putted.data.match?.state);
+await req('/games/love-golf/resign', { method: 'POST', token: A.token });
+
+const pp = (await req('/games/perfect-pair/match', { token: A.token })).data.match;
+const ppB = (await req('/games/perfect-pair/match', { token: B.token })).data.match;
+check('perfect-pair: the same word to solve', pp.state.word === ppB.state.word);
+check('perfect-pair: options shuffled differently per phone',
+  JSON.stringify(pp.state.options) !== JSON.stringify(ppB.state.options),
+  { a: pp.state.options, b: ppB.state.options });
+check('perfect-pair: the correct answer is not labelled',
+  !JSON.stringify(pp.state).includes('correct'), Object.keys(pp.state));
+await req('/games/perfect-pair/resign', { method: 'POST', token: A.token });
+
+const wys = (await req('/games/what-you-saying/match', { token: A.token })).data.match;
+check('what-you-saying: you get a mask, not the word',
+  wys.state.mask.includes('_') && !('word' in wys.state) && !('words' in wys.state), wys.state);
+const revealed = await move('what-you-saying', A.token, { action: 'reveal' });
+check('what-you-saying: revealing costs you but shows more',
+  revealed.data.match.state.revealed === 2, revealed.data.match?.state);
+await req('/games/what-you-saying/resign', { method: 'POST', token: A.token });
 
 console.log('\n=== AN UNKNOWN GAME IS A 404, NOT A CRASH ===');
 check('starting one', (await start('battleship', A.token)).status === 404);

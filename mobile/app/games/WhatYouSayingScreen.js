@@ -1,95 +1,134 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
+// What You Saying — a race.
+//
+// Letters reveal on demand rather than on a timer. A timer would have meant
+// the player whose app happened to be open first got a head start, and it
+// would make a round unwinnable if you looked away. Instead every reveal you
+// take costs points, so the question is "how few letters do you need?".
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { spacing, radius } from '../../theme';
-import { MorphButton, FadeInUp } from '../../components/Motion';
-import StickerField from '../../components/Stickers';
 import { useTheme } from '../../components/ThemeContext';
-
-const WORD_BANK = ['ANNIVERSARY', 'CHOCOLATE', 'FIREWORKS', 'VACATION', 'PROPOSAL', 'SERENADE', 'MOONLIGHT', 'BOUQUET'];
-const REVEAL_INTERVAL_MS = 2500;
-
-function maskWord(word, revealedCount) {
-  return word
-    .split('')
-    .map((letter, i) => (i < revealedCount ? letter : '_'))
-    .join(' ');
-}
+import { MorphButton } from '../../components/Motion';
+import { useMatch } from '../../components/games/useMatch';
+import MatchFrame from '../../components/games/MatchFrame';
+import RaceHeader from '../../components/games/RaceHeader';
 
 export default function WhatYouSayingScreen() {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [wordIndex, setWordIndex] = useState(0);
-  const [revealedCount, setRevealedCount] = useState(1);
+  const m = useMatch('what-you-saying');
+  const s = m.match?.state;
+
   const [guess, setGuess] = useState('');
-  const [score, setScore] = useState(0);
-  const [solved, setSolved] = useState(false);
+  useEffect(() => { setGuess(''); }, [s?.round]);
 
-  const word = WORD_BANK[wordIndex % WORD_BANK.length];
-
-  useEffect(() => {
-    if (solved) return;
-    if (revealedCount >= word.length) return;
-    const id = setTimeout(() => setRevealedCount((c) => c + 1), REVEAL_INTERVAL_MS);
-    return () => clearTimeout(id);
-  }, [revealedCount, word, solved]);
-
-  function submitGuess() {
-    if (guess.trim().toUpperCase() === word) {
-      const points = Math.max(1, word.length - revealedCount + 1);
-      setScore((s) => s + points);
-      setSolved(true);
-    } else {
-      Alert.alert('Not quite', 'Try again, or wait for another letter to reveal.');
-    }
-  }
-
-  function next() {
-    setWordIndex((i) => i + 1);
-    setRevealedCount(1);
-    setGuess('');
-    setSolved(false);
-  }
+  const canPlay = m.match?.status === 'active' && !s?.done && !m.busy;
+  const fullyRevealed = s && s.revealed >= s.length;
 
   return (
-    <View style={styles.container}>
-      <StickerField variant="minimal" />
-      <FadeInUp>
-        <Text style={font.muted}>Score: {score}</Text>
-        <Text style={styles.masked}>{maskWord(word, revealedCount)}</Text>
-        <Text style={[font.muted, { textAlign: 'center' }]}>
-          {solved ? 'Solved!' : `A new letter reveals every ${REVEAL_INTERVAL_MS / 1000}s — guess fast for more points.`}
-        </Text>
-      </FadeInUp>
-
-      {!solved ? (
-        <View style={styles.guessRow}>
-          <TextInput
-            placeholder="Your guess…"
-            placeholderTextColor={colors.textMuted}
-            value={guess}
-            onChangeText={setGuess}
-            autoCapitalize="characters"
-            onSubmitEditing={submitGuess}
-            style={styles.input}
+    <MatchFrame
+      title="What You Saying"
+      subtitle="Same six words. Guess with as few letters showing as you can."
+      {...m}
+      onStart={() => { setGuess(''); return m.start(); }}
+      onResign={m.resign}
+    >
+      {s && (
+        <>
+          <RaceHeader
+            score={s.score}
+            opponentScore={s.opponentScore}
+            progress={s.round}
+            opponentProgress={s.opponentRound}
+            total={s.rounds}
+            done={s.done}
+            opponentDone={s.opponentDone}
           />
-          <MorphButton onPress={submitGuess} style={styles.primaryButton}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Guess</Text>
-          </MorphButton>
-        </View>
-      ) : (
-        <MorphButton onPress={next} style={styles.primaryButton}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Next word</Text>
-        </MorphButton>
+
+          {s.done ? (
+            <Text style={[font.h2, styles.finished]}>
+              All six done. {s.opponentDone ? '' : 'Waiting for them…'}
+            </Text>
+          ) : (
+            <View style={styles.card}>
+              <Text style={[font.h1, styles.mask]}>{s.mask}</Text>
+              <Text style={[font.muted, { textAlign: 'center' }]}>
+                {s.revealed} of {s.length} letters showing
+                {' · '}
+                worth {Math.max(5, (s.length - s.revealed) * 10)} if you get it now
+              </Text>
+
+              <TextInput
+                value={guess}
+                onChangeText={setGuess}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                placeholder="Your guess"
+                placeholderTextColor={colors.textSecondary}
+                style={styles.input}
+                onSubmitEditing={() => canPlay && guess.trim() && m.play({ guess })}
+              />
+
+              <View style={styles.actions}>
+                <MorphButton
+                  onPress={() => m.play({ action: 'reveal' })}
+                  disabled={!canPlay || fullyRevealed}
+                  style={[styles.secondary, (!canPlay || fullyRevealed) && styles.disabled]}
+                >
+                  <Ionicons name="eye-outline" size={18} color={colors.accentIndigo} />
+                  <Text style={font.body}>Reveal</Text>
+                </MorphButton>
+
+                <MorphButton
+                  onPress={() => { m.play({ guess }); setGuess(''); }}
+                  disabled={!canPlay || !guess.trim()}
+                  style={[styles.primary, (!canPlay || !guess.trim()) && styles.disabled]}
+                >
+                  <Text style={styles.primaryText}>Guess</Text>
+                </MorphButton>
+
+                <MorphButton onPress={() => m.play({ action: 'skip' })} disabled={!canPlay} style={styles.secondary}>
+                  <Text style={font.muted}>Skip</Text>
+                </MorphButton>
+              </View>
+
+              <Text style={[font.muted, styles.hint]}>
+                A wrong guess reveals a letter too.
+              </Text>
+            </View>
+          )}
+        </>
       )}
-    </View>
+    </MatchFrame>
   );
 }
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  masked: { fontSize: 30, fontWeight: '800', letterSpacing: 4, color: colors.accent, marginVertical: spacing.lg, textAlign: 'center' },
-  guessRow: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
-  input: { flex: 1, backgroundColor: colors.surface, color: colors.text, borderRadius: radius.pill, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border },
-  primaryButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.lg, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.sm },
-});
+    card: {
+      backgroundColor: colors.surface, borderRadius: radius.card, padding: spacing.md,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    mask: { textAlign: 'center', letterSpacing: 2, marginBottom: spacing.sm },
+    input: {
+      backgroundColor: colors.surfaceAlt, color: colors.textPrimary,
+      borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md,
+      textAlign: 'center', letterSpacing: 2, fontSize: 18,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+    secondary: {
+      flexDirection: 'row', alignItems: 'center', gap: 4,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+      borderRadius: radius.pill, backgroundColor: colors.surfaceAlt,
+    },
+    primary: {
+      flex: 1, backgroundColor: colors.accentPink, borderRadius: radius.pill,
+      paddingVertical: spacing.sm, alignItems: 'center',
+    },
+    primaryText: { color: '#fff', fontWeight: '700' },
+    disabled: { opacity: 0.4 },
+    hint: { textAlign: 'center', marginTop: spacing.sm },
+    finished: { textAlign: 'center', marginTop: spacing.lg },
+  });

@@ -26,12 +26,25 @@ for (const game of listGames()) {
 
   // The rule the whole design rests on: apply() must not mutate its input.
   const before = JSON.stringify(state);
-  const move = game === 'tic-tac-toe' ? { cell: 0 }
-    : game === 'four-in-a-row' ? { column: 0 }
-      : game === 'checkers' ? { from: [5, 0], to: [4, 1] }
-        : game === 'chess' ? { from: [6, 4], to: [4, 4] }
-          : game === 'uno-reverse' ? { action: 'draw' }
-            : { column: 0, rotation: 0 };
+  // One legal opening move per game, so the no-mutation check below has
+  // something real to apply. Every engine in the registry must appear here -
+  // a new one that does not will fall through and fail loudly, which is the
+  // intent.
+  const OPENINGS = {
+    'tic-tac-toe': { cell: 0 },
+    'four-in-a-row': { column: 0 },
+    checkers: { from: [5, 0], to: [4, 1] },
+    chess: { from: [6, 4], to: [4, 4] },
+    'uno-reverse': { action: 'draw' },
+    'block-blitz': { column: 0, rotation: 0 },
+    anagrams: { action: 'skip' },
+    'what-you-saying': { action: 'skip' },
+    'perfect-pair': { choice: engine.redactFor(state, 1).options?.[0] },
+    'love-letters': { action: 'pass' },
+    'love-golf': { hole: 0, strokes: 3 },
+  };
+  check(`${game}: has an opening move in this test`, game in OPENINGS, Object.keys(OPENINGS));
+  const move = OPENINGS[game];
   engine.apply(state, move, 1);
   check(`${game}: apply() does not mutate the state it was given`,
     JSON.stringify(state) === before);
@@ -274,6 +287,141 @@ let full = c4.create();
 for (let i = 0; i < 6; i += 1) full = c4.apply(full, { column: 3 }, i % 2 === 0 ? 1 : 2).state;
 check('a full column is refused',
   throws(() => c4.apply(full, { column: 3 }, 1)) instanceof IllegalMove);
+
+console.log('\n=== THE RACE GAMES: SAME PUZZLE, SEPARATE PROGRESS ===');
+// The whole point of converting these from solo: both players must get
+// identical content, or comparing scores at the end compares two different
+// games.
+for (const game of ['anagrams', 'what-you-saying', 'perfect-pair', 'love-letters', 'love-golf']) {
+  const engine = getEngine(game);
+  check(`${game}: is freeplay, so nobody waits for a turn`, engine.freeplay === true);
+  const a = engine.create({ seed: 4242 });
+  const b = engine.create({ seed: 4242 });
+  check(`${game}: the same seed builds the same match`,
+    JSON.stringify(a) === JSON.stringify(b));
+  check(`${game}: a different seed does not`,
+    JSON.stringify(engine.create({ seed: 4243 })) !== JSON.stringify(a));
+}
+
+console.log('\n=== ANAGRAMS ===');
+const ana = getEngine('anagrams');
+let an = ana.create({ seed: 77 });
+check('eight rounds', ana.redactFor(an, 1).rounds === 8);
+check('no word scrambles back to itself',
+  an.words.every((w, i) => w !== an.scrambles[i]), an.words.filter((w, i) => w === an.scrambles[i]));
+check('both players see the same scramble',
+  ana.redactFor(an, 1).scrambled === ana.redactFor(an, 2).scrambled);
+const anaView = JSON.stringify(ana.redactFor(an, 1));
+check('the answers to later rounds are not in your view',
+  an.words.slice(1).every((w) => !anaView.includes(w)), an.words.slice(1));
+const rightAnswer = ana.apply(an, { guess: an.words[0].toLowerCase() }, 1);
+check('the answer is case-insensitive', rightAnswer.state.index[1] === 1, rightAnswer.state.index);
+check('and scores by word length', rightAnswer.state.scores[1] === an.words[0].length * 10);
+const wrongAnswer = ana.apply(an, { guess: 'NONSENSE' }, 1);
+check('a wrong guess does not advance the round', wrongAnswer.state.index[1] === 0);
+check('and never drops the score below zero', wrongAnswer.state.scores[1] === 0, wrongAnswer.state.scores[1]);
+check('an empty guess is rejected',
+  throws(() => ana.apply(an, { guess: '   ' }, 1)) instanceof IllegalMove);
+check('one player finishing does not end the match',
+  (() => { let st = an; for (let i = 0; i < 8; i += 1) st = ana.apply(st, { action: 'skip' }, 1).state;
+    return ana.redactFor(st, 1).done === true && ana.redactFor(st, 2).done === false; })());
+
+console.log('\n=== WHAT YOU SAYING ===');
+const wys = getEngine('what-you-saying');
+let wy = wys.create({ seed: 31 });
+check('one letter showing at the start', wys.redactFor(wy, 1).revealed === 1);
+check('the mask hides the rest', wys.redactFor(wy, 1).mask.includes('_'), wys.redactFor(wy, 1).mask);
+const revealed = wys.apply(wy, { action: 'reveal' }, 1);
+check('revealing shows one more', wys.redactFor(revealed.state, 1).revealed === 2);
+check('and does not advance the round', wys.redactFor(revealed.state, 1).round === 1);
+const wrongGuess = wys.apply(wy, { guess: 'WRONG' }, 1);
+check('a wrong guess costs you a letter', wys.redactFor(wrongGuess.state, 1).revealed === 2);
+const cheap = wys.apply(wy, { guess: wy.words[0] }, 1);
+const expensive = wys.apply(wys.apply(wys.apply(wy, { action: 'reveal' }, 1).state, { action: 'reveal' }, 1).state,
+  { guess: wy.words[0] }, 1);
+check('fewer letters used scores more',
+  cheap.state.scores[1] > expensive.state.scores[1],
+  { cheap: cheap.state.scores[1], expensive: expensive.state.scores[1] });
+check('the word itself is never in your view',
+  !JSON.stringify(wys.redactFor(wy, 1)).includes(wy.words[0]), wy.words[0]);
+
+console.log('\n=== PERFECT PAIR ===');
+const pp = getEngine('perfect-pair');
+let pair = pp.create({ seed: 5 });
+const v1 = pp.redactFor(pair, 1);
+const v2 = pp.redactFor(pair, 2);
+check('both start on the same word', v1.word === v2.word, { a: v1.word, b: v2.word });
+check('the options are the same four words', 
+  JSON.stringify([...v1.options].sort()) === JSON.stringify([...v2.options].sort()));
+check('but shuffled differently, so glancing over is useless',
+  JSON.stringify(v1.options) !== JSON.stringify(v2.options), v1.options);
+check('the correct answer is not labelled in your view',
+  !JSON.stringify(v1).includes('correct'), Object.keys(v1));
+const wrongPick = pp.apply(pair, { choice: v1.options.find((o) => o !== 'BEACH' && o !== undefined) }, 1);
+check('a pick that is not on offer is rejected',
+  throws(() => pp.apply(pair, { choice: 'BANANA' }, 1)) instanceof IllegalMove);
+check('one run ending does not end the match', wrongPick.result === null || wrongPick.state.alive[2] === true);
+
+console.log('\n=== LOVE LETTERS ===');
+const ll = getEngine('love-letters');
+let letters = ll.create({ seed: 8 });
+check('five rounds', ll.redactFor(letters, 1).rounds === 5);
+check('both players get the same rack',
+  JSON.stringify(ll.redactFor(letters, 1).rack) === JSON.stringify(ll.redactFor(letters, 2).rack));
+check('the rack has seven letters', ll.redactFor(letters, 1).rack.length === 7);
+check('with at least two vowels',
+  ll.redactFor(letters, 1).rack.filter((l) => 'AEIOU'.includes(l)).length >= 2,
+  ll.redactFor(letters, 1).rack);
+const rack = ll.redactFor(letters, 1).rack;
+check('a word not spellable from the rack is refused',
+  throws(() => ll.apply(letters, { word: 'ZZZZZZ' }, 1)) instanceof IllegalMove);
+check('and the message names the rack',
+  /cannot be spelled/i.test(throws(() => ll.apply(letters, { word: 'ZZZZZZ' }, 1)).message));
+check('a letter cannot be used more often than it appears',
+  throws(() => ll.apply(letters, { word: rack[0].repeat(8) }, 1)) instanceof IllegalMove);
+const played = ll.apply(letters, { word: rack.slice(0, 2).join('') }, 1);
+check('a spellable word scores', played.state.scores[1] > 0, played.state.scores[1]);
+check('their words stay hidden until both are done',
+  ll.redactFor(played.state, 2).opponentWords === null);
+check('numbers are refused',
+  throws(() => ll.apply(letters, { word: 'A1' }, 1)) instanceof IllegalMove);
+
+console.log('\n=== LOVE GOLF ===');
+const golf = getEngine('love-golf');
+let g = golf.create({ seed: 12 });
+check('six holes', golf.redactFor(g, 1).holes === 6);
+check('both players play the same layout',
+  JSON.stringify(golf.redactFor(g, 1).hole) === JSON.stringify(golf.redactFor(g, 2).hole));
+check('the hole has a start, a cup and obstacles',
+  g.holes[0].start && g.holes[0].hole && Array.isArray(g.holes[0].obstacles), g.holes[0]);
+check('coordinates are normalised so any screen can lay it out',
+  g.holes.every((h) => h.start.x >= 0 && h.start.x <= 1 && h.hole.y >= 0 && h.hole.y <= 1));
+check('a stroke count below one is refused',
+  throws(() => golf.apply(g, { strokes: 0 }, 1)) instanceof IllegalMove);
+check('a fractional stroke count is refused',
+  throws(() => golf.apply(g, { strokes: 2.5 }, 1)) instanceof IllegalMove);
+check('an absurd stroke count is capped',
+  throws(() => golf.apply(g, { strokes: 999 }, 1)) instanceof IllegalMove);
+check('reporting the wrong hole is refused, so a retry cannot score twice',
+  throws(() => golf.apply(g, { hole: 3, strokes: 2 }, 1)) instanceof IllegalMove);
+const holed = golf.apply(g, { hole: 0, strokes: 3 }, 1);
+check('a valid report advances the card', golf.redactFor(holed.state, 1).holeNumber === 2);
+// Golf scores the other way round from everything else in the app.
+let low = golf.create({ seed: 12 });
+for (let i = 0; i < 6; i += 1) {
+  low = golf.apply(low, { hole: i, strokes: 2 }, 1).state;
+  low = golf.apply(low, { hole: i, strokes: i === 5 ? 5 : 4 }, 2).state;
+}
+const finished = golf.apply(golf.create({ seed: 12 }), { hole: 0, strokes: 1 }, 1);
+check('the lower total wins, because it is golf',
+  (() => { let st = golf.create({ seed: 12 });
+    for (let i = 0; i < 6; i += 1) {
+      st = golf.apply(st, { hole: i, strokes: 2 }, 1).state;
+      const r = golf.apply(st, { hole: i, strokes: 5 }, 2);
+      st = r.state;
+      if (i === 5) return r.result === 'player1';
+    }
+    return false; })());
 
 console.log(`\nENGINE RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

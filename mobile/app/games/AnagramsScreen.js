@@ -1,129 +1,151 @@
-import React, { useMemo, useState } from 'react';
+// Anagrams — a race, not a solo puzzle.
+//
+// Both phones get the same eight scrambled words. You tap letters to build
+// your answer and move on; neither of you waits for the other.
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { spacing, radius } from '../../theme';
-import { MorphButton, FadeInUp } from '../../components/Motion';
-import Icon from '../../components/Icon';
-import StickerField from '../../components/Stickers';
 import { useTheme } from '../../components/ThemeContext';
-
-const WORD_BANK = [
-  'LOVE', 'HEART', 'KISS', 'HUGS', 'DATE', 'SWEET', 'DREAM', 'TOGETHER',
-  'FOREVER', 'ADVENTURE', 'LAUGH', 'CUDDLE', 'SUNSET', 'HOLDHANDS', 'PARTNER',
-];
-
-function shuffle(word) {
-  const letters = word.split('');
-  for (let i = letters.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [letters[i], letters[j]] = [letters[j], letters[i]];
-  }
-  const scrambled = letters.join('');
-  return scrambled === word ? shuffle(word) : scrambled;
-}
+import { MorphButton, Pop } from '../../components/Motion';
+import { useMatch } from '../../components/games/useMatch';
+import MatchFrame from '../../components/games/MatchFrame';
+import RaceHeader from '../../components/games/RaceHeader';
 
 export default function AnagramsScreen() {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [wordIndex, setWordIndex] = useState(0);
-  const [scrambled, setScrambled] = useState(() => shuffle(WORD_BANK[0]));
+  const m = useMatch('anagrams');
+  const s = m.match?.state;
+
   const [picked, setPicked] = useState([]);
-  const [remainingIdx, setRemainingIdx] = useState(() => shuffle(WORD_BANK[0]).split('').map((_, i) => i));
-  const [score, setScore] = useState(0);
-  const [feedback, setFeedback] = useState(null);
 
-  const word = WORD_BANK[wordIndex % WORD_BANK.length];
-  const letters = useMemo(() => scrambled.split(''), [scrambled]);
+  // A new round means a fresh set of tiles.
+  useEffect(() => { setPicked([]); }, [s?.round]);
 
-  function pickLetter(i) {
-    if (!remainingIdx.includes(i)) return;
-    setPicked((prev) => [...prev, i]);
-    setRemainingIdx((prev) => prev.filter((idx) => idx !== i));
-  }
+  const letters = (s?.scrambled || '').split('');
+  const guess = picked.map((i) => letters[i]).join('');
+  const canPlay = m.match?.status === 'active' && !s?.done && !m.busy;
 
-  function undo() {
-    const last = picked[picked.length - 1];
-    if (last === undefined) return;
-    setPicked((prev) => prev.slice(0, -1));
-    setRemainingIdx((prev) => [...prev, last]);
-  }
-
-  function checkAnswer() {
-    const guess = picked.map((i) => letters[i]).join('');
-    if (guess === word) {
-      setScore((s) => s + 1);
-      setFeedback('correct');
-      setTimeout(nextWord, 700);
-    } else {
-      setFeedback('wrong');
-    }
-  }
-
-  function nextWord() {
-    const nextIndex = wordIndex + 1;
-    const nextWordText = WORD_BANK[nextIndex % WORD_BANK.length];
-    const nextScrambled = shuffle(nextWordText);
-    setWordIndex(nextIndex);
-    setScrambled(nextScrambled);
-    setPicked([]);
-    setRemainingIdx(nextScrambled.split('').map((_, i) => i));
-    setFeedback(null);
-  }
+  const tap = (i) => {
+    if (!canPlay) return;
+    setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
+  };
 
   return (
-    <View style={styles.container}>
-      <StickerField variant="minimal" />
-      <FadeInUp>
-        <Text style={font.muted}>Score: {score}</Text>
-        <Text style={[font.h2, { marginVertical: spacing.md }]}>Unscramble the word</Text>
-      </FadeInUp>
+    <MatchFrame
+      title="Anagrams"
+      subtitle="Same eight words, both phones. Unscramble them faster."
+      {...m}
+      onStart={() => { setPicked([]); return m.start(); }}
+      onResign={m.resign}
+    >
+      {s && (
+        <>
+          <RaceHeader
+            score={s.score}
+            opponentScore={s.opponentScore}
+            progress={s.round}
+            opponentProgress={s.opponentRound}
+            total={s.rounds}
+            done={s.done}
+            opponentDone={s.opponentDone}
+          />
 
-      <View style={styles.answerRow}>
-        {picked.map((i, idx) => (
-          <Pressable key={idx} onPress={undo} style={styles.tile}>
-            <Text style={styles.tileText}>{letters[i]}</Text>
-          </Pressable>
-        ))}
-        {picked.length === 0 && <Text style={font.muted}>Tap letters below</Text>}
-      </View>
+          {s.done ? (
+            <Text style={[font.h2, styles.finished]}>
+              All eight done. {s.opponentDone ? '' : 'Waiting for them…'}
+            </Text>
+          ) : (
+            <View style={styles.card}>
+              <Text style={font.muted}>{s.length} letters</Text>
 
-      <View style={styles.lettersRow}>
-        {remainingIdx.map((i) => (
-          <Pressable key={i} onPress={() => pickLetter(i)} style={[styles.tile, styles.tileAvailable]}>
-            <Text style={styles.tileText}>{letters[i]}</Text>
-          </Pressable>
-        ))}
-      </View>
+              <View style={styles.answerBox}>
+                <Text style={[font.h1, styles.answer]}>
+                  {guess || '—'}
+                </Text>
+              </View>
 
-      {feedback === 'wrong' && <Text style={{ color: colors.danger, marginTop: spacing.md }}>Not quite — try again.</Text>}
-      {feedback === 'correct' && (
-        <View style={styles.correctRow}>
-          <Icon name="sparkles" color={colors.gold} size={16} />
-          <Text style={{ color: colors.success, fontWeight: '700' }}>Correct!</Text>
-        </View>
+              <View style={styles.tiles}>
+                {letters.map((letter, i) => {
+                  const used = picked.includes(i);
+                  return (
+                    <Pressable key={i} onPress={() => tap(i)} disabled={!canPlay}>
+                      <Pop active={used}>
+                        <View style={[styles.tile, used && styles.tileUsed]}>
+                          <Text style={[font.h2, used && { color: '#fff' }]}>{letter}</Text>
+                        </View>
+                      </Pop>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.actions}>
+                <MorphButton onPress={() => setPicked([])} style={styles.secondary}>
+                  <Ionicons name="backspace-outline" size={18} color={colors.textPrimary} />
+                  <Text style={font.body}>Clear</Text>
+                </MorphButton>
+
+                <MorphButton
+                  onPress={() => { m.play({ guess }); setPicked([]); }}
+                  disabled={!canPlay || picked.length !== letters.length}
+                  style={[
+                    styles.primary,
+                    (!canPlay || picked.length !== letters.length) && styles.disabled,
+                  ]}
+                >
+                  <Text style={styles.primaryText}>Submit</Text>
+                </MorphButton>
+
+                <MorphButton onPress={() => m.play({ action: 'skip' })} disabled={!canPlay} style={styles.secondary}>
+                  <Text style={font.muted}>Skip</Text>
+                </MorphButton>
+              </View>
+
+              {s.misses > 0 && (
+                <Text style={[font.muted, { marginTop: spacing.sm }]}>
+                  {s.misses} wrong {s.misses === 1 ? 'guess' : 'guesses'} so far
+                </Text>
+              )}
+            </View>
+          )}
+        </>
       )}
-
-      <View style={styles.actions}>
-        <MorphButton onPress={checkAnswer} disabled={remainingIdx.length > 0} style={styles.checkButton}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Check</Text>
-        </MorphButton>
-        <MorphButton onPress={nextWord} style={styles.skipButton}>
-          <Text style={font.body}>Skip</Text>
-        </MorphButton>
-      </View>
-    </View>
+    </MatchFrame>
   );
 }
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', padding: spacing.lg },
-  correctRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
-  answerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 56, marginVertical: spacing.lg, justifyContent: 'center' },
-  lettersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },
-  tile: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  tileAvailable: { backgroundColor: colors.surface },
-  tileText: { color: colors.text, fontWeight: '700', fontSize: 18 },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl },
-  checkButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  skipButton: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-});
+    card: {
+      backgroundColor: colors.surface, borderRadius: radius.card, padding: spacing.md,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    answerBox: {
+      minHeight: 56, borderRadius: radius.md, backgroundColor: colors.surfaceAlt,
+      alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    answer: { letterSpacing: 3 },
+    tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md, justifyContent: 'center' },
+    tile: {
+      width: 44, height: 50, borderRadius: radius.sm,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border,
+    },
+    tileUsed: { backgroundColor: colors.accentPink, borderColor: colors.accentPink },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+    secondary: {
+      flexDirection: 'row', alignItems: 'center', gap: 4,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+      borderRadius: radius.pill, backgroundColor: colors.surfaceAlt,
+    },
+    primary: {
+      flex: 1, backgroundColor: colors.accentPink, borderRadius: radius.pill,
+      paddingVertical: spacing.sm, alignItems: 'center',
+    },
+    primaryText: { color: '#fff', fontWeight: '700' },
+    disabled: { opacity: 0.4 },
+    finished: { textAlign: 'center', marginTop: spacing.lg },
+  });

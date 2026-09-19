@@ -1,9 +1,13 @@
 // The arcade.
 //
-// Two sections, because they are genuinely different things and pretending
-// otherwise was the old screen's problem: the multiplayer games carry a
-// win/loss record against your partner and can have a match already waiting,
-// while the solo ones are just something to play.
+// Every game here is played against your partner. There is no solo section
+// any more, because there are no solo games left: the five that were
+// single-player are now races over the same seeded content, and Draw Duel
+// was already live over sockets.
+//
+// Draw Duel is the one that does not go through the match layer — it is a
+// live socket game with no board state to be authoritative about — so it is
+// listed from the catalogue rather than from /games/matches.
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -53,8 +57,11 @@ export default function GamesScreen({ navigation }) {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const matchBySlug = Object.fromEntries(matches.map((m) => [m.game, m]));
-  const multiplayer = catalog.filter((g) => matchBySlug[g.slug]);
-  const solo = catalog.filter((g) => !matchBySlug[g.slug]);
+  // Anything with a match row goes in the main list; anything else (today
+  // just Draw Duel) is still two-player, it simply keeps its state on the
+  // socket rather than in game_matches.
+  const withRecord = catalog.filter((g) => matchBySlug[g.slug]);
+  const live = catalog.filter((g) => !matchBySlug[g.slug]);
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -72,7 +79,7 @@ export default function GamesScreen({ navigation }) {
         <Text style={font.h1}>Arcade</Text>
         {error && <Text style={[font.muted, { marginTop: spacing.xs }]}>{error}</Text>}
 
-        {multiplayer.length > 0 && (
+        {withRecord.length > 0 && (
           <>
             <View style={styles.sectionHead}>
               <Ionicons name="people" size={18} color={colors.accentPink} />
@@ -80,7 +87,7 @@ export default function GamesScreen({ navigation }) {
             </View>
 
             <Stagger delayStep={45}>
-              {multiplayer.map((game) => {
+              {withRecord.map((game) => {
                 const live = matchBySlug[game.slug];
                 const active = live.active;
                 const yourMove = active?.yourTurn && active?.status === 'active';
@@ -118,15 +125,17 @@ export default function GamesScreen({ navigation }) {
           </>
         )}
 
-        <View style={styles.sectionHead}>
-          <Ionicons name="game-controller" size={18} color={colors.accentIndigo} />
-          <Text style={[font.h2, { marginLeft: spacing.sm }]}>
-            {multiplayer.length > 0 ? 'On your own' : 'Games'}
-          </Text>
-        </View>
+        {live.length > 0 && (
+          <View style={styles.sectionHead}>
+            <Ionicons name="flash" size={18} color={colors.accentIndigo} />
+            <Text style={[font.h2, { marginLeft: spacing.sm }]}>
+              {withRecord.length > 0 ? 'Live together' : 'Games'}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.grid}>
-          {solo.map((game) => (
+          {live.map((game) => (
             <MorphButton
               key={game.slug}
               onPress={() => navigation.navigate(ROUTE_BY_SLUG[game.slug])}

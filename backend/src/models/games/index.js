@@ -27,6 +27,11 @@ import checkers from './checkers.js';
 import chess from './chess.js';
 import unoReverse from './unoReverse.js';
 import blockBlitz from './blockBlitz.js';
+import anagrams from './anagrams.js';
+import whatYouSaying from './whatYouSaying.js';
+import perfectPair from './perfectPair.js';
+import loveLetters from './loveLetters.js';
+import loveGolf from './loveGolf.js';
 
 const ENGINES = {
   'tic-tac-toe': ticTacToe,
@@ -35,6 +40,11 @@ const ENGINES = {
   chess,
   'uno-reverse': unoReverse,
   'block-blitz': blockBlitz,
+  anagrams,
+  'what-you-saying': whatYouSaying,
+  'perfect-pair': perfectPair,
+  'love-letters': loveLetters,
+  'love-golf': loveGolf,
 };
 
 export function getEngine(game) {

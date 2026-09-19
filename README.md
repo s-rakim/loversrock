@@ -205,6 +205,7 @@ they're load-bearing and shouldn't be casually reversed:
 | Date Ideas (curated + saved) | ✅ Fully implemented |
 | Countdowns (auto-archive) | ✅ Fully implemented |
 | Messages (text/photo/doodle unified feed) | ✅ Fully implemented |
+| Doodles — 16 colours, 5 widths, 6 papers, 8 brushes (pen/marker/neon/dashed/dotted/rainbow/ribbon/eraser), undo & redo | ✅ Fully implemented, old doodles still render |
 | Widget Photos (mirrors into Memories, FCM data message) | ✅ Fully implemented |
 | Community Question Decks (27 decks / 10 categories) | ✅ Fully implemented |
 | Thumb Kiss (live two-device touch sync) | ✅ Fully implemented |
@@ -213,8 +214,7 @@ they're load-bearing and shouldn't be casually reversed:
 | Partner cycle mode (read-only, per-category sharing, pregnancy-chance curve) | ✅ Fully implemented |
 | Nicknames (each partner names the other, independently) | ✅ Fully implemented |
 | Daily prompts refreshed nightly from a random topic (Claude / any URL / local bank) | ✅ Fully implemented |
-| Multiplayer games: Tic Tac Toe, Four in a Row, Checkers, Chess, Uno Reverse, Block Blitz | ✅ Server-authoritative, played against your partner. Chess verified by perft. |
-| Solo games: Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All playable |
+| Games — all 12 played against your partner, none solo: Tic Tac Toe, Four in a Row, Checkers, Chess, Uno Reverse, Block Blitz, Anagrams, What You Saying, Perfect Pair, Love Letters, Love Golf, Draw Duel | ✅ Server-authoritative (Love Golf's score is client-reported — `docs/GAMES.md` says why). Chess verified by perft. |
 | Voice and video calls (WebRTC, peer to peer) | ⚠️ Signalling tested end to end; the media itself needs a two-device pass. See `docs/CALLS.md`. |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
 | Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |
