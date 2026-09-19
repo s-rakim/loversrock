@@ -40,6 +40,15 @@ for (const label of [
   check(`"${label}" is in the catalogue`, labels.has(label));
 }
 
+// The vocabulary a partner actually reaches for. These are moods, logged
+// from Add Mood and shared under share_mood - a separate switch from
+// symptoms, so a gap here is invisible until someone looks for the word.
+const moodLabels = new Set(MOODS.map((m) => m.label));
+for (const label of ['Gloomy', 'Sad', 'Irritable', 'Drained', 'Weepy', 'Touchy',
+                     'Needy', 'Affectionate', 'Content', 'Feeling low']) {
+  check(`"${label}" is a mood you can pick`, moodLabels.has(label));
+}
+
 console.log('\n=== IDS ARE UNIQUE AND STABLE ===');
 const symptomIds = SYMPTOM_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 check('no duplicate symptom id', new Set(symptomIds).size === symptomIds.length,

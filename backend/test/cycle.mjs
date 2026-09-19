@@ -172,6 +172,37 @@ check('calendar flags intercourse without detailing it',
 check('calendar flags a note without its text',
   dayRow.hasNotes === true && dayRow.notes === undefined, dayRow);
 
+console.log('\n=== EVERY MOOD CROSSES, NOT JUST THE FIRST ===');
+// The partner card has room for one mood; the section below it lists them
+// all. Both read the same array, so the array has to arrive whole.
+await req('/period/sharing', { method: 'PATCH', token: OWNER.token, body: {
+  sharingEnabled: true, share_mood: true,
+}});
+await req('/period/log', { method: 'POST', token: OWNER.token, body: {
+  date: today, moods: ['gloomy', 'irritable', 'drained'], moment: 'gloomy',
+}});
+view = await req('/period/partner', { token: PARTNER.token });
+check('all three moods arrive, in order',
+  JSON.stringify(view.data.today.moods) === JSON.stringify(['gloomy', 'irritable', 'drained']),
+  view.data.today);
+check('the headline moment is the one they picked',
+  view.data.today.moment === 'gloomy', view.data.today);
+
+// Moods chosen without a moment must still show: the screen falls back to
+// moods[0], which only works if the array is there.
+await req('/period/log', { method: 'POST', token: OWNER.token, body: {
+  date: day(-1), moods: ['weepy', 'touchy'],
+}});
+const yesterday = await req(`/period/log/${day(-1)}`, { token: OWNER.token });
+check('moods save with no moment set',
+  JSON.stringify(yesterday.data.log.moods) === JSON.stringify(['weepy', 'touchy']),
+  yesterday.data.log);
+
+await req('/period/sharing', { method: 'PATCH', token: OWNER.token, body: { share_mood: false } });
+view = await req('/period/partner', { token: PARTNER.token });
+check('the whole mood array disappears when the switch goes off',
+  view.data.today?.moods === undefined && view.data.today?.moment === undefined, view.data.today);
+
 console.log(`\nCYCLE RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
 process.exit(0);
