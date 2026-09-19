@@ -93,6 +93,20 @@ EAS compiles in the cloud and gives you a download link — no Android SDK or
 Xcode needed locally. See [`docs/WIDGETS.md`](docs/WIDGETS.md) for the full
 matrix, including the local `expo prebuild` path and the iOS requirements.
 
+
+**Don't put a period in `expo.name`.** The wordmark is "loversrock." but the
+config name must be `loversrock`: Expo copies `expo.name` straight into
+`rootProject.name` in `android/settings.gradle`, and Gradle refuses a project
+name that starts or ends with a `.` — the build dies before compiling
+anything. The period you see in the app is drawn by `font.wordmark` in
+`mobile/theme.js`, which is unaffected.
+
+**`expo.icon` must point at a file that exists.** There is no `mobile/assets/`
+in this repo, so `icon`, `splash.image` and `android.adaptiveIcon` are
+deliberately absent — adding a key that points at a missing PNG fails the
+build. Drop your artwork at `mobile/assets/icon.png` *first*, then add the
+keys.
+
 #### If the app says it can't reach the server
 
 **Fix it on the phone — you do not need a new build.** `EXPO_PUBLIC_API_URL`
