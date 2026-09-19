@@ -43,6 +43,8 @@ function present(user, nickname) {
     // Resolved server-side so no screen has to re-implement the fallback.
     displayName: nickname || user.name,
     themePreference: user.theme_preference || 'system',
+    // Null for the partner by construction — see the query in GET /.
+    chatWallpaper: user.chat_wallpaper || null,
   };
 }
 
@@ -64,9 +66,15 @@ router.get('/', requireAuth, async (req, res) => {
   const pair = pairRows[0] || null;
   const partnerId = pair ? (pair.user_a_id === req.userId ? pair.user_b_id : pair.user_a_id) : null;
 
+  // chat_wallpaper is selected only for the caller. This query loads both
+  // people, and a wallpaper is a private reading preference with no reason
+  // to appear in the other direction - so the column is nulled out for
+  // anyone who is not the person asking.
   const { rows: users } = await query(
-    'SELECT id, name, avatar_url, theme_preference FROM users WHERE id = ANY($1::uuid[])',
-    [partnerId ? [req.userId, partnerId] : [req.userId]]
+    `SELECT id, name, avatar_url, theme_preference,
+            CASE WHEN id = $2 THEN chat_wallpaper ELSE NULL END AS chat_wallpaper
+     FROM users WHERE id = ANY($1::uuid[])`,
+    [partnerId ? [req.userId, partnerId] : [req.userId], req.userId]
   );
   const byId = new Map(users.map((u) => [u.id, u]));
 
@@ -97,7 +105,7 @@ router.get('/', requireAuth, async (req, res) => {
  * `userId` — a client can only ever write its own row.
  */
 router.patch('/preferences', requireAuth, async (req, res) => {
-  const { themePreference } = req.body || {};
+  const { themePreference, chatWallpaper } = req.body || {};
 
   if (themePreference !== undefined) {
     if (!THEME_PREFERENCES.includes(themePreference)) {
@@ -106,9 +114,46 @@ router.patch('/preferences', requireAuth, async (req, res) => {
     await query('UPDATE users SET theme_preference = $1 WHERE id = $2', [themePreference, req.userId]);
   }
 
-  const { rows } = await query('SELECT theme_preference FROM users WHERE id = $1', [req.userId]);
-  res.json({ themePreference: rows[0].theme_preference });
+  if (chatWallpaper !== undefined) {
+    const problem = validateWallpaper(chatWallpaper);
+    if (problem) return res.status(400).json({ error: problem });
+    await query('UPDATE users SET chat_wallpaper = $1 WHERE id = $2', [chatWallpaper, req.userId]);
+  }
+
+  const { rows } = await query(
+    'SELECT theme_preference, chat_wallpaper FROM users WHERE id = $1',
+    [req.userId]
+  );
+  res.json({ themePreference: rows[0].theme_preference, chatWallpaper: rows[0].chat_wallpaper });
 });
+
+/**
+ * A wallpaper is either a built-in id or 'photo:<storage key>'.
+ *
+ * The photo form is checked rather than trusted: the key is bounded, and it
+ * must look like a storage key rather than a URL or a path, so this cannot
+ * become a way to point the app at an arbitrary address. Whether the key
+ * belongs to this pair is enforced where it is read - the image is served
+ * through the same /media route as every other picture, which already scopes
+ * by pair.
+ */
+function validateWallpaper(value) {
+  if (value === null || value === '') return null;   // clearing it
+  if (typeof value !== 'string') return 'chatWallpaper must be a string or null';
+  if (value.length > 300) return 'chatWallpaper is too long';
+
+  if (value.startsWith('photo:')) {
+    const key = value.slice(6);
+    if (!key) return 'chatWallpaper photo needs a key';
+    if (/^https?:|^\/\/|\.\./i.test(key)) return 'chatWallpaper photo must be a stored key, not a URL';
+    return null;
+  }
+
+  if (!/^[a-z0-9_-]{1,40}$/.test(value)) {
+    return 'chatWallpaper must be a built-in id or photo:<key>';
+  }
+  return null;
+}
 
 /** Sets what *I* call my partner. Only ever writes my own row. */
 router.put('/nickname', requireAuth, requirePair, async (req, res) => {

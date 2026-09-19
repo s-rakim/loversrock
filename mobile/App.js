@@ -36,6 +36,7 @@ import GamesScreen from './app/GamesScreen';
 import SettingsScreen from './app/SettingsScreen';
 import CallScreen from './app/CallScreen';
 import WidgetPhotoScreen from './app/WidgetPhotoScreen';
+import WallpaperScreen from './app/WallpaperScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
 import TicTacToeScreen from './app/games/TicTacToeScreen';
 import CheckersScreen from './app/games/CheckersScreen';
@@ -201,6 +202,7 @@ function Root() {
             <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
             <Stack.Screen name="WidgetPhoto" component={WidgetPhotoScreen} options={{ title: 'Photo Drop' }} />
+            <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Chat Wallpaper' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
             <Stack.Screen name="PeriodTracker" component={PeriodTrackerScreen} options={{ title: 'Cycle Tracker' }} />

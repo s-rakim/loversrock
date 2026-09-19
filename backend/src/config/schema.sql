@@ -203,6 +203,15 @@ CREATE TABLE IF NOT EXISTS deck_question_responses (
 -- answered every question. Its only job is to make the reveal happen exactly
 -- once: the insert is the claim, so a retried request or both phones
 -- finishing simultaneously cannot send the notification twice.
+-- What each person wants behind their own message thread. Personal, not
+-- shared: a wallpaper is a reading preference, and the two of you having
+-- different taste is not a conflict to resolve. Stored on the account rather
+-- than the device so it follows you to a new phone.
+--
+-- Holds either a built-in id ('blush') or 'photo:<storage key>' pointing at
+-- one of the pair's own memories.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS chat_wallpaper TEXT;
+
 CREATE TABLE IF NOT EXISTS quiz_days (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pair_id         UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
