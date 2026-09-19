@@ -90,6 +90,10 @@ const makeStyles = (colors) =>
       paddingHorizontal: spacing.xs,
     },
     bubble: {
+      // Fixed, not minHeight: this is a circle around a glyph, and a
+      // borderRadius of half the width only stays round while the height
+      // matches it. The label below is what has to grow with the font
+      // setting, and it does - it has no height of its own.
       width: 62,
       height: 62,
       borderRadius: 31,
@@ -99,5 +103,5 @@ const makeStyles = (colors) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    label: { marginTop: spacing.xs, textAlign: 'center', fontSize: 12, lineHeight: 15 },
+    label: { marginTop: spacing.xs, textAlign: 'center', fontSize: 12 },
   });

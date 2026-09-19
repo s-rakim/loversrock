@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { Appearance, AccessibilityInfo } from 'react-native';
+import { Appearance, AccessibilityInfo, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lightColors, darkColors, makeFont, gradientForCategory } from '../theme';
 import { apiFetch } from '../services/api';
@@ -84,11 +84,20 @@ export function ThemeProvider({ children }) {
   const reduceMotion = motionPreference === 'system' ? systemReduceMotion : motionPreference === 'on';
   const isDark = scheme === 'dark';
 
+  // The phone's own font-size setting. React Native already scales fontSize
+  // by it, so makeFont does NOT touch fontSize - it uses this for lineHeight,
+  // which RN does not scale. Without that, turning the phone's font size up
+  // grows the glyphs while the line spacing stays put and the text closes up.
+  const { fontScale } = useWindowDimensions();
+
   const value = useMemo(() => {
     const colors = isDark ? darkColors : lightColors;
     return {
       colors,
-      font: makeFont(colors),
+      font: makeFont(colors, fontScale),
+      // Exposed so a screen sizing its own one-off text can keep its leading
+      // in step rather than being the one line that stays cramped.
+      fontScale,
       scheme,
       isDark,
       preference,
@@ -103,7 +112,7 @@ export function ThemeProvider({ children }) {
       statusBarStyle: isDark ? 'light' : 'dark',
       keyboardAppearance: isDark ? 'dark' : 'light',
     };
-  }, [isDark, scheme, preference, setPreference, reduceMotion, motionPreference, setMotionPreference, hydrated]);
+  }, [isDark, scheme, preference, setPreference, reduceMotion, motionPreference, setMotionPreference, hydrated, fontScale]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
