@@ -34,6 +34,11 @@ import PeriodTrackerScreen from './app/PeriodTrackerScreen';
 import GamesScreen from './app/GamesScreen';
 import SettingsScreen from './app/SettingsScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
+import TicTacToeScreen from './app/games/TicTacToeScreen';
+import CheckersScreen from './app/games/CheckersScreen';
+import ChessScreen from './app/games/ChessScreen';
+import UnoReverseScreen from './app/games/UnoReverseScreen';
+import BlockBlitzScreen from './app/games/BlockBlitzScreen';
 import AnagramsScreen from './app/games/AnagramsScreen';
 import LoveGolfScreen from './app/games/LoveGolfScreen';
 import DrawDuelScreen from './app/games/DrawDuelScreen';
@@ -171,6 +176,11 @@ function Root() {
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
             <Stack.Screen name="PeriodTracker" component={PeriodTrackerScreen} options={{ title: 'Cycle Tracker' }} />
             <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ title: 'Four in a Row' }} />
+            <Stack.Screen name="TicTacToe" component={TicTacToeScreen} options={{ title: 'Tic Tac Toe' }} />
+            <Stack.Screen name="Checkers" component={CheckersScreen} options={{ title: 'Checkers' }} />
+            <Stack.Screen name="Chess" component={ChessScreen} options={{ title: 'Chess' }} />
+            <Stack.Screen name="UnoReverse" component={UnoReverseScreen} options={{ title: 'Uno Reverse' }} />
+            <Stack.Screen name="BlockBlitz" component={BlockBlitzScreen} options={{ title: 'Block Blitz' }} />
             <Stack.Screen name="Anagrams" component={AnagramsScreen} options={{ title: 'Anagrams' }} />
             <Stack.Screen name="LoveGolf" component={LoveGolfScreen} options={{ title: 'Love Golf' }} />
             <Stack.Screen name="DrawDuel" component={DrawDuelScreen} options={{ title: 'Draw Duel' }} />

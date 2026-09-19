@@ -41,6 +41,12 @@ function viewOf(match, engine, userId) {
         : (match.result === 'player1' ? 1 : 2) === seat ? 'you' : 'them',
     moveCount: match.move_count,
     state: engine.redactFor(match.state, seat),
+    // Only for the player on move, and only for engines that offer it. The
+    // board renders these; it never works them out for itself.
+    legalMoves: engine.legalMovesFor && match.status === 'active'
+      && (engine.freeplay || match.turn_user_id === userId)
+      ? engine.legalMovesFor(match.state, seat)
+      : null,
     updatedAt: match.updated_at,
   };
 }

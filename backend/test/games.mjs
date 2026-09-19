@@ -205,6 +205,42 @@ fr = await move('four-in-a-row', A.token, { column: 0 });
 check('four in a column wins', fr.data.match.outcome === 'you', fr.data.match);
 check('and the winning line is returned', Array.isArray(fr.data.match.state.winningLine), fr.data.match.state);
 
+console.log('\n=== LEGAL MOVES COME FROM THE SERVER, FOR THE MOVER ONLY ===');
+// The boards highlight destinations from this rather than running a second
+// copy of the rules on the phone, so it has to be present, correct, and not
+// handed to the player who is not on move.
+await req('/games/chess/start', { method: 'POST', token: A.token });
+await req('/games/chess/start', { method: 'POST', token: B.token });
+const moverView = await req('/games/chess/match', { token: A.token });
+const waiterView = await req('/games/chess/match', { token: B.token });
+check('the player on move gets legal moves',
+  Array.isArray(moverView.data.match.legalMoves), moverView.data.match.legalMoves);
+check('and there are twenty of them at the start',
+  moverView.data.match.legalMoves.length === 20, moverView.data.match.legalMoves?.length);
+check('the player waiting gets none',
+  waiterView.data.match.legalMoves === null, waiterView.data.match.legalMoves);
+
+await req('/games/checkers/start', { method: 'POST', token: A.token });
+const ckView = await req('/games/checkers/match', { token: A.token });
+check('checkers offers its seven openings',
+  ckView.data.match.legalMoves.length === 7, ckView.data.match.legalMoves?.length);
+check('and none of them is a capture yet',
+  ckView.data.match.legalMoves.every((mv) => mv.captured === null));
+// Once a capture exists, the compulsory rule must show up HERE, because the
+// board only offers what this list contains.
+await req('/games/checkers/move', { method: 'POST', token: A.token, body: { move: { from: [5, 0], to: [4, 1] } } });
+await req('/games/checkers/move', { method: 'POST', token: B.token, body: { move: { from: [2, 3], to: [3, 2] } } });
+const forced = await req('/games/checkers/match', { token: A.token });
+check('with a capture on the board only captures are offered',
+  forced.data.match.legalMoves.every((mv) => mv.captured !== null),
+  forced.data.match.legalMoves);
+await req('/games/checkers/resign', { method: 'POST', token: A.token });
+await req('/games/chess/resign', { method: 'POST', token: A.token });
+
+check('a freeplay game offers no move list it cannot compute',
+  (await req('/games/block-blitz/start', { method: 'POST', token: A.token })).data.match.legalMoves === null);
+await req('/games/block-blitz/resign', { method: 'POST', token: A.token });
+
 console.log('\n=== AN UNKNOWN GAME IS A 404, NOT A CRASH ===');
 check('starting one', (await start('battleship', A.token)).status === 404);
 check('moving in one', (await move('battleship', A.token, {})).status === 404);

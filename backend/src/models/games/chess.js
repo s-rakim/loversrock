@@ -341,6 +341,16 @@ export default {
     return { state: next, result: null, nextSeat: opponent };
   },
 
+  /**
+   * The legal moves for one seat, so the board can highlight destinations
+   * without a second chess engine on the phone. Two implementations of the
+   * rules would eventually disagree, and the one on the phone would be the
+   * one nobody could fix without a new build.
+   */
+  legalMovesFor(state, seat) {
+    return legalMoves(state, seat);
+  },
+
   redactFor(state) {
     return state;
   },
