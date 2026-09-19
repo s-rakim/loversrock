@@ -112,7 +112,8 @@ export default function LoginScreen({ navigation }) {
             and "it still fails" is ambiguous between a stale APK and a real
             fault. */}
         <Text style={styles.buildStamp}>
-          v{Constants.expoConfig?.version || '?'} · {getApiUrl().replace(/^https?:\/\//, '')}
+          v{Constants.expoConfig?.version || '?'} · {Constants.expoConfig?.extra?.commit || 'local'} ·{' '}
+          {getApiUrl().replace(/^https?:\/\//, '')}
         </Text>
       </FadeInUp>
     </KeyboardAvoidingView>
