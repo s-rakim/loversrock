@@ -1,14 +1,19 @@
-const S3rver = require('s3rver');
-const fs = require('fs');
+// Stands in for MinIO so the upload path runs unmodified against a real S3
+// API. The backend package is "type": "module", so this is ESM — s3rver is
+// CommonJS but Node exposes its export as the default import.
+import fs from 'node:fs';
+import S3rver from 's3rver';
 
-fs.rmSync('./.s3-data', { recursive: true, force: true });
-fs.mkdirSync('./.s3-data', { recursive: true });
+const DIRECTORY = new URL('./.s3-data/', import.meta.url).pathname;
+
+fs.rmSync(DIRECTORY, { recursive: true, force: true });
+fs.mkdirSync(DIRECTORY, { recursive: true });
 
 new S3rver({
   port: 9000,
   address: '127.0.0.1',
   silent: false,
-  directory: './.s3-data',
+  directory: DIRECTORY,
   configureBuckets: [{ name: 'loversrock' }],
 }).run((err, { address, port } = {}) => {
   if (err) {

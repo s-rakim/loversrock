@@ -14,6 +14,7 @@ import { useGlass } from '../components/GlassContext';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import ServerAddress from '../components/ServerAddress';
+import NicknameCard from '../components/NicknameCard';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 
@@ -61,6 +62,10 @@ export default function SettingsScreen() {
           <Icon name="settings-outline" chip chipSize={44} />
           <Text style={font.h1}>Settings</Text>
         </View>
+      </FadeInUp>
+
+      <FadeInUp delay={50}>
+        <NicknameCard />
       </FadeInUp>
 
       <FadeInUp delay={60}>

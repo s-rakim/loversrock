@@ -154,6 +154,7 @@ they're load-bearing and shouldn't be casually reversed:
 3. Pair data is scoped by `pair_id` forever; unlinking never deletes or reassigns history, and re-pairing always creates a brand-new `pair_id`.
 4. Location sharing is opt-in, off by default, and instantly revocable by either partner.
 5. Period tracking is personal data scoped by `user_id`, never `pair_id`. Partner sharing (opt-in, off by default) exposes only the computed cycle phase and predicted dates — never raw flow, symptoms, mood, or notes.
+6. Nicknames belong to a pairing, not to a person — keyed by `(pair_id, set_by_id)`, so a name given by an ex can never resurface in a new pairing.
 
 ## Feature status
 
@@ -172,6 +173,7 @@ they're load-bearing and shouldn't be casually reversed:
 | Thumb Kiss (live two-device touch sync) | ✅ Fully implemented |
 | Distance Apart (real `expo-location`, opt-in) | ✅ Fully implemented |
 | Cycle Tracker (period/symptom/mood logging, predictions, fertile window, opt-in partner phase sharing) | ✅ Fully implemented |
+| Nicknames (each partner names the other, independently) | ✅ Fully implemented |
 | Games: Four in a Row, Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All 7 genuinely playable |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
 | Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |

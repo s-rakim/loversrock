@@ -11,7 +11,9 @@
     "test:integration": "node test/integration.mjs",
     "test:contract": "node test/contract.mjs",
     "test:cron": "node test/cron.mjs",
-    "test:widget": "node test/widget.mjs"
+    "test:widget": "node test/widget.mjs",
+    "test:nicknames": "node test/nicknames.mjs",
+    "test:storage": "node test/local-s3.js"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

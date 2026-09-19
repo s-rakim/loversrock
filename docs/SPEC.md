@@ -68,6 +68,24 @@ daily logs, flow intensity, symptoms, mood, or notes, regardless of the
 sharing flag. There is no setting that unlocks that detail to a partner;
 that data is not this app's to share.
 
+## 6. Nicknames belong to a pairing, not to a person
+
+`pair_nicknames` is keyed by `(pair_id, set_by_id)`, so a nickname is
+attached to the specific pairing it was given in — not stored on the user
+who received it.
+
+Why: putting the nickname on `users` would be simpler, but it would survive
+an unlink. A name an ex chose for you would then reappear the moment you
+paired with somebody new, which is exactly the kind of leak across a
+re-pairing that #3 exists to prevent. Keying on `pair_id` means a new pairing
+starts blank, and the old nicknames stay attached to the old, orphaned
+`pair_id` along with the rest of that history.
+
+Each row is one direction. Two rows means each partner has chosen a name for
+the other; one row means only one of them has. Both partners can read both
+rows — seeing what your partner calls you is the point of the feature — but
+only the person who set a nickname can change or clear it.
+
 ## Known, deliberate gaps
 
 - **Widgets are written but never compiled.** The Android `AppWidgetProvider`s,

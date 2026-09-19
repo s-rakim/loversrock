@@ -238,6 +238,21 @@ CREATE TABLE IF NOT EXISTS widget_tokens (
   revoked_at    TIMESTAMPTZ
 );
 
+-- What each partner calls the other. Keyed by (pair_id, set_by_id): a
+-- nickname belongs to a specific pairing, not to a person, so unlinking and
+-- re-pairing starts from blank rather than carrying a name given by an ex
+-- into a new relationship (docs/SPEC.md #3 and #6). Each row is one
+-- direction: set_by_id chose this name for the other member of the pair.
+CREATE TABLE IF NOT EXISTS pair_nicknames (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  set_by_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  nickname    TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pair_id, set_by_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_partner_id ON users(partner_id);
 CREATE INDEX IF NOT EXISTS idx_prompt_responses_pair_prompt ON prompt_responses(pair_id, prompt_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_attempts_pair_question ON quiz_attempts(pair_id, quiz_question_id);
@@ -247,3 +262,4 @@ CREATE INDEX IF NOT EXISTS idx_widget_photos_pair_created_at ON widget_photos(pa
 CREATE INDEX IF NOT EXISTS idx_period_cycles_user_start ON period_cycles(user_id, start_date);
 CREATE INDEX IF NOT EXISTS idx_period_daily_logs_user_date ON period_daily_logs(user_id, log_date);
 CREATE INDEX IF NOT EXISTS idx_widget_tokens_active ON widget_tokens(token_hash) WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_pair_nicknames_pair ON pair_nicknames(pair_id);

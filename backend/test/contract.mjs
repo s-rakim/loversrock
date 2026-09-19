@@ -41,6 +41,13 @@ const arch = await req(`/quiz/archive?month=${todayStr.slice(0, 7)}`, { token: A
 check('quiz archive day keys are YYYY-MM-DD', arch.data.days.every((d) => isDay(d.date)), arch.data.days.slice(0, 2));
 
 console.log('\n=== FIELDS EACH SCREEN DESTRUCTURES ===');
+// NicknameCard reads profile.paired, profile.partner.{name,nickname,displayName}
+// and profile.me.nickname; HomeScreen reads profile.partner.displayName.
+const prof = await req('/profile', { token: A.token });
+check('NicknameCard/HomeScreen: profile.paired is a boolean', typeof prof.data.paired === 'boolean', prof.data);
+check('profile.partner has name + nickname + displayName', prof.data.partner && 'name' in prof.data.partner && 'nickname' in prof.data.partner && 'displayName' in prof.data.partner, prof.data.partner);
+check('profile.me has nickname + displayName', 'nickname' in prof.data.me && 'displayName' in prof.data.me, prof.data.me);
+check('displayName is never null (falls back to the real name)', typeof prof.data.partner.displayName === 'string' && prof.data.partner.displayName.length > 0, prof.data.partner);
 const games = await req('/games', { token: A.token });
 check('GamesScreen: slug/emoji/title/subtitle/is_implemented present', games.data.games.every((g) => g.slug && g.emoji && g.title && 'is_implemented' in g));
 

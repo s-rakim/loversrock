@@ -44,17 +44,28 @@ function sql(statement) {
   });
 }
 function rewindPairToYesterday(email, streak) {
-  sql(`UPDATE pairs SET last_active_date = CURRENT_DATE - 1, streak_count = ${streak}
+  sql(`UPDATE pairs SET last_active_date = '${addDays(pairToday, -1)}', streak_count = ${streak}
        WHERE user_a_id = (SELECT id FROM users WHERE email='${email}') AND unlinked_at IS NULL;
        DELETE FROM prompt_responses WHERE pair_id = (SELECT id FROM pairs WHERE user_a_id=(SELECT id FROM users WHERE email='${email}') AND unlinked_at IS NULL);`);
 }
 function rewindPairToGap(email, streak) {
-  sql(`UPDATE pairs SET last_active_date = CURRENT_DATE - 3, streak_count = ${streak}
+  sql(`UPDATE pairs SET last_active_date = '${addDays(pairToday, -3)}', streak_count = ${streak}
        WHERE user_a_id = (SELECT id FROM users WHERE email='${email}') AND unlinked_at IS NULL;
        DELETE FROM prompt_responses WHERE pair_id = (SELECT id FROM pairs WHERE user_a_id=(SELECT id FROM users WHERE email='${email}') AND unlinked_at IS NULL);`);
 }
 
 const today = new Date().toISOString().slice(0, 10);
+
+// The pair below is pinned to America/Denver, and the server computes "today"
+// in the pair's timezone, never in UTC (docs/SPEC.md #2). For the ~6 hours a
+// day when UTC has rolled over and Denver has not, those are different
+// calendar days — so anything asserting on the pair's day has to use this,
+// not the runner's UTC date, or it fails for reasons that have nothing to do
+// with the code under test.
+const PAIR_TZ = 'America/Denver';
+const dayIn = (tz, at = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+const pairToday = dayIn(PAIR_TZ);
 const addDays = (d, n) => new Date(new Date(`${d}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
 const stamp = Date.now();
 
@@ -94,7 +105,7 @@ check('fcm-token is idempotent per device (multi-device safe)', fcm2.status === 
 section('PAIRING / TIMEZONE PINNING / UNLINK');
 check('unpaired user is blocked from pair data', (await req('/bucket-list', { token: A.token })).status === 403);
 
-const invite = await req('/auth/invite', { method: 'POST', token: A.token, body: { deviceTimezone: 'America/Denver' } });
+const invite = await req('/auth/invite', { method: 'POST', token: A.token, body: { deviceTimezone: PAIR_TZ } });
 check('invite generates 6-char code', invite.status === 201 && invite.data.inviteCode?.length === 6, invite.data);
 check('invite has ~7-day expiry', Math.round((new Date(invite.data.expiresAt) - Date.now()) / 86400000) === 7);
 check('invite requires deviceTimezone', (await req('/auth/invite', { method: 'POST', token: B.token, body: {} })).status === 400);
@@ -183,9 +194,9 @@ if (qGuess.length > 1) {
 }
 check('quiz rejects unknown question id', (await req('/quiz/00000000-0000-0000-0000-000000000000/respond', { method: 'POST', token: A.token, body: { answer: 'x' } })).status === 404);
 
-const archive = await req(`/quiz/archive?month=${today.slice(0, 7)}`, { token: A.token });
+const archive = await req(`/quiz/archive?month=${pairToday.slice(0, 7)}`, { token: A.token });
 check('quiz archive returns per-day completion + score', archive.status === 200 && Array.isArray(archive.data.days) && archive.data.days.length > 0, archive.data);
-const todayRow = archive.data.days.find((d) => d.date === today);
+const todayRow = archive.data.days.find((d) => d.date === pairToday);
 check('archive completion fraction is sane', todayRow && todayRow.completionFraction > 0 && todayRow.completionFraction <= 1, todayRow);
 check('archive rejects bad month format', (await req('/quiz/archive?month=2026-13-01', { token: A.token })).status === 400);
 

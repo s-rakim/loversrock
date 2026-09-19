@@ -20,18 +20,21 @@ export default function HomeScreen({ navigation }) {
   const [decksByCategory, setDecksByCategory] = useState({});
   const [games, setGames] = useState([]);
   const [widgetPhoto, setWidgetPhoto] = useState(null);
+  const [profile, setProfile] = useState(null);
 
   const load = useCallback(async () => {
-    const [prompt, decks, gamesRes, widget] = await Promise.allSettled([
+    const [prompt, decks, gamesRes, widget, profileRes] = await Promise.allSettled([
       apiFetch('/daily-prompt/today'),
       apiFetch('/decks'),
       apiFetch('/games'),
       apiFetch('/widget-photos/latest'),
+      apiFetch('/profile'),
     ]);
     if (prompt.status === 'fulfilled') setStreak(prompt.value.streakCount || 0);
     if (decks.status === 'fulfilled') setDecksByCategory(decks.value.decksByCategory || {});
     if (gamesRes.status === 'fulfilled') setGames(gamesRes.value.games || []);
     if (widget.status === 'fulfilled') setWidgetPhoto(widget.value.widgetPhoto);
+    if (profileRes.status === 'fulfilled') setProfile(profileRes.value);
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -48,6 +51,11 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.streakText}>{streak}</Text>
             </View>
           </View>
+          {profile?.paired && (
+            <Text style={styles.greeting}>
+              you &amp; <Text style={styles.greetingName}>{profile.partner.displayName}</Text>
+            </Text>
+          )}
         </FadeInUp>
 
         <FadeInUp delay={60}>
@@ -139,7 +147,9 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.lg },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  greeting: { fontSize: 15, color: colors.textMuted, marginTop: -spacing.xs, marginBottom: spacing.lg },
+  greetingName: { color: colors.accent, fontWeight: '700' },
   streakPill: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surface,
     borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
