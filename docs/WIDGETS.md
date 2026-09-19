@@ -52,25 +52,29 @@ mood or notes.
 Widgets are native code, so **they cannot run in Expo Go.** You need a real
 build.
 
-### Widgets are off by default
+### Verifying the Kotlin without the Android SDK
 
-The two widget config plugins inject Kotlin and Swift that has never been
-through a compiler, and a failure in either blocks the *entire* APK — the
-tested, working parts of the app included. So `app.config.js` filters them out
-unless `LOVERSROCK_WIDGETS=1` is set.
+The widget Kotlin is the only part of this app a normal `npm` workflow can't
+check, and a full Android SDK is a multi-gigabyte install that some network
+policies block outright. So:
 
 ```bash
-# The normal build: no widgets, no hand-written native code.
-eas build --profile preview --platform android
-
-# With widgets, once the native code is known to compile.
-eas build --profile preview-widgets --platform android
+cd mobile && bash widgets/android/tools/typecheck.sh
 ```
 
-Nothing breaks with them off: `services/widgetBridge.js` degrades to a no-op
-when `NativeModules.WidgetBridge` is absent, and Settings says widgets need a
-dev-client build. Verified by prebuild — with the flag off, the only Kotlin in
-the generated project is Expo's own `MainApplication.kt` and `MainActivity.kt`.
+It compiles all six widget sources against the **real** Android framework
+(Robolectric's `android-all` from Maven Central), a generated `R` that mirrors
+what aapt emits from `widgets/android/res`, and hand-written stubs for
+`androidx.core` notifications and the React Native bridge — the two artifacts
+that publish only to Maven repos outside Maven Central.
+
+It catches syntax errors, type errors, bad framework calls and missing `R`
+symbols. It cannot catch a mismatch between a stub and the real androidx/RN
+signature, so **green here is strong evidence, not proof** — only a Gradle
+build proves it. Dependencies are cached after the first run.
+
+`LOVERSROCK_WIDGETS=0` drops both widget plugins from a build. That is for
+bisecting a native failure, not a normal build — widgets ship by default.
 
 ### Easiest: EAS Build (no local toolchain)
 

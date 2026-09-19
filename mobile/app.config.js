@@ -8,14 +8,10 @@
 //    on the login screen. Without it, "is this the latest build?" can only be
 //    answered by hand against the EAS dashboard.
 //
-// 2. The widget config plugins are OPT-IN. They inject Kotlin and Swift that
-//    has never been through a compiler, and a failure there blocks the whole
-//    APK — including the parts that are tested and working. Leaving them off by
-//    default means a broken widget can never stop the app from shipping.
-//
-//    Turn them on for a build with:  LOVERSROCK_WIDGETS=1
-//    (eas.json sets it per-profile; locally, set it before `expo prebuild`.)
-const WIDGETS_ENABLED = process.env.LOVERSROCK_WIDGETS === '1';
+// 2. Widgets are ON. They are the point of this app, so the build includes
+//    them by default. `LOVERSROCK_WIDGETS=0` drops both plugins — an escape
+//    hatch for bisecting a native build failure, never the normal path.
+const WIDGETS_ENABLED = process.env.LOVERSROCK_WIDGETS !== '0';
 
 const isWidgetPlugin = (plugin) =>
   String(Array.isArray(plugin) ? plugin[0] : plugin).includes('Widgets');
