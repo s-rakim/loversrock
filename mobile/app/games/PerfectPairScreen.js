@@ -1,104 +1,120 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+// Perfect Pair — a race.
+//
+// Both walk the same association chain from the same word. A wrong pick ends
+// your run; the longer run wins. The options are shuffled differently on
+// each phone, so glancing at your partner's screen tells you nothing.
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { spacing, radius } from '../../theme';
-import { MorphButton, FadeInUp } from '../../components/Motion';
-import StickerField from '../../components/Stickers';
 import { useTheme } from '../../components/ThemeContext';
-
-// Each word maps to its one "correct" association plus a few distractors —
-// picking the correct word continues the chain; any wrong pick ends it.
-const ASSOCIATIONS = {
-  SUN: { correct: 'BEACH', distractors: ['SNOW', 'MIDNIGHT', 'CELLAR'] },
-  BEACH: { correct: 'WAVES', distractors: ['DESERT', 'ATTIC', 'GLACIER'] },
-  WAVES: { correct: 'OCEAN', distractors: ['MOUNTAIN', 'PAVEMENT', 'CEILING'] },
-  OCEAN: { correct: 'SHIP', distractors: ['CACTUS', 'ELEVATOR', 'CANDLE'] },
-  SHIP: { correct: 'ANCHOR', distractors: ['KEYBOARD', 'BALLOON', 'PILLOW'] },
-  ANCHOR: { correct: 'HARBOR', distractors: ['GALAXY', 'NOTEBOOK', 'FOREST'] },
-  HARBOR: { correct: 'LIGHTHOUSE', distractors: ['SUBWAY', 'BAKERY', 'ORCHARD'] },
-  LIGHTHOUSE: { correct: 'STORM', distractors: ['LIBRARY', 'STADIUM', 'GARDEN'] },
-  STORM: { correct: 'RAINBOW', distractors: ['DESK', 'BRIDGE', 'FENCE'] },
-  RAINBOW: { correct: 'SUN', distractors: ['TUNNEL', 'CARPET', 'MIRROR'] },
-};
-
-function shuffled(arr) {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
+import { MorphButton, Pop } from '../../components/Motion';
+import { useMatch } from '../../components/games/useMatch';
+import MatchFrame from '../../components/games/MatchFrame';
+import RaceHeader from '../../components/games/RaceHeader';
 
 export default function PerfectPairScreen() {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [current, setCurrent] = useState('SUN');
-  const [chain, setChain] = useState(0);
-  const [gameOver, setGameOver] = useState(false);
-  const [options, setOptions] = useState(() => buildOptions('SUN'));
+  const m = useMatch('perfect-pair');
+  const s = m.match?.state;
 
-  function buildOptions(word) {
-    const entry = ASSOCIATIONS[word];
-    return shuffled([entry.correct, ...entry.distractors]);
-  }
-
-  function pick(choice) {
-    if (gameOver) return;
-    const entry = ASSOCIATIONS[current];
-    if (choice === entry.correct) {
-      const nextChain = chain + 1;
-      setChain(nextChain);
-      const next = ASSOCIATIONS[choice] ? choice : 'SUN';
-      setCurrent(next);
-      setOptions(buildOptions(next));
-    } else {
-      setGameOver(true);
-    }
-  }
-
-  function restart() {
-    setCurrent('SUN');
-    setChain(0);
-    setGameOver(false);
-    setOptions(buildOptions('SUN'));
-  }
+  const canPlay = m.match?.status === 'active' && s?.alive && !m.busy;
 
   return (
-    <View style={styles.container}>
-      <StickerField variant="minimal" />
-      <FadeInUp>
-        <Text style={font.muted}>Chain: {chain}</Text>
-        <Text style={[font.h1, { marginVertical: spacing.lg, textAlign: 'center' }]}>{current}</Text>
-        <Text style={[font.muted, { textAlign: 'center', marginBottom: spacing.lg }]}>
-          What does this make you think of?
-        </Text>
-      </FadeInUp>
+    <MatchFrame
+      title="Perfect Pair"
+      subtitle="Follow the chain. One wrong link ends your run."
+      {...m}
+      onStart={m.start}
+      onResign={m.resign}
+    >
+      {s && (
+        <>
+          <RaceHeader
+            score={s.score}
+            opponentScore={s.opponentScore}
+            progress={s.chain.length}
+            opponentProgress={s.opponentChainLength}
+            total={25}
+            label="Link"
+            done={!s.alive}
+            opponentDone={!s.opponentAlive}
+          />
 
-      {!gameOver ? (
-        <View style={styles.optionsGrid}>
-          {options.map((opt) => (
-            <MorphButton key={opt} onPress={() => pick(opt)} style={styles.optionButton}>
-              <Text style={font.body}>{opt}</Text>
-            </MorphButton>
-          ))}
-        </View>
-      ) : (
-        <FadeInUp>
-          <Text style={[font.h2, { color: colors.danger, textAlign: 'center' }]}>Chain broken!</Text>
-          <Text style={[font.muted, { textAlign: 'center', marginBottom: spacing.md }]}>Final chain: {chain}</Text>
-          <MorphButton onPress={restart} style={styles.restartButton}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Try again</Text>
-          </MorphButton>
-        </FadeInUp>
+          {s.alive ? (
+            <View style={styles.card}>
+              <Text style={font.muted}>What goes with</Text>
+              <Text style={[font.h1, styles.word]}>{s.word}</Text>
+
+              <View style={styles.options}>
+                {s.options.map((option) => (
+                  <MorphButton
+                    key={option}
+                    onPress={() => canPlay && m.play({ choice: option })}
+                    disabled={!canPlay}
+                    style={styles.option}
+                  >
+                    <Text style={font.h3}>{option}</Text>
+                  </MorphButton>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.card}>
+              <Ionicons name="flag-outline" size={32} color={colors.textSecondary} style={{ alignSelf: 'center' }} />
+              <Text style={[font.h2, styles.word]}>Your run ended</Text>
+              {s.lastWrong && (
+                <Text style={[font.muted, { textAlign: 'center' }]}>
+                  You picked {s.lastWrong.picked} — it was {s.lastWrong.correct}.
+                </Text>
+              )}
+              <Text style={[font.muted, { textAlign: 'center', marginTop: spacing.sm }]}>
+                {s.opponentAlive ? 'They are still going…' : 'Both runs are over.'}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.card}>
+            <Text style={font.h3}>Your chain ({s.chain.length})</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
+              {s.chain.map((word, i) => (
+                <View key={`${word}-${i}`} style={styles.chainRow}>
+                  <Pop active={i === s.chain.length - 1}>
+                    <View style={[styles.chainChip, i === s.chain.length - 1 && styles.chainChipLast]}>
+                      <Text style={[font.muted, i === s.chain.length - 1 && { color: '#fff' }]}>{word}</Text>
+                    </View>
+                  </Pop>
+                  {i < s.chain.length - 1 && (
+                    <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </>
       )}
-    </View>
+    </MatchFrame>
   );
 }
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
-  optionButton: { backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderWidth: 1, borderColor: colors.border, minWidth: '40%', alignItems: 'center' },
-  restartButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, alignSelf: 'center' },
-});
+    card: {
+      backgroundColor: colors.surface, borderRadius: radius.card, padding: spacing.md,
+      marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border,
+    },
+    word: { textAlign: 'center', marginVertical: spacing.sm },
+    options: { gap: spacing.sm, marginTop: spacing.sm },
+    option: {
+      backgroundColor: colors.surfaceAlt, borderRadius: radius.pill,
+      paddingVertical: spacing.md, alignItems: 'center',
+      borderWidth: 1, borderColor: colors.border,
+    },
+    chainRow: { flexDirection: 'row', alignItems: 'center' },
+    chainChip: {
+      backgroundColor: colors.surfaceAlt, borderRadius: radius.pill,
+      paddingHorizontal: spacing.md, paddingVertical: 6,
+    },
+    chainChipLast: { backgroundColor: colors.accentPink },
+  });
