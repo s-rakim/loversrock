@@ -188,6 +188,7 @@ they're load-bearing and shouldn't be casually reversed:
 | Distance Apart (real `expo-location`, opt-in) | ✅ Fully implemented |
 | Cycle Tracker (period/symptom/mood logging, predictions, fertile window, opt-in partner phase sharing) | ✅ Fully implemented |
 | Nicknames (each partner names the other, independently) | ✅ Fully implemented |
+| Daily prompts refreshed nightly from a random topic (Claude / any URL / local bank) | ✅ Fully implemented |
 | Games: Four in a Row, Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All 7 genuinely playable |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
 | Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |
