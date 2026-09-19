@@ -110,7 +110,7 @@ export default function BucketListScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   addRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   input: {
     flex: 1, backgroundColor: colors.surface, color: colors.text, borderRadius: radius.md,

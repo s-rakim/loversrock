@@ -102,7 +102,7 @@ export default function LoveGolfScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', padding: spacing.lg },
   field: {
     width: FIELD_SIZE, height: FIELD_SIZE, backgroundColor: '#123a1f', borderRadius: radius.lg,
     marginTop: spacing.lg, borderWidth: 2, borderColor: colors.border, overflow: 'hidden',

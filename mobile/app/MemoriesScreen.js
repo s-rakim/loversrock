@@ -109,8 +109,8 @@ export default function MemoriesScreen() {
 
 const makeStyles = (colors, font) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
-  centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
+  centered: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   addButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
     backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.sm, marginBottom: spacing.md,

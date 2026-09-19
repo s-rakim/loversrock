@@ -92,7 +92,7 @@ export default function DateIdeasScreen() {
 
 const makeStyles = (colors, font) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   tabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   tab: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   tabActive: { borderColor: colors.accent },

@@ -116,7 +116,7 @@ export default function AnagramsScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', padding: spacing.lg },
   correctRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
   answerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, minHeight: 56, marginVertical: spacing.lg, justifyContent: 'center' },
   lettersRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center' },

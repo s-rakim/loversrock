@@ -68,6 +68,16 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
   }
 }
 
+console.log('\n=== LAVA LAMP TOKENS ===');
+for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
+  check(`${name}: has a blob palette`, Array.isArray(colors.blobs) && colors.blobs.length >= 3, colors.blobs?.length);
+  check(`${name}: blob opacity is sane`, colors.blobOpacity > 0 && colors.blobOpacity <= 1, colors.blobOpacity);
+  check(`${name}: background is a two-stop gradient`,
+    Array.isArray(colors.backgroundGradient) && colors.backgroundGradient.length === 2, colors.backgroundGradient);
+  check(`${name}: surface is translucent so the animation shows through`,
+    colors.surface.startsWith('rgba'), colors.surface);
+}
+
 console.log('\n=== NO SCREEN IMPORTS STATIC COLOURS ===');
 const walk = (dir, out = []) => {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -92,6 +102,23 @@ const missing = screens.filter((f) => {
 });
 check('every screen that uses tokens calls useTheme()', missing.length === 0,
   missing.map((f) => path.relative(root, f)).join(', '));
+
+console.log('\n=== BACKGROUND IS NOT PAINTED OVER ===');
+const painted = screens.filter((f) => /backgroundColor: colors\.bg\b/.test(fs.readFileSync(f, 'utf8')));
+check('no screen paints colors.bg over the lava lamp', painted.length === 0,
+  painted.map((f) => path.relative(root, f)).join(', '));
+
+const lava = fs.readFileSync(path.join(root, 'components', 'LavaLamp.js'), 'utf8');
+check('blob motion uses the native driver', /useNativeDriver: true/.test(lava));
+// Match imports only - the file explains in prose why those libraries are
+// not used, and that explanation should not trip the check.
+const lavaImports = (lava.match(/^import .*$/gm) || []).join('\n');
+check('no Reanimated or Skia imported', !/reanimated|react-native-skia/i.test(lavaImports), lavaImports);
+check('animation pauses when backgrounded', /AppState/.test(lava));
+check('reduce motion is honoured', /reduceMotion/.test(lava));
+
+const ctx = fs.readFileSync(path.join(root, 'components', 'ThemeContext.js'), 'utf8');
+check('reduce motion follows the OS setting', /AccessibilityInfo/.test(ctx));
 
 console.log(`\nTHEME RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

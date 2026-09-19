@@ -125,7 +125,7 @@ export default function LoginScreen({ navigation }) {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, justifyContent: 'center', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', padding: spacing.lg },
   wordmarkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   input: {
     backgroundColor: colors.surface,

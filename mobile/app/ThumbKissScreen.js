@@ -93,7 +93,7 @@ export default function ThumbKissScreen() {
 
 const makeStyles = (colors, font) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   touchArea: {
     width: TOUCH_AREA_SIZE, height: TOUCH_AREA_SIZE, borderRadius: TOUCH_AREA_SIZE / 2,
     backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.border, overflow: 'hidden',

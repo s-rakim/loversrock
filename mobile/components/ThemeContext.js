@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
-import { Appearance } from 'react-native';
+import { Appearance, AccessibilityInfo } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lightColors, darkColors, makeFont, gradientForCategory } from '../theme';
 import { apiFetch } from '../services/api';
 
 const STORAGE_KEY = 'loversrock_theme_preference';
+const MOTION_KEY = 'loversrock_reduce_motion';
 
 /** 'system' follows the OS live; 'light'/'dark' pin it. */
 export const THEME_PREFERENCES = ['system', 'light', 'dark'];
@@ -15,6 +16,9 @@ export function ThemeProvider({ children }) {
   const [preference, setPreferenceState] = useState('system');
   const [systemScheme, setSystemScheme] = useState(() => Appearance.getColorScheme() || 'light');
   const [hydrated, setHydrated] = useState(false);
+  // 'system' defers to the OS accessibility setting; true/false override it.
+  const [motionPreference, setMotionPreferenceState] = useState('system');
+  const [systemReduceMotion, setSystemReduceMotion] = useState(false);
 
   // Restore the saved choice before the first paint that matters. Failing to
   // read storage just means the OS scheme wins, which is the default anyway.
@@ -26,7 +30,22 @@ export function ThemeProvider({ children }) {
       })
       .catch(() => {})
       .finally(() => !cancelled && setHydrated(true));
+    AsyncStorage.getItem(MOTION_KEY)
+      .then((saved) => {
+        if (!cancelled && ['system', 'on', 'off'].includes(saved)) setMotionPreferenceState(saved);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
+  }, []);
+
+  // Honour the OS "reduce motion" setting, and keep following it while open.
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => !cancelled && setSystemReduceMotion(Boolean(enabled)))
+      .catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setSystemReduceMotion);
+    return () => { cancelled = true; sub?.remove?.(); };
   }, []);
 
   // Follow the OS live, not just at launch — someone flipping their phone to
@@ -51,7 +70,18 @@ export function ThemeProvider({ children }) {
     apiFetch('/profile/preferences', { method: 'PATCH', body: { themePreference: next } }).catch(() => {});
   }, []);
 
+  const setMotionPreference = useCallback(async (next) => {
+    if (!['system', 'on', 'off'].includes(next)) return;
+    setMotionPreferenceState(next);
+    try {
+      await AsyncStorage.setItem(MOTION_KEY, next);
+    } catch {
+      // Persistence is a nicety; the current session still honours the choice.
+    }
+  }, []);
+
   const scheme = preference === 'system' ? systemScheme : preference;
+  const reduceMotion = motionPreference === 'system' ? systemReduceMotion : motionPreference === 'on';
   const isDark = scheme === 'dark';
 
   const value = useMemo(() => {
@@ -63,6 +93,9 @@ export function ThemeProvider({ children }) {
       isDark,
       preference,
       setPreference,
+      reduceMotion,
+      motionPreference,
+      setMotionPreference,
       hydrated,
       gradientForCategory: (category) => gradientForCategory(category, scheme),
       // react-navigation and expo-status-bar both want the *opposite* word
@@ -70,7 +103,7 @@ export function ThemeProvider({ children }) {
       statusBarStyle: isDark ? 'light' : 'dark',
       keyboardAppearance: isDark ? 'dark' : 'light',
     };
-  }, [isDark, scheme, preference, setPreference, hydrated]);
+  }, [isDark, scheme, preference, setPreference, reduceMotion, motionPreference, setMotionPreference, hydrated]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

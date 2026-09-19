@@ -20,7 +20,7 @@ import { FadeInUp, MorphButton } from '../components/Motion';
 import { useTheme, THEME_PREFERENCES } from '../components/ThemeContext';
 
 export default function SettingsScreen() {
-  const { colors, font, preference, setPreference } = useTheme();
+  const { colors, font, preference, setPreference, motionPreference, setMotionPreference, reduceMotion } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { intensity, setIntensity } = useGlass();
   const navigation = useNavigation();
@@ -94,6 +94,22 @@ export default function SettingsScreen() {
                 </View>
               );
             })}
+          </View>
+
+          <View style={styles.motionRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={font.body}>Reduce motion</Text>
+              <Text style={font.muted}>
+                {motionPreference === 'system'
+                  ? `Following your phone (currently ${reduceMotion ? 'on' : 'off'})`
+                  : 'Background animation is ' + (reduceMotion ? 'paused' : 'playing')}
+              </Text>
+            </View>
+            <Switch
+              value={reduceMotion}
+              onValueChange={(on) => setMotionPreference(on ? 'on' : 'off')}
+              trackColor={{ true: colors.accentPink }}
+            />
           </View>
         </View>
       </FadeInUp>
@@ -186,7 +202,7 @@ export default function SettingsScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
   // Bottom padding clears the floating glass tab bar.
   scrollContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
@@ -200,6 +216,11 @@ const makeStyles = (colors) =>
   },
   settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   themeRow: { flexDirection: 'row', gap: spacing.sm },
+  motionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    marginTop: spacing.lg, paddingTop: spacing.md,
+    borderTopWidth: 1, borderTopColor: colors.border,
+  },
   themeOption: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
     paddingVertical: spacing.sm, borderRadius: radius.pill,

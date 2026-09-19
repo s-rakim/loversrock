@@ -10,6 +10,7 @@ import { getAccessToken, loadApiUrl } from './services/api';
 import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
+import LavaLamp from './components/LavaLamp';
 import GlassTabBar from './components/GlassTabBar';
 
 import LoginScreen from './app/LoginScreen';
@@ -55,7 +56,7 @@ function useNavTheme() {
       ...base,
       colors: {
         ...base.colors,
-        background: colors.background,
+        background: 'transparent',
         card: colors.surface,
         text: colors.textPrimary,
         border: colors.cardBorder,
@@ -66,7 +67,7 @@ function useNavTheme() {
       headerStyle: { backgroundColor: colors.surface },
       headerTintColor: colors.textPrimary,
       headerShadowVisible: false,
-      contentStyle: { backgroundColor: colors.background },
+      contentStyle: { backgroundColor: 'transparent' },
     },
   };
 }
@@ -104,14 +105,17 @@ function Root() {
 
   if (checkingAuth) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <LavaLamp />
         <ActivityIndicator color={colors.accentPink} size="large" />
       </View>
     );
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <View style={{ flex: 1 }}>
+      <LavaLamp />
+      <NavigationContainer theme={navTheme}>
           <StatusBar style={statusBarStyle} />
           <Stack.Navigator initialRouteName={hasToken ? 'MainTabs' : 'Login'} screenOptions={screenOptions}>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
@@ -135,7 +139,8 @@ function Root() {
             <Stack.Screen name="PerfectPair" component={PerfectPairScreen} options={{ title: 'Perfect Pair' }} />
             <Stack.Screen name="LoveLetters" component={LoveLettersScreen} options={{ title: 'Love Letters' }} />
           </Stack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </View>
   );
 }
 

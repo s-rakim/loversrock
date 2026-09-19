@@ -43,7 +43,7 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <StickerField variant="home" />
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 140 }}>
         <FadeInUp>

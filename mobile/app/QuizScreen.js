@@ -150,8 +150,8 @@ export default function QuizScreen() {
 
 const makeStyles = (colors, font) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
-  centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
+  centered: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', marginBottom: spacing.xl },
   questionText: { ...font.h1, marginBottom: spacing.lg },
   choices: { gap: spacing.sm },

@@ -87,7 +87,7 @@ export default function WhatYouSayingScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   masked: { fontSize: 30, fontWeight: '800', letterSpacing: 4, color: colors.accent, marginVertical: spacing.lg, textAlign: 'center' },
   guessRow: { flexDirection: 'row', gap: spacing.sm, width: '100%' },
   input: { flex: 1, backgroundColor: colors.surface, color: colors.text, borderRadius: radius.pill, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border },

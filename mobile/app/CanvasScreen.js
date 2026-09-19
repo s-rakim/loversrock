@@ -112,7 +112,7 @@ export default function CanvasScreen({ navigation }) {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.md },
   canvas: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   toolbar: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   toolButton: { flex: 1, flexDirection: 'row', gap: spacing.xs, backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center' },

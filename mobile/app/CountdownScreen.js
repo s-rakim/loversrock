@@ -109,7 +109,7 @@ export default function CountdownScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   form: { marginBottom: spacing.lg },
   input: {
     backgroundColor: colors.surface, color: colors.text, borderRadius: radius.md, padding: spacing.md,

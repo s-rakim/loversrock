@@ -355,8 +355,8 @@ export default function PeriodTrackerScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  centered: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  centered: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   phaseCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg,
     padding: spacing.md, marginTop: spacing.md, borderWidth: 1, borderColor: colors.border,

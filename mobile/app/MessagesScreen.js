@@ -130,7 +130,7 @@ export default function MessagesScreen({ navigation }) {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1, backgroundColor: 'transparent' },
   bubble: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, maxWidth: '80%' },
   photo: { width: 180, height: 180, borderRadius: radius.sm },
   inputBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 90 },

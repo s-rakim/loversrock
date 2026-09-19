@@ -27,7 +27,7 @@ export default function GamesScreen({ navigation }) {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <StickerField variant="minimal" />
       <FlatList
         style={styles.container}

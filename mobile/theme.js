@@ -38,7 +38,8 @@ export const lightColors = {
   // Names the existing screens already use. Kept so the whole app could move
   // onto the provider without every colour being renamed in the same change.
   bg: '#EDE9FB',
-  surface: '#FFFFFF',
+  // Translucent, not solid white: the lava lamp has to read through the cards.
+  surface: 'rgba(255,255,255,0.95)',
   surfaceAlt: '#F3ECEA',
   border: '#E9E1DE',
   text: '#111111',

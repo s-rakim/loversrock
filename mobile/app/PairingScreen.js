@@ -100,7 +100,7 @@ export default function PairingScreen({ navigation }) {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,

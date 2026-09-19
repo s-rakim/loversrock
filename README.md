@@ -205,6 +205,20 @@ but React Native's built-in `Animated.Value` + `Animated.timing`/`spring` —
 zero extra dependencies, and structurally unable to hit that crash class
 again.
 
+The same constraint decided the lava lamp background. The spec asked for
+`@shopify/react-native-skia` blobs merged with a colour-matrix threshold and
+driven by Reanimated — but Skia 1.x declares `react-native-reanimated` as a
+peer dependency, so adopting it would reintroduce exactly the library that was
+removed. `react-native-svg` is already here, but Expo SDK 51 pins 15.2.0, which
+predates its filter primitives (no `FeGaussianBlur`, no `FeColorMatrix`).
+
+`components/LavaLamp.js` gets the same effect from what is already installed:
+radial gradients with a transparent outer stop give each blob its soft edge,
+overlapping alpha gives the merge, and every blob is an `Animated.View`
+transform so the motion runs on the native driver. No new native dependency,
+so it needs no rebuild beyond the one already required.
+
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).

@@ -138,7 +138,7 @@ const makeStyles = (colors) =>
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   hint: { fontSize: 12, marginTop: spacing.xs, marginBottom: spacing.sm },
   input: {
-    backgroundColor: colors.bg, color: colors.text, borderRadius: radius.md,
+    backgroundColor: 'transparent', color: colors.text, borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.border,
   },
   buttonRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },

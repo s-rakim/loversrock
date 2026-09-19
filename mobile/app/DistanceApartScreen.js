@@ -118,7 +118,7 @@ export default function DistanceApartScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   toggleLabel: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   distanceCard: {

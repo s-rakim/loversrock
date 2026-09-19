@@ -100,7 +100,7 @@ export default function FourInARowScreen() {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', padding: spacing.lg },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   board: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.xs, marginVertical: spacing.lg },
   row: { flexDirection: 'row' },
