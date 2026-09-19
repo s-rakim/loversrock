@@ -20,7 +20,8 @@
     "test:cycle": "node test/cycle.mjs",
     "test:games": "node test/games.mjs",
     "test:engines": "node test/gameEngines.mjs",
-    "test:calls": "node test/calls.mjs"
+    "test:calls": "node test/calls.mjs",
+    "test:quiz-compare": "node test/quizCompare.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

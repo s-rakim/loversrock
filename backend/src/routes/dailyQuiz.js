@@ -3,6 +3,7 @@ import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { pairLocalDateString, getUserDeviceTokens } from '../models/pairs.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
+import { answersMatch, matchResult } from '../models/quizResults.js';
 
 const router = asyncRouter();
 
@@ -27,9 +28,26 @@ router.get('/today', async (req, res) => {
 
   const attempts = await attemptsFor(req.pair.id, questions.map((q) => q.id));
 
+  const mineFor = (q) => attempts.find((a) => a.quiz_question_id === q.id && a.user_id === req.userId);
+  const partnerFor = (q) => attempts.find((a) => a.quiz_question_id === q.id && a.user_id === req.partnerId);
+
+  // The reveal gate. Partner answers appear only once BOTH of you have
+  // answered every question scheduled for today - not question by question,
+  // because a partial reveal would let someone answer one, read what you
+  // said, and then answer the rest around it.
+  const myCount = questions.filter((q) => mineFor(q)).length;
+  const partnerCount = questions.filter((q) => partnerFor(q)).length;
+  const iAmDone = myCount === questions.length;
+  const partnerIsDone = partnerCount === questions.length;
+  const revealed = iAmDone && partnerIsDone;
+
+  let matched = 0;
   const payload = questions.map((q) => {
-    const mine = attempts.find((a) => a.quiz_question_id === q.id && a.user_id === req.userId);
-    const partner = attempts.find((a) => a.quiz_question_id === q.id && a.user_id === req.partnerId);
+    const mine = mineFor(q);
+    const partner = partnerFor(q);
+    const isMatch = revealed ? answersMatch(mine?.answer, partner?.answer) : null;
+    if (isMatch) matched += 1;
+
     return {
       id: q.id,
       questionOrder: q.question_order,
@@ -40,10 +58,28 @@ router.get('/today', async (req, res) => {
       myCorrectnessState: mine ? mine.correctness_state : 'pending',
       isCorrect: mine ? mine.is_correct : null,
       partnerAnswered: Boolean(partner),
+      // Only ever populated once the gate above opens. Before that the
+      // partner's answer is not in the payload at all, so there is nothing
+      // for a client to accidentally render or a proxy to cache.
+      partnerAnswer: revealed ? (partner ? partner.answer : null) : null,
+      matched: isMatch,
     };
   });
 
-  res.json({ scheduledDate: today, questions: payload });
+  res.json({
+    scheduledDate: today,
+    questions: payload,
+    progress: {
+      total: questions.length,
+      mine: myCount,
+      partner: partnerCount,
+      iAmDone,
+      partnerIsDone,
+    },
+    revealed,
+    // The headline: Perfect Match / Strong Connection / Growing Together.
+    result: revealed ? matchResult(matched, questions.length) : null,
+  });
 });
 
 router.post('/:questionId/respond', async (req, res) => {
@@ -64,7 +100,7 @@ router.post('/:questionId/respond', async (req, res) => {
        RETURNING *`,
       [req.pair.id, question.id, req.userId, answer, isCorrect]
     );
-    return res.json(toAttemptPayload(rows[0]));
+    return res.json(await respondPayload(req, rows[0]));
   }
 
   if (question.type === 'this_or_that') {
@@ -77,7 +113,7 @@ router.post('/:questionId/respond', async (req, res) => {
        RETURNING *`,
       [req.pair.id, question.id, req.userId, answer]
     );
-    return res.json(toAttemptPayload(rows[0]));
+    return res.json(await respondPayload(req, rows[0]));
   }
 
   // guess_partner: waits until both partners have submitted for this
@@ -122,14 +158,14 @@ router.post('/:questionId/respond', async (req, res) => {
       'SELECT * FROM quiz_attempts WHERE pair_id = $1 AND quiz_question_id = $2 AND user_id = $3',
       [req.pair.id, question.id, req.userId]
     );
-    return res.json(toAttemptPayload(mine[0]));
+    return res.json(await respondPayload(req, mine[0]));
   }
 
   const { rows: mine } = await query(
     'SELECT * FROM quiz_attempts WHERE pair_id = $1 AND quiz_question_id = $2 AND user_id = $3',
     [req.pair.id, question.id, req.userId]
   );
-  res.json(toAttemptPayload(mine[0]));
+  res.json(await respondPayload(req, mine[0]));
 });
 
 function toAttemptPayload(row) {
@@ -138,6 +174,77 @@ function toAttemptPayload(row) {
     answer: row.answer,
     correctnessState: row.correctness_state,
     isCorrect: row.is_correct,
+  };
+}
+
+/**
+ * Wraps an attempt with the state of the whole day, and fires the reveal
+ * once - the moment the second person finishes the last question.
+ *
+ * `respond` has four exit paths (trivia, this-or-that, and two for
+ * guess-partner). Building the response in one place is what stops three of
+ * them quietly drifting out of step with the fourth.
+ */
+async function respondPayload(req, attemptRow) {
+  const today = pairLocalDateString(req.pair);
+  const { rows: questions } = await query(
+    'SELECT id FROM quiz_questions WHERE scheduled_date = $1',
+    [today]
+  );
+  const attempts = await attemptsFor(req.pair.id, questions.map((q) => q.id));
+
+  const mineCount = attempts.filter((a) => a.user_id === req.userId).length;
+  const partnerCount = attempts.filter((a) => a.user_id === req.partnerId).length;
+  const justCompleted = questions.length > 0
+    && mineCount === questions.length
+    && partnerCount === questions.length;
+
+  if (justCompleted) {
+    let matched = 0;
+    for (const q of questions) {
+      const mine = attempts.find((a) => a.quiz_question_id === q.id && a.user_id === req.userId);
+      const theirs = attempts.find((a) => a.quiz_question_id === q.id && a.user_id === req.partnerId);
+      if (answersMatch(mine?.answer, theirs?.answer)) matched += 1;
+    }
+    const result = matchResult(matched, questions.length);
+
+    // One atomic claim on the reveal. The insert succeeds for exactly one
+    // request and returns a row; every retry conflicts and returns nothing.
+    // That is what stops a double-tap, or both phones finishing at the same
+    // instant, sending the notification twice.
+    const { rows: claimed } = await query(
+      `INSERT INTO quiz_days (pair_id, scheduled_date, revealed_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (pair_id, scheduled_date) DO NOTHING
+       RETURNING id`,
+      [req.pair.id, today]
+    );
+    const firstReveal = claimed.length === 1;
+
+    if (firstReveal) {
+      const io = req.app.get('io');
+      if (io) io.to(`pair:${req.pair.id}`).emit('quiz:revealed', { scheduledDate: today, tier: result.tier });
+
+      const tokens = [
+        ...(await getUserDeviceTokens(req.userId)),
+        ...(await getUserDeviceTokens(req.partnerId)),
+      ];
+      await sendNotification(
+        tokens,
+        { title: result.title, body: result.blurb },
+        deepLink('quiz'),
+        { channel: CHANNELS.partner }
+      ).catch((err) => console.error('[quiz] reveal push failed:', err.message));
+    }
+
+    return { ...toAttemptPayload(attemptRow), dayComplete: true, result };
+  }
+
+  return {
+    ...toAttemptPayload(attemptRow),
+    dayComplete: false,
+    result: null,
+    progress: { total: questions.length, mine: mineCount, partner: partnerCount },
   };
 }
 

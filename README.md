@@ -199,7 +199,7 @@ they're load-bearing and shouldn't be casually reversed:
 |---|---|
 | Auth (signup/login/refresh/pairing/unlink) | ✅ Fully implemented |
 | Daily Prompt (reveal-after-both, streaks) | ✅ Fully implemented |
-| Daily Quiz (trivia/guess-partner/this-or-that, archive) | ✅ Fully implemented |
+| Daily Quiz — both answer, answers hidden until both finish, then compared and titled: Perfect Match / Strong Connection / Growing Together | ✅ Fully implemented |
 | Memories (upload, soft-delete, 30-day restore) | ✅ Fully implemented |
 | Bucket List (live sync via Socket.io) | ✅ Fully implemented |
 | Date Ideas (curated + saved) | ✅ Fully implemented |
