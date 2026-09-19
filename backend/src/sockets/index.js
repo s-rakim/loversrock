@@ -74,6 +74,36 @@ export function initSockets(httpServer, corsOrigins) {
     // looking at the board.
     socket.on('game:watching', (payload) => broadcast('game:watching', payload));
     socket.on('game:left', (payload) => broadcast('game:left', payload));
+
+    // ---------------------------------------------------------------- CALLS
+    //
+    // WebRTC signalling. These are relayed and never stored: an SDP offer or
+    // an ICE candidate is worthless a second late and meaningless out of
+    // context, so there is nothing worth keeping and something worth not
+    // keeping. The call itself is recorded over REST in routes/calls.js;
+    // this is only the handshake that lets the two phones find each other.
+    //
+    // Media does not pass through here. Once the handshake completes the
+    // audio and video go directly between the devices.
+    socket.on('call:offer', (payload) => broadcast('call:offer', payload));
+    socket.on('call:answer', (payload) => broadcast('call:answer', payload));
+    // Trickle ICE: candidates arrive one at a time as they are discovered,
+    // rather than waiting for gathering to finish, which is what keeps
+    // connection setup to about a second on a good network.
+    socket.on('call:ice', (payload) => broadcast('call:ice', payload));
+    socket.on('call:hangup', (payload) => broadcast('call:hangup', payload));
+    socket.on('call:decline', (payload) => broadcast('call:decline', payload));
+    // Renegotiation, for switching a voice call to video mid-call.
+    socket.on('call:renegotiate', (payload) => broadcast('call:renegotiate', payload));
+    // "Still ringing" / "I picked up on another device".
+    socket.on('call:ringing', (payload) => broadcast('call:ringing', payload));
+
+    // A dropped socket mid-call must not leave the other end staring at a
+    // frozen frame. The peer connection's own ICE timeout would eventually
+    // notice, but that takes tens of seconds; this is immediate.
+    socket.on('disconnect', () => {
+      socket.to(room).emit('call:peer-gone', { fromUserId: socket.userId });
+    });
   });
 
   return io;

@@ -135,6 +135,7 @@ export const SCREEN_FOR_TYPE = {
   game_invite: 'Games',
   game_turn: 'Games',
   call: 'Home',
+  call: 'Call',
   period_reminder: 'PeriodTracker',
   water: 'PeriodTracker',
   memory: 'Memories',

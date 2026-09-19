@@ -9,6 +9,7 @@ import { MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
+import CallButtons from '../components/calls/CallButtons';
 
 function Doodle({ strokeData }) {
   const { colors } = useTheme();
@@ -88,6 +89,13 @@ export default function MessagesScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <StickerField variant="minimal" />
+
+      {/* Calling from the conversation you are already having is the point. */}
+      <View style={styles.callBar}>
+        <Text style={font.h2}>Messages</Text>
+        <CallButtons compact />
+      </View>
+
       <FlatList
         ref={listRef}
         data={messages}
@@ -131,6 +139,10 @@ export default function MessagesScreen({ navigation }) {
 const makeStyles = (colors) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
+  callBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingTop: spacing.md,
+  },
   bubble: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, alignSelf: 'flex-start', borderWidth: 1, borderColor: colors.border, maxWidth: '80%' },
   photo: { width: 180, height: 180, borderRadius: radius.sm },
   inputBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 90 },

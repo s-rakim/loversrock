@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -14,6 +14,7 @@ import LavaLamp from './components/LavaLamp';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification } from './services/notifications';
 import GlassTabBar from './components/GlassTabBar';
+import { CallProvider, useCall } from './components/calls/CallContext';
 import { fadeOnFocus } from './components/Motion';
 
 import LoginScreen from './app/LoginScreen';
@@ -33,6 +34,7 @@ import DistanceApartScreen from './app/DistanceApartScreen';
 import PeriodTrackerScreen from './app/PeriodTrackerScreen';
 import GamesScreen from './app/GamesScreen';
 import SettingsScreen from './app/SettingsScreen';
+import CallScreen from './app/CallScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
 import TicTacToeScreen from './app/games/TicTacToeScreen';
 import CheckersScreen from './app/games/CheckersScreen';
@@ -109,6 +111,30 @@ function MainTabs() {
   );
 }
 
+/**
+ * Pushes the call screen the moment a call exists, whoever started it.
+ *
+ * An incoming call must interrupt whatever is on screen — that is the one
+ * notification in this app allowed to. It renders nothing itself; it only
+ * watches the call state, which is why it sits inside the navigator.
+ */
+function CallPresenter({ navigationRef }) {
+  const { call } = useCall();
+  const shown = useRef(false);
+
+  useEffect(() => {
+    const live = call.phase === 'ringing-in' || call.phase === 'ringing-out'
+      || call.phase === 'connecting' || call.phase === 'connected';
+    if (live && !shown.current && navigationRef.isReady()) {
+      shown.current = true;
+      navigationRef.navigate('Call');
+    }
+    if (!live) shown.current = false;
+  }, [call.phase, navigationRef]);
+
+  return null;
+}
+
 function Root() {
   const { navTheme, screenOptions } = useNavTheme();
   const { colors, statusBarStyle } = useTheme();
@@ -161,6 +187,7 @@ function Root() {
       <LavaLamp />
       <NavigationContainer ref={navigationRef} theme={navTheme}>
           <StatusBar style={statusBarStyle} />
+          <CallPresenter navigationRef={navigationRef} />
           <Stack.Navigator initialRouteName={hasToken ? 'MainTabs' : 'Login'} screenOptions={screenOptions}>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
@@ -175,6 +202,18 @@ function Root() {
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
             <Stack.Screen name="PeriodTracker" component={PeriodTrackerScreen} options={{ title: 'Cycle Tracker' }} />
+            <Stack.Screen
+              name="Call"
+              component={CallScreen}
+              options={{
+                headerShown: false,
+                presentation: 'fullScreenModal',
+                animation: 'slide_from_bottom',
+                // Not swipe-dismissible: leaving a call is a deliberate act,
+                // and an accidental back-swipe mid-call would be maddening.
+                gestureEnabled: false,
+              }}
+            />
             <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ title: 'Four in a Row' }} />
             <Stack.Screen name="TicTacToe" component={TicTacToeScreen} options={{ title: 'Tic Tac Toe' }} />
             <Stack.Screen name="Checkers" component={CheckersScreen} options={{ title: 'Checkers' }} />
@@ -198,7 +237,9 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <GlassProvider>
-          <Root />
+          <CallProvider>
+            <Root />
+          </CallProvider>
         </GlassProvider>
       </ThemeProvider>
     </SafeAreaProvider>
