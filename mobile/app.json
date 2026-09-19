@@ -7,7 +7,9 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#F7F4F2",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.loversrock.app"
@@ -38,6 +40,11 @@
           "photosPermission": "loversrock needs access to your photos to add them to your shared Memories."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "19b22dec-4d84-432e-973a-05e82edadbfc"
+      }
+    }
   }
 }
