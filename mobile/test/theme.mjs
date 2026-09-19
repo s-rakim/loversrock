@@ -20,7 +20,7 @@ const { code } = babel.transformSync(src, {
 });
 const module_ = { exports: {} };
 new Function('module', 'exports', 'require', code)(module_, module_.exports, require);
-const { lightColors, darkColors, makeFont, radius, spacing } = module_.exports;
+const { lightColors, darkColors, makeFont, lineHeightFor, radius, spacing } = module_.exports;
 
 // ---------- colour maths ----------
 const parse = (c) => {
@@ -78,6 +78,41 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
     colors.surface.startsWith('rgba'), colors.surface);
 }
 
+console.log('\n=== TEXT FOLLOWS THE PHONE\u2019S FONT SETTING ===');
+// React Native scales fontSize by the OS setting on its own but does NOT
+// scale lineHeight. Left alone, turning the font size up grows the glyphs
+// while the spacing stays put and the text closes up - which is what
+// "squeezed" looked like.
+const atOne = makeFont(lightColors, 1);
+const atLarge = makeFont(lightColors, 1.6);
+const STYLES = ['wordmark', 'h1', 'h2', 'h3', 'body', 'muted'];
+
+for (const key of STYLES) {
+  check(`${key} sets a lineHeight at all`, typeof atOne[key].lineHeight === 'number', atOne[key]);
+  check(`${key} lineHeight grows with the phone setting`,
+    atLarge[key].lineHeight > atOne[key].lineHeight,
+    { one: atOne[key].lineHeight, large: atLarge[key].lineHeight });
+  check(`${key} fontSize is NOT scaled here (RN already does it)`,
+    atLarge[key].fontSize === atOne[key].fontSize,
+    { one: atOne[key].fontSize, large: atLarge[key].fontSize });
+  check(`${key} leaves room for its own glyphs`,
+    atOne[key].lineHeight > atOne[key].fontSize,
+    { size: atOne[key].fontSize, leading: atOne[key].lineHeight });
+  check(`${key} leading is a whole pixel`,
+    Number.isInteger(atOne[key].lineHeight), atOne[key].lineHeight);
+}
+
+check('leading scales in proportion, not by a constant',
+  Math.abs(atLarge.body.lineHeight / atOne.body.lineHeight - 1.6) < 0.08,
+  { ratio: atLarge.body.lineHeight / atOne.body.lineHeight });
+check('body is more generously spaced than a heading, as running text should be',
+  atOne.body.lineHeight / atOne.body.fontSize > atOne.h1.lineHeight / atOne.h1.fontSize,
+  { body: atOne.body.lineHeight / atOne.body.fontSize, h1: atOne.h1.lineHeight / atOne.h1.fontSize });
+check('the helper for one-off text follows the same rule',
+  lineHeightFor(12, 2) === Math.round(12 * 1.4 * 2), lineHeightFor(12, 2));
+check('a missing scale defaults to 1 rather than collapsing to zero',
+  makeFont(lightColors).body.lineHeight === atOne.body.lineHeight);
+
 console.log('\n=== NO SCREEN IMPORTS STATIC COLOURS ===');
 const walk = (dir, out = []) => {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -93,6 +128,27 @@ const offenders = screens.filter((f) => {
   const text = fs.readFileSync(f, 'utf8');
   return /import \{[^}]*\b(colors|font)\b[^}]*\} from '[^']*theme'/.test(text);
 });
+console.log('\n=== THE PROVIDER ACTUALLY READS THE SETTING ===');
+const ctxSource = fs.readFileSync(path.join(root, 'components', 'ThemeContext.js'), 'utf8');
+check('it reads fontScale from the OS', /useWindowDimensions\(\)/.test(ctxSource));
+check('and passes it to makeFont', /makeFont\(colors,\s*fontScale\)/.test(ctxSource));
+check('fontScale is in the memo deps, or the font would freeze at the first value',
+  /\}, \[[^\]]*fontScale[^\]]*\]/.test(ctxSource));
+check('and it is exposed for one-off text', /^\s*fontScale,$/m.test(ctxSource));
+
+console.log('\n=== NOTHING PINS A LINE HEIGHT BEHIND THE SCALE\u2019S BACK ===');
+// A hard-coded lineHeight cannot scale, so it is the one thing that goes
+// cramped at a large setting while everything around it breathes.
+const pinned = [];
+for (const f of screens) {
+  const text = fs.readFileSync(f, 'utf8');
+  for (const m of text.matchAll(/lineHeight:\s*(\d+)\b/g)) {
+    pinned.push(`${path.relative(root, f)}: lineHeight ${m[1]}`);
+  }
+}
+check('no literal lineHeight left in any screen', pinned.length === 0, pinned.join(', '));
+
+
 check(`no static colour imports across ${screens.length} screens/components`, offenders.length === 0,
   offenders.map((f) => path.relative(root, f)).join(', '));
 

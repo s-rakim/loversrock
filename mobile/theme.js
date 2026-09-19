@@ -78,21 +78,55 @@ export const darkColors = {
   glassBorder: 'rgba(255, 92, 141, 0.28)',
 };
 
-/** Type scale bound to a colour set, so text follows the active theme. */
-export function makeFont(colors) {
+/**
+ * Type scale bound to a colour set, so text follows the active theme.
+ *
+ * `fontScale` is the phone's own font-size setting, from
+ * useWindowDimensions().fontScale. It is NOT applied to fontSize: React
+ * Native already scales fontSize by that setting on its own, and doing it
+ * here as well would apply it twice.
+ *
+ * It IS applied to lineHeight, because React Native does not. That mismatch
+ * is the whole problem: turn the phone's font size up and the glyphs grow
+ * while the line spacing stays put, so the text closes up and looks
+ * squeezed. Multiplying lineHeight by the same factor keeps the spacing in
+ * proportion at every setting.
+ *
+ * The ratios are deliberate rather than uniform - headings read better
+ * tighter than body copy, which needs room to be comfortable over several
+ * lines.
+ */
+export function makeFont(colors, fontScale = 1) {
+  // Rounded to whole pixels: a fractional lineHeight is rounded
+  // inconsistently across Android versions and shows up as text that jitters
+  // by a pixel between lines.
+  const leading = (size, ratio) => Math.round(size * ratio * fontScale);
+
   return {
     wordmark: {
       fontFamily: 'serif',
       fontSize: 34,
+      lineHeight: leading(34, 1.18),
       color: colors.textPrimary,
       letterSpacing: 0.5,
     },
-    h1: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
-    h2: { fontSize: 18, fontWeight: '600', color: colors.textPrimary },
-    h3: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
-    body: { fontSize: 15, color: colors.textPrimary },
-    muted: { fontSize: 13, color: colors.textSecondary },
+    h1: { fontSize: 24, lineHeight: leading(24, 1.25), fontWeight: '700', color: colors.textPrimary },
+    h2: { fontSize: 18, lineHeight: leading(18, 1.3), fontWeight: '600', color: colors.textPrimary },
+    h3: { fontSize: 15, lineHeight: leading(15, 1.35), fontWeight: '600', color: colors.textPrimary },
+    body: { fontSize: 15, lineHeight: leading(15, 1.45), color: colors.textPrimary },
+    muted: { fontSize: 13, lineHeight: leading(13, 1.4), color: colors.textSecondary },
   };
+}
+
+/**
+ * The same leading rule for one-off text that is not on the scale.
+ *
+ * Used where a screen sets its own fontSize - a scoreboard number, a chip
+ * label - so those get spacing that tracks the phone setting too instead of
+ * being the one line that closes up.
+ */
+export function lineHeightFor(fontSize, fontScale = 1, ratio = 1.4) {
+  return Math.round(fontSize * ratio * fontScale);
 }
 
 // Pastel in light; darker and translucent in dark, so a chip reads as a tint
@@ -142,4 +176,4 @@ export const DEFAULT_GLASS_INTENSITY = 55;
 // Deprecated: light-theme colours as a static object, for any module that
 // cannot use a hook (StyleSheet.create at module scope). Prefer useTheme().
 export const colors = lightColors;
-export const font = makeFont(lightColors);
+export const font = makeFont(lightColors, 1);

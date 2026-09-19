@@ -224,7 +224,7 @@ const makeStyles = (colors) =>
       position: 'absolute', bottom: 1, width: 6, height: 6,
       borderRadius: 3, backgroundColor: '#FF8A00',
     },
-    cycleDay: { fontSize: 9, lineHeight: 11 },
+    cycleDay: { fontSize: 9 },
     logDot: { width: 4, height: 4, borderRadius: 2, marginTop: 1, backgroundColor: 'transparent' },
     legend: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.sm },
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
