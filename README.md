@@ -107,6 +107,29 @@ deliberately absent — adding a key that points at a missing PNG fails the
 build. Drop your artwork at `mobile/assets/icon.png` *first*, then add the
 keys.
 
+#### Turning on push notifications
+
+Local reminders (cycle predictions, daily log, water) work with no setup —
+they are scheduled on the device and fire even when the server is unreachable.
+
+**Push** needs one file. The backend already talks to FCM through
+`FIREBASE_SERVICE_ACCOUNT_JSON`; the app needs the matching client config from
+the *same* Firebase project:
+
+1. Firebase console → Project settings → Your apps → Add an **Android** app
+   with package name `com.loversrock.app`
+2. Download `google-services.json`
+3. Put it at `mobile/google-services.json` and rebuild
+
+`app.config.js` declares it only when the file exists, so a build without it
+succeeds — push just stays off, and `registerForPush()` returns
+`token-unavailable` rather than failing. Permission is requested after pairing
+rather than at first launch, so the first prompt arrives when there is
+something to notify about.
+
+Android channels (Reminders, Partner, Games, Calls) are created on first run.
+Calls use MAX importance so a ring can interrupt; reminders sit lower.
+
 #### If the app says it can't reach the server
 
 **Fix it on the phone — you do not need a new build.** `EXPO_PUBLIC_API_URL`

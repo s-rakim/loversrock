@@ -2,7 +2,7 @@ import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { pairLocalDateString } from '../models/pairs.js';
-import { sendNotification } from '../config/firebase.js';
+import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 
 const router = asyncRouter();
@@ -88,10 +88,15 @@ router.post('/today/respond', async (req, res) => {
     if (!mine.notified_at || !partner.notified_at) {
       const partnerTokens = await getUserDeviceTokens(req.partnerId);
       const myTokens = await getUserDeviceTokens(req.userId);
-      await sendNotification([...partnerTokens, ...myTokens], {
-        title: "You both answered today's prompt 💛",
-        body: 'Tap to see what your partner said.',
-      }).catch((err) => console.error('[daily-prompt] push failed:', err.message));
+      await sendNotification(
+        [...partnerTokens, ...myTokens],
+        {
+          title: "You both answered today's prompt 💛",
+          body: 'Tap to see what your partner said.',
+        },
+        deepLink('prompt'),
+        { channel: CHANNELS.partner }
+      ).catch((err) => console.error('[daily-prompt] push failed:', err.message));
 
       await query('UPDATE prompt_responses SET notified_at = now() WHERE pair_id = $1 AND prompt_id = $2', [
         req.pair.id,

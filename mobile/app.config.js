@@ -27,6 +27,13 @@ const asset = (name) => {
   return fs.existsSync(file) ? `./assets/${name}` : null;
 };
 
+// FCM needs google-services.json from the Firebase project. Declared only when
+// the file is present: naming a missing one fails the build, and without it
+// getDevicePushTokenAsync() simply returns no token and push stays off.
+const googleServices = fs.existsSync(path.join(__dirname, 'google-services.json'))
+  ? './google-services.json'
+  : null;
+
 const icon = asset('icon.png');
 // Android crops the adaptive foreground to a mask; fall back to the plain
 // icon if no dedicated foreground was supplied.
@@ -45,6 +52,7 @@ module.exports = ({ config }) => ({
     : {}),
   android: {
     ...config.android,
+    ...(googleServices ? { googleServicesFile: googleServices } : {}),
     ...(adaptiveIcon
       ? { adaptiveIcon: { foregroundImage: adaptiveIcon, backgroundColor: config.backgroundColor } }
       : {}),

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,6 +11,8 @@ import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import LavaLamp from './components/LavaLamp';
+import * as Notifications from 'expo-notifications';
+import { ensureChannels, routeForNotification } from './services/notifications';
 import GlassTabBar from './components/GlassTabBar';
 
 import LoginScreen from './app/LoginScreen';
@@ -90,6 +92,28 @@ function MainTabs() {
 function Root() {
   const { navTheme, screenOptions } = useNavTheme();
   const { colors, statusBarStyle } = useTheme();
+  const navigationRef = useNavigationContainerRef();
+
+  // Channels must exist before the first notification arrives, not before the
+  // first one is *sent* — Android drops anything aimed at a missing channel.
+  useEffect(() => {
+    ensureChannels();
+  }, []);
+
+  // Two paths into the app: tapped while running, and tapped from cold. The
+  // second returns the response that launched the app, which is easy to miss.
+  useEffect(() => {
+    const go = (response) => {
+      const route = routeForNotification(response);
+      if (route && navigationRef.isReady()) navigationRef.navigate(route.screen, route.params);
+    };
+
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) go(response);
+    });
+    const sub = Notifications.addNotificationResponseReceivedListener(go);
+    return () => sub.remove();
+  }, [navigationRef]);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [hasToken, setHasToken] = useState(false);
 
@@ -115,7 +139,7 @@ function Root() {
   return (
     <View style={{ flex: 1 }}>
       <LavaLamp />
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer ref={navigationRef} theme={navTheme}>
           <StatusBar style={statusBarStyle} />
           <Stack.Navigator initialRouteName={hasToken ? 'MainTabs' : 'Login'} screenOptions={screenOptions}>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

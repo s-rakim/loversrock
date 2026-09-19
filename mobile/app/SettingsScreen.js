@@ -15,6 +15,7 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import ServerAddress from '../components/ServerAddress';
 import NicknameCard from '../components/NicknameCard';
+import RemindersCard from '../components/RemindersCard';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import { useTheme, THEME_PREFERENCES } from '../components/ThemeContext';
@@ -116,6 +117,10 @@ export default function SettingsScreen() {
 
       <FadeInUp delay={50}>
         <NicknameCard />
+      </FadeInUp>
+
+      <FadeInUp delay={55}>
+        <RemindersCard />
       </FadeInUp>
 
       <FadeInUp delay={60}>

@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { query } from '../config/db.js';
 import { deleteObject } from '../config/storage.js';
-import { sendNotification } from '../config/firebase.js';
+import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
 import { fetchQuestions } from '../services/promptSources.js';
@@ -61,10 +61,12 @@ export async function pushWeeklyDateIdea() {
       ...(await getUserDeviceTokens(pair.user_b_id)),
     ];
     if (tokens.length === 0) continue;
-    await sendNotification(tokens, {
-      title: 'Date idea of the week 💡',
-      body: idea.title,
-    }).catch((err) => console.error('[cron] weekly date idea push failed:', err.message));
+    await sendNotification(
+      tokens,
+      { title: 'Date idea of the week 💡', body: idea.title },
+      deepLink('partner_update', { screen: 'DateIdeas' }),
+      { channel: CHANNELS.partner }
+    ).catch((err) => console.error('[cron] weekly date idea push failed:', err.message));
   }
 }
 
@@ -99,10 +101,15 @@ export async function pushPeriodReminders() {
     if (daysUntil === 1) {
       const tokens = await getUserDeviceTokens(settings.user_id);
       if (tokens.length === 0) continue;
-      await sendNotification(tokens, {
-        title: 'Period expected tomorrow',
-        body: "Based on your cycle history, your period is expected to start tomorrow.",
-      }).catch((err) => console.error('[cron] period reminder push failed:', err.message));
+      await sendNotification(
+        tokens,
+        {
+          title: 'Period expected tomorrow',
+          body: 'Based on your cycle history, your period is expected to start tomorrow.',
+        },
+        deepLink('period_reminder'),
+        { channel: CHANNELS.reminders }
+      ).catch((err) => console.error('[cron] period reminder push failed:', err.message));
     }
   }
 }

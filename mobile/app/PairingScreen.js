@@ -6,6 +6,7 @@ import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
+import { registerForPush } from '../services/notifications';
 
 export default function PairingScreen({ navigation }) {
   const { colors, font } = useTheme();
@@ -36,6 +37,7 @@ export default function PairingScreen({ navigation }) {
     setLoading(true);
     try {
       await apiFetch('/auth/invite/accept', { method: 'POST', body: { inviteCode: enteredCode.trim() } });
+      registerForPush(); // asked here, after onboarding - not at first launch
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     } catch (err) {
       Alert.alert('Could not pair', err.message);

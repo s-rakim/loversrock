@@ -2,7 +2,7 @@ import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { pairLocalDateString, getUserDeviceTokens } from '../models/pairs.js';
-import { sendNotification } from '../config/firebase.js';
+import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 
 const router = asyncRouter();
 
@@ -108,10 +108,15 @@ router.post('/:questionId/respond', async (req, res) => {
       ...(await getUserDeviceTokens(req.userId)),
       ...(await getUserDeviceTokens(req.partnerId)),
     ];
-    await sendNotification(tokens, {
-      title: 'Quiz answer revealed 🔮',
-      body: isMatch ? "You matched — you know each other!" : "You didn't match this time.",
-    }).catch((err) => console.error('[quiz] reveal push failed:', err.message));
+    await sendNotification(
+      tokens,
+      {
+        title: 'Quiz answer revealed 🔮',
+        body: isMatch ? "You matched — you know each other!" : "You didn't match this time.",
+      },
+      deepLink('quiz'),
+      { channel: CHANNELS.partner }
+    ).catch((err) => console.error('[quiz] reveal push failed:', err.message));
 
     const { rows: mine } = await query(
       'SELECT * FROM quiz_attempts WHERE pair_id = $1 AND quiz_question_id = $2 AND user_id = $3',
