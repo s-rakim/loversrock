@@ -69,7 +69,40 @@ check('CountdownScreen: label/target_date present, target_date parseable', cds.d
 await req('/messages', { method: 'POST', token: A.token, body: { type: 'doodle', strokeData: [[{ x: 1, y: 2 }]] } });
 const msgs = await req('/messages', { token: A.token });
 const doodleMsg = msgs.data.messages.find((m) => m.type === 'doodle');
-check('MessagesScreen: doodle stroke_data is an array of point arrays', Array.isArray(doodleMsg.stroke_data) && Array.isArray(doodleMsg.stroke_data[0]) && 'x' in doodleMsg.stroke_data[0][0], doodleMsg.stroke_data);
+check('MessagesScreen: a legacy doodle still round-trips (old messages exist)', Array.isArray(doodleMsg.stroke_data) && Array.isArray(doodleMsg.stroke_data[0]) && 'x' in doodleMsg.stroke_data[0][0], doodleMsg.stroke_data);
+
+// The shape CanvasScreen actually sends now: styled strokes plus the paper
+// colour. Nothing validates it server-side (stroke_data is free JSONB), which
+// is exactly why it is worth asserting that it survives the round trip.
+const styled = {
+  strokes: [
+    { points: [{ x: 1, y: 2 }, { x: 3, y: 4 }], color: '#4FC16B', width: 14, tool: 'neon' },
+    { points: [{ x: 5, y: 6 }], color: '#2F6FE0', width: 4, tool: 'dotted' },
+  ],
+  canvasColor: '#14141F',
+};
+await req('/messages', { method: 'POST', token: A.token, body: { type: 'doodle', strokeData: styled } });
+const styledBack = (await req('/messages', { token: A.token })).data.messages
+  .filter((m) => m.type === 'doodle')
+  .map((m) => m.stroke_data)
+  .find((d) => d && !Array.isArray(d));
+// Compared field by field, not with JSON.stringify: Postgres jsonb does not
+// preserve key order, so a stringify comparison fails on data that is
+// perfectly intact. The values are what matter; the ordering is Postgres's.
+const sameStroke = (a, b) =>
+  a.tool === b.tool && a.color === b.color && a.width === b.width
+  && JSON.stringify(a.points) === JSON.stringify(b.points);
+check('CanvasScreen: the styled doodle format round-trips',
+  styledBack.strokes.length === styled.strokes.length
+  && styledBack.strokes.every((stroke, i) => sameStroke(stroke, styled.strokes[i])),
+  styledBack.strokes);
+check('CanvasScreen: point order within a stroke is preserved, because it is a line',
+  JSON.stringify(styledBack.strokes[0].points) === JSON.stringify(styled.strokes[0].points),
+  styledBack.strokes[0].points);
+check('CanvasScreen: the brush survives the trip',
+  styledBack.strokes[0].tool === 'neon' && styledBack.strokes[0].width === 14, styledBack.strokes?.[0]);
+check('CanvasScreen: the paper colour travels with the drawing',
+  styledBack.canvasColor === '#14141F', styledBack.canvasColor);
 
 const pset = await req('/period/settings', { token: A.token });
 check('PeriodTrackerScreen settings: camelCase keys as screen expects', ['averageCycleLength', 'averagePeriodLength', 'sharingEnabled'].every((k) => k in pset.data.settings), pset.data.settings);

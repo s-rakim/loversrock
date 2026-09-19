@@ -61,7 +61,7 @@ export default function GamesScreen({ navigation }) {
   // just Draw Duel) is still two-player, it simply keeps its state on the
   // socket rather than in game_matches.
   const withRecord = catalog.filter((g) => matchBySlug[g.slug]);
-  const live = catalog.filter((g) => !matchBySlug[g.slug]);
+  const liveOnly = catalog.filter((g) => !matchBySlug[g.slug]);
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -88,8 +88,8 @@ export default function GamesScreen({ navigation }) {
 
             <Stagger delayStep={45}>
               {withRecord.map((game) => {
-                const live = matchBySlug[game.slug];
-                const active = live.active;
+                const row = matchBySlug[game.slug];
+                const active = row.active;
                 const yourMove = active?.yourTurn && active?.status === 'active';
                 return (
                   <MorphButton
@@ -108,7 +108,7 @@ export default function GamesScreen({ navigation }) {
                           : game.subtitle}
                       </Text>
                       <Text style={[font.muted, styles.record]}>
-                        {live.record.wins}W · {live.record.draws}D · {live.record.losses}L
+                        {row.record.wins}W · {row.record.draws}D · {row.record.losses}L
                       </Text>
                     </View>
                     {yourMove ? (
@@ -125,7 +125,7 @@ export default function GamesScreen({ navigation }) {
           </>
         )}
 
-        {live.length > 0 && (
+        {liveOnly.length > 0 && (
           <View style={styles.sectionHead}>
             <Ionicons name="flash" size={18} color={colors.accentIndigo} />
             <Text style={[font.h2, { marginLeft: spacing.sm }]}>
@@ -135,7 +135,7 @@ export default function GamesScreen({ navigation }) {
         )}
 
         <View style={styles.grid}>
-          {live.map((game) => (
+          {liveOnly.map((game) => (
             <MorphButton
               key={game.slug}
               onPress={() => navigation.navigate(ROUTE_BY_SLUG[game.slug])}
