@@ -199,6 +199,18 @@ CREATE TABLE IF NOT EXISTS deck_question_responses (
 -- Scoped by pair_id like every other content table (docs/SPEC.md #3), so a
 -- match belongs to the pairing it was played in and does not survive a
 -- re-pairing into a new one.
+-- One row per pair per quiz day, written the moment BOTH partners have
+-- answered every question. Its only job is to make the reveal happen exactly
+-- once: the insert is the claim, so a retried request or both phones
+-- finishing simultaneously cannot send the notification twice.
+CREATE TABLE IF NOT EXISTS quiz_days (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id         UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  scheduled_date  DATE NOT NULL,
+  revealed_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(pair_id, scheduled_date)
+);
+
 CREATE TABLE IF NOT EXISTS game_matches (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pair_id        UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
