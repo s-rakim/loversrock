@@ -95,18 +95,34 @@ matrix, including the local `expo prebuild` path and the iOS requirements.
 
 #### If the app says it can't reach the server
 
-The API URL is **baked into the binary at build time** from
-`EXPO_PUBLIC_API_URL` in `eas.json`. Changing it means a new build; there is no
-in-app server setting. Tap **Test connection** on the login screen — it shows
-the URL the app was built with and pings `/health`, which tells you which of
-these it is:
+**Fix it on the phone — you do not need a new build.** `EXPO_PUBLIC_API_URL`
+from `eas.json` is only the starting value; the address the app actually uses
+is whatever was last saved on the device.
 
-| Symptom | Cause |
+On the login screen tap **“Can't connect? Check the server address”**, or go to
+**Settings → Server** once you're in. Type your server's Tailscale IP
+(`tailscale ip -4` on the server) and hit **Save & test** — it saves the address,
+pings `/health`, and tells you what happened. `100.101.102.103` is enough;
+`http://` and `:4000` are filled in for you. The saved address survives
+restarts, and **Reset** puts back the one baked into the build.
+
+Whatever the app reports, it names the address it tried. What each message means:
+
+| Message | Cause |
 |---|---|
-| "still the placeholder" | `eas.json` was never edited. Replace `100.x.x.x` in **all three** profiles and rebuild. |
-| "points at localhost" | On a phone that means the phone. Use the server's Tailscale IP (`tailscale ip -4` on the server). |
-| "Can't reach the server" | Tailscale down on either end, or the backend isn't listening. From the server: `curl http://<tailscale-ip>:4000/health`. |
-| Connects, then 500s | Backend is up but can't reach Postgres or MinIO — check `docker compose logs backend`. |
+| "still the placeholder" | The build shipped with `100.x.x.x`. Set the real address in Settings → Server, or replace it in **all three** `eas.json` profiles before the next build. |
+| "points at the phone itself" | The address is `localhost`/`127.0.0.1`. On a phone that means the phone. Use the server's Tailscale IP. |
+| "Can't reach the server at …" | The address is plausible but nothing answered: Tailscale down on either end, or the backend isn't running. From the server: `curl http://<tailscale-ip>:4000/health`. |
+| Connects, then 500s | Backend is up but the database isn't ready — usually migrations were never run. See setup step 4, and `docker compose logs backend`. |
+
+If you see a bare **"Network request failed"** with no explanation, the build
+predates this handling — rebuild from the current branch.
+
+The address logic has its own checks, runnable without a build:
+
+```bash
+cd mobile && npm run test:server-url
+```
 
 The backend serves plain HTTP because a Tailscale IP has no hostname to put on
 a certificate. Both platforms block that in release builds by default, so

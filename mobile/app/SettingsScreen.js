@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, Alert, Switch, ScrollView } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useNavigation } from '@react-navigation/native';
 import { apiFetch, clearTokens, disconnectSocket } from '../services/api';
@@ -13,6 +13,7 @@ import {
 import { useGlass } from '../components/GlassContext';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import ServerAddress from '../components/ServerAddress';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 
@@ -54,6 +55,7 @@ export default function SettingsScreen() {
   return (
     <View style={styles.container}>
       <StickerField variant="minimal" />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <FadeInUp>
         <View style={styles.headerRow}>
           <Icon name="settings-outline" chip chipSize={44} />
@@ -124,6 +126,10 @@ export default function SettingsScreen() {
         </View>
       </FadeInUp>
 
+      <FadeInUp delay={95}>
+        <ServerAddress />
+      </FadeInUp>
+
       <FadeInUp delay={100}>
         <MorphButton onPress={unlink} style={styles.actionRow}>
           <Icon name="person-remove-outline" chip chipColor={colors.surfaceAlt} color={colors.textMuted} />
@@ -134,12 +140,15 @@ export default function SettingsScreen() {
           <Text style={[font.body, { color: colors.danger }]}>Log out</Text>
         </MorphButton>
       </FadeInUp>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  container: { flex: 1, backgroundColor: colors.bg },
+  // Bottom padding clears the floating glass tab bar.
+  scrollContent: { padding: spacing.lg, paddingBottom: spacing.xl * 3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,

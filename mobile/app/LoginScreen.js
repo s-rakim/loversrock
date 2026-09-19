@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { apiFetch, setTokens, pingServer, API_URL } from '../services/api';
+import { apiFetch, setTokens } from '../services/api';
 import { provisionWidgets } from '../services/widgetBridge';
 import { colors, font, spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import StickerField, { HeartShape } from '../components/Stickers';
+import ServerAddress from '../components/ServerAddress';
 
 export default function LoginScreen({ navigation }) {
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
@@ -12,23 +13,7 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
-
-  // Signing in is the first thing that ever touches the network, so a bad
-  // EXPO_PUBLIC_API_URL, a Tailscale drop or a stopped backend all surface here
-  // as one indistinguishable failure. This separates "can't reach the server"
-  // from "wrong email or password" without needing a laptop.
-  async function testConnection() {
-    setTesting(true);
-    try {
-      await pingServer();
-      Alert.alert('Connected', `The backend at ${API_URL} is up.`);
-    } catch (err) {
-      Alert.alert('No connection', err.message);
-    } finally {
-      setTesting(false);
-    }
-  }
+  const [showServer, setShowServer] = useState(false);
 
   async function submit() {
     if (!email || !password || (mode === 'signup' && !name)) {
@@ -110,11 +95,13 @@ export default function LoginScreen({ navigation }) {
           </Text>
         </MorphButton>
 
-        <MorphButton onPress={testConnection} disabled={testing} style={styles.switchButton}>
+        <MorphButton onPress={() => setShowServer((v) => !v)} style={styles.switchButton}>
           <Text style={[font.muted, styles.diagnostic]}>
-            {testing ? 'Checking…' : `Test connection · ${API_URL}`}
+            {showServer ? 'Hide server settings' : 'Can\u2019t connect? Check the server address'}
           </Text>
         </MorphButton>
+
+        {showServer && <ServerAddress compact />}
       </FadeInUp>
     </KeyboardAvoidingView>
   );

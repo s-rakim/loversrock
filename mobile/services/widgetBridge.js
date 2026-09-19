@@ -1,5 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
-import { apiFetch, API_URL } from './api';
+import { apiFetch, getApiUrl } from './api';
 
 // The native module only exists in a dev-client/EAS build that ran
 // `expo prebuild` with the widget config plugins. In Expo Go it is simply
@@ -26,7 +26,9 @@ export async function provisionWidgets() {
       method: 'POST',
       body: { label: `${Platform.OS} device` },
     });
-    await native.setCredentials(API_URL, widgetToken);
+    // Read at call time: the server address is changeable in Settings, and
+    // the widget process needs whatever it is now, not the build-time value.
+    await native.setCredentials(getApiUrl(), widgetToken);
     return { provisioned: true };
   } catch (err) {
     return { provisioned: false, reason: err.message };

@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-import { getAccessToken } from './services/api';
+import { getAccessToken, loadApiUrl } from './services/api';
 import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
 import GlassTabBar from './components/GlassTabBar';
@@ -75,8 +75,12 @@ export default function App() {
   const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
-    getAccessToken()
+    // The saved server address has to be restored before anything can make a
+    // request, so this runs ahead of the first render that can fetch.
+    loadApiUrl()
+      .then(getAccessToken)
       .then((token) => setHasToken(Boolean(token)))
+      .catch(() => setHasToken(false))
       .finally(() => setCheckingAuth(false));
   }, []);
 
