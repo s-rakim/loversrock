@@ -116,6 +116,9 @@ export default function PartnerCycleScreen() {
     ? cycleLength - 14
     : cycleLength - 14;
   const sexDrive = SEX_DRIVE_LEVELS.find((l) => l.id === today.sexDrive);
+  // `moment` is the one they picked to lead with; fall back to the first mood
+  // so the card is never blank when moods are shared but moment was not set.
+  const headlineMood = today.moment || today.moods?.[0] || null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -176,19 +179,29 @@ export default function PartnerCycleScreen() {
               <Ionicons name="hand-left-outline" size={16} color={colors.accentIndigo} />
             </View>
             <Text style={[font.muted, { fontSize: 11 }]}>{agoLabel(today.updatedAt)}</Text>
-            {today.moment || today.moods?.length ? (
+            {headlineMood ? (
               <View style={styles.centreBlock}>
                 <Ionicons
-                  name={MOODS_BY_ID[today.moment || today.moods?.[0]]?.icon || 'happy-outline'}
+                  name={MOODS_BY_ID[headlineMood]?.icon || 'happy-outline'}
                   size={30}
                   color={colors.accentPink}
                 />
                 <Text style={[font.h3, { marginTop: spacing.xs }]}>
-                  {MOODS_BY_ID[today.moment || today.moods?.[0]]?.label || today.moment}
+                  {MOODS_BY_ID[headlineMood]?.label || headlineMood}
                 </Text>
+                {/* The card only has room for one, so say when there are more
+                    rather than silently dropping them — the full set is in
+                    Today's mood below. */}
+                {today.moods?.length > 1 && (
+                  <Text style={[font.muted, { fontSize: 11, marginTop: 2 }]}>
+                    +{today.moods.length - 1} more
+                  </Text>
+                )}
               </View>
             ) : (
-              <Text style={[font.muted, styles.notShared]}>Not shared</Text>
+              <Text style={[font.muted, styles.notShared]}>
+                {partner.shared?.share_mood ? 'Nothing logged today.' : 'Not shared'}
+              </Text>
             )}
           </View>
         </View>
@@ -207,6 +220,30 @@ export default function PartnerCycleScreen() {
             </Text>
           </View>
         )}
+
+        <View style={styles.card}>
+          <Text style={[font.h3, { color: colors.accentIndigo }]}>Today's mood</Text>
+          {today.moods?.length ? (
+            <View style={styles.chipWrap}>
+              {today.moods.map((id) => (
+                <View key={id} style={styles.chip}>
+                  <Ionicons
+                    name={MOODS_BY_ID[id]?.icon || 'happy-outline'}
+                    size={14}
+                    color={colors.accentIndigo}
+                  />
+                  <Text style={[font.muted, { marginLeft: 4 }]}>
+                    {MOODS_BY_ID[id]?.label || id}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={[font.muted, { marginTop: spacing.xs }]}>
+              {partner.shared?.share_mood ? 'Nothing logged today.' : 'Not shared.'}
+            </Text>
+          )}
+        </View>
 
         <View style={styles.card}>
           <Text style={[font.h3, { color: colors.accentIndigo }]}>Today's symptoms</Text>
