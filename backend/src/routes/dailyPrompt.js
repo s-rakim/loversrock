@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { pairLocalDateString } from '../models/pairs.js';
 import { sendNotification } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 
-const router = Router();
+const router = asyncRouter();
 
 router.use(requireAuth, requirePair);
 

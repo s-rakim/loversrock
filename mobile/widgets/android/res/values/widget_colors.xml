@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors mobile/theme.js: grey-white surfaces with the rose accent. -->
+<resources>
+    <color name="widget_surface">#FFFFFFFF</color>
+    <color name="widget_border">#FFE9E1DE</color>
+    <color name="widget_text">#FF2B2320</color>
+    <color name="widget_text_muted">#FF8C7F79</color>
+    <color name="widget_accent">#FFE8607A</color>
+
+    <string name="widget_summary_description">Your streak, next countdown, and distance apart</string>
+    <string name="widget_photo_description">The latest photo from your partner</string>
+</resources>

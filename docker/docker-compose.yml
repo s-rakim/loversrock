@@ -41,8 +41,18 @@ services:
     restart: unless-stopped
     env_file:
       - ../backend/.env
+    environment:
+      # Inside the compose network the other services are reachable by service
+      # name, not localhost — `localhost` from this container is this container.
+      # These override whatever .env says, so the same .env works for both
+      # `docker compose up` and running the backend directly with `npm start`.
+      DATABASE_URL: postgres://${POSTGRES_USER:-loversrock}:${POSTGRES_PASSWORD:-loversrock}@postgres:5432/${POSTGRES_DB:-loversrock}
+      STORAGE_ENDPOINT: minio
+      STORAGE_PORT: "9000"
     ports:
-      - "4000:4000"
+      # 0.0.0.0 on purpose: the phone reaches this over the Tailscale interface,
+      # so binding to loopback would make the API unreachable from the app.
+      - "0.0.0.0:4000:4000"
     depends_on:
       postgres:
         condition: service_healthy

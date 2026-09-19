@@ -23,7 +23,13 @@ export async function ensureBucket() {
 
 export async function uploadBase64Image(base64Data, { prefix = 'uploads' } = {}) {
   const match = /^data:(image\/\w+);base64,(.+)$/.exec(base64Data);
-  if (!match) throw new Error('Expected a base64 data URL image');
+  if (!match) {
+    // Bad client input, not a server fault — surfaced as 400 by the error
+    // handler in server.js rather than a generic 500.
+    const err = new Error('Expected a base64 data URL image');
+    err.status = 400;
+    throw err;
+  }
 
   const [, mimeType, data] = match;
   const ext = mimeType.split('/')[1] || 'jpg';

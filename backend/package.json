@@ -7,7 +7,15 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "migrate": "node src/config/migrate.js",
-    "seed": "node seed/run-seed.js"
+    "seed": "node seed/run-seed.js",
+    "test:integration": "node test/integration.mjs",
+    "test:contract": "node test/contract.mjs",
+    "test:cron": "node test/cron.mjs",
+    "test:widget": "node test/widget.mjs"
+  },
+  "devDependencies": {
+    "s3rver": "^3.7.1",
+    "socket.io-client": "^4.7.5"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

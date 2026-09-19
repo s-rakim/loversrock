@@ -1,0 +1,19 @@
+# Without this, `COPY . .` ships the host's node_modules into the image —
+# overwriting the ones `npm install` just built for Alpine — and bakes
+# backend/.env (JWT secrets, storage keys, the Firebase service account) into
+# an image layer. Both are avoided by excluding them here.
+node_modules
+npm-debug.log*
+*.log
+
+# Secrets. docker-compose.yml already supplies these at runtime via env_file.
+.env
+.env.local
+
+# Test fixtures/state; the compose bind mount still exposes test/ at runtime.
+test/.s3-data
+
+.git
+.gitignore
+Dockerfile
+.dockerignore

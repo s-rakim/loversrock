@@ -34,18 +34,31 @@ isn't on the tailnet.
    cp .env.example .env
    ```
    Fill in `FIREBASE_SERVICE_ACCOUNT_JSON` with the full service-account JSON from a free Firebase project (as a single-line string). This is required even for a fully local setup, since FCM is the only piece that has to be cloud-hosted.
-3. **Start Postgres + MinIO:**
+3. **Start the stack** (Postgres + MinIO + the backend API):
    ```bash
    cd docker
    docker compose up -d
    ```
-4. **Install, migrate, seed:**
+4. **Create the schema and load the seed data.** Compose does *not* do this for
+   you — `docker/init.sql` only installs the Postgres extensions, so a freshly
+   started stack has an empty database and every endpoint answers
+   `500 relation "users" does not exist` until you run:
    ```bash
-   cd backend
-   npm install
-   npm run migrate
-   npm run seed
+   docker compose exec backend npm run migrate
+   docker compose exec backend npm run seed
    ```
+   **Re-run `migrate` after pulling changes.** `src/config/schema.sql` is the
+   whole schema and every statement is `IF NOT EXISTS`, so it is safe to run
+   any number of times — but new tables (period tracking, widget tokens) only
+   appear once you do. Backend *code* needs no rebuild: `docker-compose.yml`
+   bind-mounts `../backend` into the container, so a `docker compose restart
+   backend` picks up edits. Rebuild (`docker compose build backend`) only when
+   `package.json` dependencies change.
+
+   Prefer running the backend on the host instead of in Docker? `npm install &&
+   npm run migrate && npm run seed` from `backend/` works too — Postgres and
+   MinIO publish their ports — but stop the container first
+   (`docker compose stop backend`) or port 4000 will already be taken.
 5. **Tailscale:** sign into the same Tailscale account on your PC and your phone, then get your PC's tailnet IP:
    ```bash
    tailscale ip -4
@@ -63,6 +76,60 @@ isn't on the tailnet.
    ```bash
    npx expo start --tunnel
    ```
+
+### Building a real installable app
+
+Expo Go is fine for day-to-day JS work, but **the home/lock screen widgets are
+native and cannot run in it**. To get an actual APK you can sideload:
+
+```bash
+cd mobile
+# edit eas.json: replace 100.x.x.x with your Tailscale IP
+npm install -g eas-cli && eas login
+eas build --profile preview --platform android
+```
+
+EAS compiles in the cloud and gives you a download link — no Android SDK or
+Xcode needed locally. See [`docs/WIDGETS.md`](docs/WIDGETS.md) for the full
+matrix, including the local `expo prebuild` path and the iOS requirements.
+
+#### If the app says it can't reach the server
+
+**Fix it on the phone — you do not need a new build.** `EXPO_PUBLIC_API_URL`
+from `eas.json` is only the starting value; the address the app actually uses
+is whatever was last saved on the device.
+
+On the login screen tap **“Can't connect? Check the server address”**, or go to
+**Settings → Server** once you're in. Type your server's Tailscale IP
+(`tailscale ip -4` on the server) and hit **Save & test** — it saves the address,
+pings `/health`, and tells you what happened. `100.101.102.103` is enough;
+`http://` and `:4000` are filled in for you. The saved address survives
+restarts, and **Reset** puts back the one baked into the build.
+
+Whatever the app reports, it names the address it tried. What each message means:
+
+| Message | Cause |
+|---|---|
+| "still the placeholder" | The build shipped with `100.x.x.x`. Set the real address in Settings → Server, or replace it in **all three** `eas.json` profiles before the next build. |
+| "points at the phone itself" | The address is `localhost`/`127.0.0.1`. On a phone that means the phone. Use the server's Tailscale IP. |
+| "Can't reach the server at …" | The address is plausible but nothing answered: Tailscale down on either end, or the backend isn't running. From the server: `curl http://<tailscale-ip>:4000/health`. |
+| Connects, then 500s | Backend is up but the database isn't ready — usually migrations were never run. See setup step 4, and `docker compose logs backend`. |
+
+If you see a bare **"Network request failed"** with no explanation, the build
+predates this handling — rebuild from the current branch.
+
+The address logic has its own checks, runnable without a build:
+
+```bash
+cd mobile && npm run test:server-url
+```
+
+The backend serves plain HTTP because a Tailscale IP has no hostname to put on
+a certificate. Both platforms block that in release builds by default, so
+`plugins/withCleartextTraffic.js` opts back in (Android
+`usesCleartextTraffic`, iOS ATS). The traffic still rides inside Tailscale's
+WireGuard tunnel. If you later terminate TLS in front of the backend, remove
+that plugin from `app.json`.
 
 ### Pushing this repo to your own GitHub
 
@@ -86,6 +153,7 @@ they're load-bearing and shouldn't be casually reversed:
 2. Daily prompt/quiz "today" is computed from the **pair's** pinned timezone, not either device's.
 3. Pair data is scoped by `pair_id` forever; unlinking never deletes or reassigns history, and re-pairing always creates a brand-new `pair_id`.
 4. Location sharing is opt-in, off by default, and instantly revocable by either partner.
+5. Period tracking is personal data scoped by `user_id`, never `pair_id`. Partner sharing (opt-in, off by default) exposes only the computed cycle phase and predicted dates — never raw flow, symptoms, mood, or notes.
 
 ## Feature status
 
@@ -103,8 +171,10 @@ they're load-bearing and shouldn't be casually reversed:
 | Community Question Decks (27 decks / 10 categories) | ✅ Fully implemented |
 | Thumb Kiss (live two-device touch sync) | ✅ Fully implemented |
 | Distance Apart (real `expo-location`, opt-in) | ✅ Fully implemented |
+| Cycle Tracker (period/symptom/mood logging, predictions, fertile window, opt-in partner phase sharing) | ✅ Fully implemented |
 | Games: Four in a Row, Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All 7 genuinely playable |
-| **Native Android home-screen widgets** | ❌ Not built — every underlying feature exists as an in-app screen; the native Kotlin/Expo-config-plugin layer needs a real Android build environment to compile and verify. See `docs/ANDROID_WIDGET.md`. |
+| Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
+| Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |
 | **Web marketing landing page** | ❌ Out of scope — mobile-only by design; the reference design's effects (WebGL, DOM SVG filters) don't map to React Native anyway. |
 
 ## A note on the animation library

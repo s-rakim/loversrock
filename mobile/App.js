@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-import { getAccessToken } from './services/api';
+import { getAccessToken, loadApiUrl } from './services/api';
 import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
 import GlassTabBar from './components/GlassTabBar';
@@ -25,6 +25,7 @@ import MessagesScreen from './app/MessagesScreen';
 import CanvasScreen from './app/CanvasScreen';
 import ThumbKissScreen from './app/ThumbKissScreen';
 import DistanceApartScreen from './app/DistanceApartScreen';
+import PeriodTrackerScreen from './app/PeriodTrackerScreen';
 import GamesScreen from './app/GamesScreen';
 import SettingsScreen from './app/SettingsScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
@@ -74,8 +75,12 @@ export default function App() {
   const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
-    getAccessToken()
+    // The saved server address has to be restored before anything can make a
+    // request, so this runs ahead of the first render that can fetch.
+    loadApiUrl()
+      .then(getAccessToken)
       .then((token) => setHasToken(Boolean(token)))
+      .catch(() => setHasToken(false))
       .finally(() => setCheckingAuth(false));
   }, []);
 
@@ -105,6 +110,7 @@ export default function App() {
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
+            <Stack.Screen name="PeriodTracker" component={PeriodTrackerScreen} options={{ title: 'Cycle Tracker' }} />
             <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ title: 'Four in a Row' }} />
             <Stack.Screen name="Anagrams" component={AnagramsScreen} options={{ title: 'Anagrams' }} />
             <Stack.Screen name="LoveGolf" component={LoveGolfScreen} options={{ title: 'Love Golf' }} />

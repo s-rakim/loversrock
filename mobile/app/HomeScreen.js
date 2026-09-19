@@ -12,6 +12,7 @@ const QUICK_LINKS = [
   ['DateIdeas', 'Date Ideas', 'bulb-outline'],
   ['Countdown', 'Countdowns', 'hourglass-outline'],
   ['DistanceApart', 'Distance Apart', 'navigate-outline'],
+  ['PeriodTracker', 'Cycle Tracker', 'water-outline'],
 ];
 
 export default function HomeScreen({ navigation }) {

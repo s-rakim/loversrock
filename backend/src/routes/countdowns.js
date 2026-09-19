@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 
-const router = Router();
+const router = asyncRouter();
 
 router.use(requireAuth, requirePair);
 

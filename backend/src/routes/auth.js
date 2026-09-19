@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { asyncRouter } from '../lib/asyncRouter.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
@@ -6,7 +6,7 @@ import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { getActivePairForUser } from '../models/pairs.js';
 
-const router = Router();
+const router = asyncRouter();
 
 function issueTokens(userId) {
   const accessToken = jwt.sign({ sub: userId }, process.env.JWT_ACCESS_SECRET, {
