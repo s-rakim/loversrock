@@ -167,6 +167,29 @@ The config plugins (`mobile/plugins/`) do the wiring at prebuild time:
   `Info.plist`/entitlements, adds the App Group to the main app, and creates
   the `LoversRockWidgets` app-extension target in the Xcode project.
 
+## Sending a photo (the locket)
+
+Home screen -> the wide photo card -> **Take a photo** or **Choose**, add a
+caption, send. It lands on your partner's widget and, because every widget
+photo is mirrored into Memories with `source='widget'`, it is never lost
+even if native delivery fails.
+
+The chain, and where each part is proven:
+
+| Hop | Proven by |
+|---|---|
+| App uploads (`POST /widget-photos`) | `test/locket.mjs` |
+| Mirrored into Memories | `test/locket.mjs` |
+| FCM **data** message wakes the widget | `test/push.mjs` |
+| Widget fetches (`GET /widget/photo`, widget token in the query string) | `test/locket.mjs`, including that the bytes are a real PNG |
+| Widget paints it on the home screen | **Not proven — needs a device** |
+
+Photos are capped at 1024px and quality 0.5 before upload. That is not
+cosmetic: base64 inflates the payload by about a third, and an Android
+`RemoteViews` bitmap has to cross a Binder transaction with a hard ~1MB
+limit. A full-resolution phone photo fails that and the widget draws
+nothing.
+
 ## Installing on the device
 
 - **Android:** long-press the home screen → Widgets → loversrock → drag out

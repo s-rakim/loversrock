@@ -37,7 +37,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "loversrock needs access to your photos to add them to your shared Memories."
+          "photosPermission": "loversrock needs access to your photos to add them to your shared Memories.",
+          "cameraPermission": "loversrock needs your camera to take a photo for your partner’s home screen widget."
         }
       ],
       "@config-plugins/react-native-webrtc"

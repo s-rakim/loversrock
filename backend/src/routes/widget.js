@@ -200,9 +200,26 @@ router.get('/photo', async (req, res, next) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'No photo yet' });
 
-  const stream = await getObjectStream(rows[0].image_url);
+  const key = rows[0].image_url;
+  // Declare the type. Android's BitmapFactory sniffs the bytes and copes
+  // without it, but iOS's image loader and any HTTP cache in between go by
+  // the header - an image served as "no idea" is the kind of thing that
+  // works on one platform and silently shows a blank widget on the other.
+  const extension = (key.split('.').pop() || '').toLowerCase();
+  const contentType = extension === 'png' ? 'image/png'
+    : extension === 'webp' ? 'image/webp'
+      : extension === 'gif' ? 'image/gif'
+        : 'image/jpeg';
+  res.setHeader('Content-Type', contentType);
   res.setHeader('Cache-Control', 'no-cache');
-  stream.on('error', () => res.status(404).end());
+
+  const stream = await getObjectStream(key);
+  // Once piping has begun the status line is already sent, so a late error
+  // can only destroy the response - calling res.status() then would throw.
+  stream.on('error', () => {
+    if (res.headersSent) res.destroy();
+    else res.status(404).end();
+  });
   stream.pipe(res);
 });
 
