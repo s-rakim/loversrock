@@ -19,12 +19,45 @@
 import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { Platform, AppState } from 'react-native';
+import { Platform, AppState, PermissionsAndroid, Alert } from 'react-native';
 import {
   RTCPeerConnection, RTCSessionDescription, RTCIceCandidate,
   mediaDevices, registerGlobals,
 } from 'react-native-webrtc';
 import { apiFetch, connectSocket, getSocket } from '../../services/api';
+
+/**
+ * Audio routing, the ringtone, the proximity sensor and the wake lock.
+ *
+ * react-native-webrtc deliberately owns none of this — it has no speakerphone
+ * API at all, which is why the speaker button used to toggle its own icon and
+ * change nothing. Worse, Android routes call audio to the EARPIECE by
+ * default, so a video call played out of the earpiece while you held the
+ * phone at arm's length: audible only if you pressed it to your face, which
+ * reads exactly like a call that does not work.
+ *
+ * Required at runtime rather than imported, so that a build where the native
+ * module is missing degrades to "no speaker control" instead of a white
+ * screen on launch.
+ */
+let InCallManager = null;
+try {
+  // eslint-disable-next-line global-require
+  InCallManager = require('react-native-incall-manager').default;
+} catch {
+  InCallManager = null;
+}
+const audio = {
+  start: (media) => { try { InCallManager?.start({ media, auto: true }); } catch { /* no native module */ } },
+  stop: () => { try { InCallManager?.stop(); } catch { /* */ } },
+  speaker: (on) => { try { InCallManager?.setForceSpeakerphoneOn(on); } catch { /* */ } },
+  ring: () => { try { InCallManager?.startRingtone('_DEFAULT_'); } catch { /* */ } },
+  stopRing: () => { try { InCallManager?.stopRingtone(); } catch { /* */ } },
+  ringback: () => { try { InCallManager?.startRingback('_DEFAULT_'); } catch { /* */ } },
+  stopRingback: () => { try { InCallManager?.stopRingback(); } catch { /* */ } },
+  screenOn: (on) => { try { InCallManager?.setKeepScreenOn(on); } catch { /* */ } },
+};
+export const hasAudioRouting = () => InCallManager !== null;
 
 // react-native-webrtc needs its globals installed once, before any peer
 // connection is built.
@@ -61,12 +94,55 @@ export function CallProvider({ children }) {
     localStreamRef.current?.getTracks?.().forEach((t) => { try { t.stop(); } catch { /* */ } });
     localStreamRef.current = null;
 
+    audio.stopRing();
+    audio.stopRingback();
+    audio.screenOn(false);
+    audio.stop();
+
     pendingCandidates.current = [];
     callIdRef.current = null;
     setLocalStream(null);
     setRemoteStream(null);
     setMuted(false);
     setCameraOff(false);
+    setSpeakerOn(false);
+  }, []);
+
+  /**
+   * Android runtime permissions.
+   *
+   * react-native-webrtc does NOT request these itself — declaring CAMERA and
+   * RECORD_AUDIO in the manifest is only half of it, and on Android 6+
+   * getUserMedia simply rejects until the user has actually granted them.
+   * That rejection was being swallowed into `error`, which only the call
+   * screen renders, and the call screen never opened because the phase never
+   * left 'idle'. The result: tapping Call did nothing at all, which is
+   * indistinguishable from the button being a placeholder.
+   */
+  const ensurePermissions = useCallback(async (kind) => {
+    if (Platform.OS !== 'android') return true;
+
+    const wanted = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+    if (kind === 'video') wanted.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+    // Android 12+ needs this to open the Bluetooth headset's audio route.
+    if (PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT) {
+      wanted.push(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
+    }
+
+    const granted = await PermissionsAndroid.requestMultiple(wanted);
+    // Bluetooth is a nicety; the mic and camera are not.
+    const required = kind === 'video'
+      ? [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, PermissionsAndroid.PERMISSIONS.CAMERA]
+      : [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+
+    const missing = required.filter((p) => granted[p] !== PermissionsAndroid.RESULTS.GRANTED);
+    if (missing.length === 0) return true;
+
+    Alert.alert(
+      kind === 'video' ? 'Camera and microphone needed' : 'Microphone needed',
+      'Allow access in Settings → Apps → loversrock → Permissions, then try the call again.'
+    );
+    return false;
   }, []);
 
   /** Mic, and camera only for a video call — never ask for more than needed. */
@@ -107,7 +183,11 @@ export function CallProvider({ children }) {
 
     connection.addEventListener('connectionstatechange', () => {
       const state = connection.connectionState;
-      if (state === 'connected') setCall((c) => ({ ...c, phase: 'connected' }));
+      if (state === 'connected') {
+        audio.stopRingback();
+        audio.stopRing();
+        setCall((c) => ({ ...c, phase: 'connected' }));
+      }
       // 'failed' is terminal; 'disconnected' often recovers on its own, so
       // it is deliberately not treated as the end of the call.
       if (state === 'failed') {
@@ -132,7 +212,15 @@ export function CallProvider({ children }) {
   /** Ring your partner. */
   const startCall = useCallback(async (kind = 'voice') => {
     setError(null);
+    if (!(await ensurePermissions(kind))) return;
     try {
+      // A video call belongs on the speaker; a voice call belongs on the
+      // earpiece with the proximity sensor blanking the screen. `auto: true`
+      // gives the second behaviour, and this gives the first.
+      audio.start(kind === 'video' ? 'video' : 'audio');
+      audio.screenOn(true);
+      if (kind === 'video') { audio.speaker(true); setSpeakerOn(true); }
+
       const stream = await getMedia(kind);
       const { call: record } = await apiFetch('/calls/start', { method: 'POST', body: { kind } });
       callIdRef.current = record.id;
@@ -147,18 +235,30 @@ export function CallProvider({ children }) {
 
       const socket = await connectSocket();
       socket.emit('call:offer', { callId: record.id, kind, sdp: offer.sdp, type: offer.type });
+      audio.ringback();   // so the caller hears that it is ringing
     } catch (err) {
-      setError(err.body?.call ? 'A call is already in progress.' : err.message);
+      const message = err.body?.call ? 'A call is already in progress.' : err.message;
+      setError(message);
       setCall(IDLE);
       teardown();
+      // The call screen is where `error` is rendered, and a failure this
+      // early means it never opened — so say it out loud instead of
+      // failing silently.
+      Alert.alert("Couldn't start the call", message);
     }
-  }, [getMedia, buildPeerConnection, teardown]);
+  }, [ensurePermissions, getMedia, buildPeerConnection, teardown]);
 
   /** Pick up. */
   const answerCall = useCallback(async () => {
     if (call.phase !== 'ringing-in' || !call.offer) return;
     setError(null);
+    if (!(await ensurePermissions(call.kind))) return;
     try {
+      audio.stopRing();
+      audio.start(call.kind === 'video' ? 'video' : 'audio');
+      audio.screenOn(true);
+      if (call.kind === 'video') { audio.speaker(true); setSpeakerOn(true); }
+
       const stream = await getMedia(call.kind);
       const connection = await buildPeerConnection(call.kind, stream);
 
@@ -178,7 +278,7 @@ export function CallProvider({ children }) {
       setCall(IDLE);
       teardown();
     }
-  }, [call, getMedia, buildPeerConnection, flushCandidates, teardown]);
+  }, [call, ensurePermissions, getMedia, buildPeerConnection, flushCandidates, teardown]);
 
   /** Hang up, decline, or give up — the server works out which it was. */
   const endCall = useCallback(async (reason = 'hangup') => {
@@ -220,14 +320,7 @@ export function CallProvider({ children }) {
   const toggleSpeaker = useCallback(() => {
     setSpeakerOn((on) => {
       const next = !on;
-      // InCallManager would be the fuller answer; this covers the common case
-      // without another native dependency.
-      if (Platform.OS === 'android') {
-        try {
-          // eslint-disable-next-line global-require
-          require('react-native-webrtc').setSpeakerphoneOn?.(next);
-        } catch { /* not available on this build */ }
-      }
+      audio.speaker(next);
       return next;
     });
   }, []);
@@ -248,6 +341,7 @@ export function CallProvider({ children }) {
           return;
         }
         callIdRef.current = payload.callId;
+        audio.ring();
         setCall({
           phase: 'ringing-in',
           kind: payload.kind || 'voice',

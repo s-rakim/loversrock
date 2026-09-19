@@ -47,6 +47,11 @@ export async function getObjectStream(key) {
   return storageClient.getObject(BUCKET, key);
 }
 
+/** The stored metadata for a key — used to serve the right Content-Type. */
+export async function statObject(key) {
+  return storageClient.statObject(BUCKET, key);
+}
+
 export async function deleteObject(key) {
   return storageClient.removeObject(BUCKET, key);
 }

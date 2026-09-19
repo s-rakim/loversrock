@@ -266,7 +266,12 @@ const cats = Object.keys(decks.data.decksByCategory || {});
 const deckCount = Object.values(decks.data.decksByCategory || {}).flat().length;
 check('decks grouped by category', decks.status === 200 && cats.length === 11, cats.length);
 check('27 decks seeded', deckCount === 27, deckCount);
-check('locked/premium decks flagged', Object.values(decks.data.decksByCategory).flat().some((d) => d.is_locked));
+// There is no paywall. This is a server two people run for themselves, and
+// shipping 17 of the 27 decks behind a "Premium" badge meant the owner was
+// locked out of his own content. Asserted so it cannot creep back.
+check('no deck is locked behind anything',
+  Object.values(decks.data.decksByCategory).flat().every((d) => d.is_locked === false),
+  Object.values(decks.data.decksByCategory).flat().filter((d) => d.is_locked).map((d) => d.slug));
 const deckQs = await req('/decks/would-you-rather-classic/questions', { token: A.token });
 check('deck questions load', deckQs.status === 200 && deckQs.data.questions.length > 0);
 const dq = deckQs.data.questions[0];

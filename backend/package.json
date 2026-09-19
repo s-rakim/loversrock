@@ -22,7 +22,8 @@
     "test:engines": "node test/gameEngines.mjs",
     "test:calls": "node test/calls.mjs",
     "test:quiz-compare": "node test/quizCompare.mjs",
-    "test:locket": "node test/locket.mjs"
+    "test:locket": "node test/locket.mjs",
+    "test:media": "node test/media.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

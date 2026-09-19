@@ -139,12 +139,6 @@ export default function HomeScreen({ navigation }) {
                   >
                     <Icon name={deck.emoji} chip chipColor="rgba(255,255,255,0.6)" size={20} />
                     <Text style={[font.body, { marginTop: spacing.sm }]}>{deck.title}</Text>
-                    {deck.is_locked && (
-                      <View style={styles.lockedTag}>
-                        <Icon name="lock-closed-outline" size={11} chip={false} color={colors.text} />
-                        <Text style={styles.lockedTagText}>Premium</Text>
-                      </View>
-                    )}
                   </MorphButton>
                 );
               })}
@@ -225,6 +219,4 @@ const makeStyles = (colors, font) =>
     width: 110, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
     marginRight: spacing.sm, borderWidth: 1, borderColor: colors.border, minHeight: 100, justifyContent: 'center', alignItems: 'center',
   },
-  lockedTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs },
-  lockedTagText: { fontSize: 11, color: colors.text, fontWeight: '600' },
 });

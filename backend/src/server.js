@@ -5,8 +5,8 @@ import { createServer } from 'http';
 
 import { initSockets } from './sockets/index.js';
 import { startCronJobs } from './cron/index.js';
-import { ensureBucket, getObjectStream } from './config/storage.js';
-import { requireAuth } from './middleware/auth.js';
+import { ensureBucket, getObjectStream, statObject } from './config/storage.js';
+import { requireAuthAllowingQuery } from './middleware/auth.js';
 import { wrapAsync } from './lib/asyncRouter.js';
 
 import authRoutes from './routes/auth.js';
@@ -55,11 +55,27 @@ app.use('/profile', profileRoutes);
 
 // Auth-gated media streaming out of MinIO — mobile clients never get direct
 // storage credentials or presigned URLs, everything proxies through here.
+//
+// The token may arrive in the query string here (see requireAuthAllowingQuery):
+// the native image loaders cannot attach headers, so header-only auth meant
+// every photo in the app came back 401 and rendered as nothing.
 app.get(
   '/media/:key(*)',
-  wrapAsync(requireAuth),
+  wrapAsync(requireAuthAllowingQuery),
   wrapAsync(async (req, res) => {
     try {
+      // Without a Content-Type the iOS image loader refuses the bytes
+      // outright and Android only guesses right by luck, so the stored
+      // type is read back rather than left to the default.
+      const meta = await statObject(req.params.key).catch(() => null);
+      const type = meta?.metaData?.['content-type'] || 'application/octet-stream';
+      res.setHeader('Content-Type', type);
+      if (meta?.size) res.setHeader('Content-Length', meta.size);
+      // Immutable: every key is a fresh UUID, so a cached copy can never
+      // go stale. This is what stops the thread re-downloading every photo
+      // on each scroll.
+      res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+
       const stream = await getObjectStream(req.params.key);
       stream.on('error', () => res.status(404).end());
       stream.pipe(res);

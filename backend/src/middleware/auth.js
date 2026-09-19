@@ -38,3 +38,32 @@ export async function requirePair(req, res, next) {
   req.partnerId = req.pair.user_a_id === req.userId ? req.pair.user_b_id : req.pair.user_a_id;
   next();
 }
+
+/**
+ * Same access token, read from the query string as well as the header.
+ *
+ * Deliberately scoped to media. An <Image source={{ uri }} /> is fetched by
+ * the platform's own image loader — Fresco on Android, NSURLSession on iOS —
+ * and neither sends headers the JS never gets to set. A header-only rule
+ * therefore does not mean "media is protected", it means every photo in the
+ * app renders as an empty grey box, which is exactly what it was doing. The
+ * widget endpoints already took their credential this way for the same
+ * reason; this brings /media in line.
+ *
+ * The header is still preferred when it is there, so ordinary API clients
+ * keep their tokens out of URLs and access logs.
+ */
+export async function requireAuthAllowingQuery(req, res, next) {
+  const [scheme, headerToken] = (req.headers.authorization || '').split(' ');
+  const token = (scheme === 'Bearer' && headerToken) || req.query.token;
+
+  if (!token) return res.status(401).json({ error: 'Missing bearer token' });
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    req.userId = payload.sub;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}

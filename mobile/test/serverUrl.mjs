@@ -132,7 +132,7 @@ check('it is persisted', AsyncStorage.__dump().loversrock_server_url === `http:/
 check('the placeholder warning clears', api.apiUrlProblem() === null, String(api.apiUrlProblem()));
 check('ping reaches the new server', (await api.pingServer()).status === 'ok');
 check('apiFetch uses the new address', (await api.apiFetch('/auth/login', { method: 'POST', body: {} })).accessToken === 'access');
-check('mediaUrl follows it', api.mediaUrl('k') === `http://${UP}/media/k`, api.mediaUrl('k'));
+check('mediaUrl follows it', api.mediaUrl('k').startsWith(`http://${UP}/media/k`), api.mediaUrl('k'));
 check('the socket follows it', (await api.connectSocket()).url === `http://${UP}`);
 
 console.log('\nSurviving an app restart');
@@ -154,6 +154,36 @@ try {
 check('the failure names the address it tried', downMsg.includes(`http://${DOWN}`), downMsg);
 check('and points at the in-app fix', /Settings/.test(downMsg));
 check('still no bare "Network request failed"', !/Network request failed/.test(downMsg));
+
+console.log('\nSigned media URLs, because <Image> cannot send a header');
+// /media is authenticated, and the native image loaders make a bare GET with
+// no headers JavaScript ever sees. Every photo in the app therefore 401'd and
+// rendered as an empty box. The token rides in the query string instead.
+await restarted.setApiUrl(UP);
+check('anonymous before sign-in, rather than inventing a token',
+  restarted.mediaUrl('messages/1.jpg') === `http://${UP}/media/messages/1.jpg`,
+  restarted.mediaUrl('messages/1.jpg'));
+
+await restarted.setTokens({ accessToken: 'tok-123', refreshToken: 'r' });
+check('signed once there is a session',
+  restarted.mediaUrl('messages/1.jpg') === `http://${UP}/media/messages/1.jpg?token=tok-123`,
+  restarted.mediaUrl('messages/1.jpg'));
+check('built synchronously, which is what render needs',
+  typeof restarted.mediaUrl('k') === 'string');
+
+await restarted.setTokens({ accessToken: 'tok/with+chars=', refreshToken: 'r' });
+check('the token is percent-encoded, so a + never becomes a space',
+  restarted.mediaUrl('k') === `http://${UP}/media/k?token=tok%2Fwith%2Bchars%3D`,
+  restarted.mediaUrl('k'));
+
+await restarted.setTokens({ accessToken: 'rotated', refreshToken: 'r' });
+check('a rotated token is picked up immediately',
+  restarted.mediaUrl('k').endsWith('?token=rotated'), restarted.mediaUrl('k'));
+
+await restarted.clearTokens();
+check('and signing out unsigns it', restarted.mediaUrl('k') === `http://${UP}/media/k`, restarted.mediaUrl('k'));
+check('a missing key is null, not the string "undefined" in a URL',
+  restarted.mediaUrl(null) === null && restarted.mediaUrl(undefined) === null);
 
 console.log('\nResetting');
 check('reverts to the build-time address', (await restarted.resetApiUrl()) === 'http://100.x.x.x:4000');

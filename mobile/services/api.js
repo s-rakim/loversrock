@@ -116,20 +116,30 @@ export async function pingServer() {
   return res.json();
 }
 
+// Kept in memory as well as in the keychain. mediaUrl() has to be able to
+// build a URL synchronously, in render, and SecureStore is async — so the
+// live token is mirrored here every time it is read or written.
+let cachedAccessToken = null;
+
 export async function getAccessToken() {
-  return SecureStore.getItemAsync(ACCESS_KEY);
+  if (cachedAccessToken) return cachedAccessToken;
+  cachedAccessToken = await SecureStore.getItemAsync(ACCESS_KEY);
+  return cachedAccessToken;
 }
+
 
 export async function getRefreshToken() {
   return SecureStore.getItemAsync(REFRESH_KEY);
 }
 
 export async function setTokens({ accessToken, refreshToken }) {
+  cachedAccessToken = accessToken;
   await SecureStore.setItemAsync(ACCESS_KEY, accessToken);
   if (refreshToken) await SecureStore.setItemAsync(REFRESH_KEY, refreshToken);
 }
 
 export async function clearTokens() {
+  cachedAccessToken = null;
   await SecureStore.deleteItemAsync(ACCESS_KEY);
   await SecureStore.deleteItemAsync(REFRESH_KEY);
 }
@@ -190,8 +200,18 @@ export async function apiFetch(path, { method = 'GET', body, isRetry = false } =
   return data;
 }
 
+/**
+ * A URL an <Image> can actually load.
+ *
+ * /media is authenticated, and the native image loaders send no headers —
+ * so the token rides in the query string, the same way the widget's does.
+ * Without it every photo in the app came back 401 and rendered as a blank
+ * box: messages, memories, the widget preview and photo wallpapers alike.
+ */
 export function mediaUrl(key) {
-  return `${currentUrl}/media/${key}`;
+  if (!key) return null;
+  const base = `${currentUrl}/media/${key}`;
+  return cachedAccessToken ? `${base}?token=${encodeURIComponent(cachedAccessToken)}` : base;
 }
 
 let socket = null;
