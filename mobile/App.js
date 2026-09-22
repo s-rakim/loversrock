@@ -106,6 +106,9 @@ function MainTabs() {
       tabBar={(props) => <GlassTabBar {...props} />}
     >
       <Tab.Screen name="Home" component={fadeOnFocus(HomeScreen)} />
+      {/* The quiz is the thing there is a new one of every day, and it was
+          buried two taps deep behind a Home card. It gets its own tab. */}
+      <Tab.Screen name="Quiz" component={fadeOnFocus(QuizScreen)} />
       <Tab.Screen name="Games" component={fadeOnFocus(GamesScreen)} />
       <Tab.Screen name="Messages" component={fadeOnFocus(MessagesScreen)} />
       <Tab.Screen name="Memories" component={fadeOnFocus(MemoriesScreen)} />
@@ -152,9 +155,18 @@ function Root() {
   // Two paths into the app: tapped while running, and tapped from cold. The
   // second returns the response that launched the app, which is easy to miss.
   useEffect(() => {
+    // Routes that live inside the bottom tabs rather than the root stack.
+    // navigate('Quiz') from the root would otherwise have nothing to match.
+    const TAB_ROUTES = new Set(['Home', 'Quiz', 'Games', 'Messages', 'Memories', 'Settings']);
+
     const go = (response) => {
       const route = routeForNotification(response);
-      if (route && navigationRef.isReady()) navigationRef.navigate(route.screen, route.params);
+      if (!route || !navigationRef.isReady()) return;
+      if (TAB_ROUTES.has(route.screen)) {
+        navigationRef.navigate('MainTabs', { screen: route.screen, params: route.params });
+      } else {
+        navigationRef.navigate(route.screen, route.params);
+      }
     };
 
     Notifications.getLastNotificationResponseAsync().then((response) => {
@@ -196,7 +208,6 @@ function Root() {
             <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
             <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
             <Stack.Screen name="DailyPrompt" component={DailyPromptScreen} options={{ title: "Today's Prompt" }} />
-            <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Daily Quiz' }} />
             <Stack.Screen name="DeckDetail" component={DeckDetailScreen} options={{ title: 'Deck' }} />
             <Stack.Screen name="BucketList" component={BucketListScreen} options={{ title: 'Bucket List' }} />
             <Stack.Screen name="DateIdeas" component={DateIdeasScreen} options={{ title: 'Date Ideas' }} />

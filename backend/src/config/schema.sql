@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS daily_prompts (
   scheduled_date  DATE NOT NULL UNIQUE,
   category        TEXT NOT NULL,
   content         TEXT NOT NULL,
-  -- Which provider produced this row: seed, claude, http or local. Purely for
+  -- Which provider produced this row: seed, http or local. Purely for
   -- observability - you can see at a glance whether the daily fetch is working
   -- or whether everything has quietly been coming from the local bank.
   source          TEXT NOT NULL DEFAULT 'seed',

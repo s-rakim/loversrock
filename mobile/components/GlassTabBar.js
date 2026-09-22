@@ -9,6 +9,7 @@ import { useTheme } from './ThemeContext';
 
 const TAB_META = {
   Home: { icon: 'home-outline', iconActive: 'home', label: 'Home' },
+  Quiz: { icon: 'help-circle-outline', iconActive: 'help-circle', label: 'Quiz' },
   Games: { icon: 'game-controller-outline', iconActive: 'game-controller', label: 'Arcade' },
   Messages: { icon: 'chatbubble-outline', iconActive: 'chatbubble', label: 'Messages' },
   Memories: { icon: 'images-outline', iconActive: 'images', label: 'Memories' },

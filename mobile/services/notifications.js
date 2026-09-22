@@ -134,7 +134,9 @@ export const SCREEN_FOR_TYPE = {
   partner_update: 'Home',
   game_invite: 'Games',
   game_turn: 'Games',
-  call: 'Home',
+  // One entry, not two: this object had `call` twice, so the first was dead
+  // and the second silently won. It happened to be the right one, which is
+  // why nothing ever looked wrong.
   call: 'Call',
   period_reminder: 'PeriodTracker',
   water: 'PeriodTracker',

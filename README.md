@@ -213,7 +213,7 @@ they're load-bearing and shouldn't be casually reversed:
 | Cycle Tracker (Today / Calendar / Partner / Analysis, 59 symptoms in 6 groups, 36 moods, flow, intercourse, sex drive, weight, temperature, predictions, fertile window) | ✅ Fully implemented |
 | Partner cycle mode (read-only, per-category sharing, pregnancy-chance curve) | ✅ Fully implemented |
 | Nicknames (each partner names the other, independently) | ✅ Fully implemented |
-| Daily prompts refreshed nightly from a random topic (Claude / any URL / local bank) | ✅ Fully implemented |
+| Daily prompts refreshed nightly from a random topic (any URL / local bank) | ✅ Fully implemented |
 | Games — all 12 played against your partner, none solo: Tic Tac Toe, Four in a Row, Checkers, Chess, Uno Reverse, Block Blitz, Anagrams, What You Saying, Perfect Pair, Love Letters, Love Golf, Draw Duel | ✅ Server-authoritative (Love Golf's score is client-reported — `docs/GAMES.md` says why). Chess verified by perft. |
 | Voice and video calls (WebRTC, peer to peer) | ⚠️ Signalling tested end to end; the media itself needs a two-device pass. See `docs/CALLS.md`. |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |

@@ -1,9 +1,9 @@
 // Exercises the daily-prompt fetcher: normalisation, each provider, and the
 // cron job that schedules them against a live database.
 //
-// The Claude provider is driven through an injected fake client so the suite
-// costs nothing and needs no key; the HTTP provider runs against a real local
-// server, so the fetch/parse path is genuinely executed.
+// The HTTP provider runs against a real local server rather than a mock, so
+// the fetch and parse path is genuinely executed; the local provider needs
+// nothing but the seeded bank.
 // This suite talks to the database directly rather than through the HTTP API,
 // so it has to load .env itself - server.js does that for the other suites.
 import 'dotenv/config';
@@ -11,7 +11,7 @@ import http from 'node:http';
 import { query } from '../src/config/db.js';
 import {
   TOPICS, pickTopic, normalizeQuestions, htmlToQuestions, sourceUrls,
-  fetchFromHttp, fetchFromLocal, fetchFromClaude, fetchQuestions,
+  fetchFromHttp, fetchFromLocal, fetchQuestions,
 } from '../src/services/promptSources.js';
 import { refreshDailyPrompts } from '../src/cron/index.js';
 
@@ -113,22 +113,7 @@ const first = fetchFromLocal(3);
 check('exclude removes already-used questions',
   fetchFromLocal(6, { exclude: first }).every((q) => !first.includes(q)));
 
-console.log('\n=== CLAUDE PROVIDER (injected fake client) ===');
-const fakeClient = (payload, stop = 'end_turn') => ({
-  beta: { messages: { create: async (params) => {
-    fakeClient.lastParams = params;
-    return { stop_reason: stop, content: [{ type: 'text', text: payload }] };
-  } } },
-});
-const ok = fakeClient(JSON.stringify({ questions: ['What made you smile today?', 'Where should we go next year?'] }));
-check('parses a structured response', (await fetchFromClaude('travel', 6, { client: ok })).length === 2);
-const refused = fakeClient('{}', 'refusal');
-check('a refusal yields nothing rather than throwing', (await fetchFromClaude('x', 6, { client: refused })).length === 0);
-const garbled = fakeClient('not json at all');
-check('unparseable model output yields nothing', (await fetchFromClaude('x', 6, { client: garbled })).length === 0);
-
 console.log('\n=== PROVIDER SELECTION / FALLBACK ===');
-delete process.env.ANTHROPIC_API_KEY; delete process.env.PROMPT_ANTHROPIC_API_KEY;
 process.env.PROMPT_SOURCE_URL = `${base}/array`;
 const viaHttp = await fetchQuestions({ count: 6 });
 check('uses the http source when configured', viaHttp.source.startsWith('http:'), viaHttp.source);

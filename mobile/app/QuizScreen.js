@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiFetch, connectSocket, getSocket } from '../services/api';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton, ProgressDot } from '../components/Motion';
@@ -11,6 +12,10 @@ import QuizResult from '../components/QuizResult';
 
 export default function QuizScreen() {
   const { colors, font } = useTheme();
+  // The quiz is a bottom tab now rather than a pushed screen, so there is no
+  // stack header supplying a title or clearing the status bar. It carries its
+  // own.
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
@@ -81,9 +86,19 @@ export default function QuizScreen() {
     }
   }
 
+  const Header = ({ subtitle }) => (
+    <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+      <Icon name="help-circle" chip chipSize={38} />
+      <View style={{ flex: 1 }}>
+        <Text style={font.h1}>Daily Quiz</Text>
+        {subtitle ? <Text style={font.muted}>{subtitle}</Text> : null}
+      </View>
+    </View>
+  );
+
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator color={colors.accent} />
       </View>
     );
@@ -91,8 +106,13 @@ export default function QuizScreen() {
 
   if (questions.length === 0) {
     return (
-      <View style={styles.centered}>
-        <Text style={font.body}>No quiz scheduled for today.</Text>
+      <View style={styles.container}>
+        <Header />
+        <View style={styles.centered}>
+          <Icon name="calendar-outline" size={36} color={colors.textMuted} />
+          <Text style={[font.body, { marginTop: spacing.sm }]}>No quiz scheduled for today.</Text>
+          <Text style={[font.muted, { marginTop: 2 }]}>A new one lands overnight.</Text>
+        </View>
       </View>
     );
   }
@@ -105,11 +125,12 @@ export default function QuizScreen() {
   // set of questions to answer.
   if (revealed && result) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl }}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl * 4 }}>
         <StickerField variant="minimal" />
         <View style={styles.celebrationLayer}>
           <CelebrationBurst trigger={celebrateTrigger} />
         </View>
+        <Header subtitle="Both finished — here's how you did" />
         <QuizResult result={result} questions={questions} />
       </ScrollView>
     );
@@ -119,8 +140,10 @@ export default function QuizScreen() {
   // yet, so there is nothing to show even by accident.
   if (waitingOnThem) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.container}>
         <StickerField variant="minimal" />
+        <Header subtitle="Waiting on them" />
+        <View style={styles.centered}>
         <Icon name="hourglass-outline" size={40} color={colors.accent} />
         <Text style={[font.h2, styles.waitTitle]}>All answered</Text>
         <Text style={[font.muted, styles.waitBody]}>
@@ -131,6 +154,7 @@ export default function QuizScreen() {
             They've done {progress.partner} of {progress.total}.
           </Text>
         )}
+        </View>
       </View>
     );
   }
@@ -141,6 +165,7 @@ export default function QuizScreen() {
       <View style={styles.celebrationLayer}>
         <CelebrationBurst trigger={celebrateTrigger} />
       </View>
+      <Header subtitle={`Question ${index + 1} of ${questions.length}`} />
       <FadeInUp>
         <View style={styles.dots}>
           {questions.map((item, i) => (
@@ -228,7 +253,11 @@ export default function QuizScreen() {
 
 const makeStyles = (colors, font) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: 'transparent', paddingHorizontal: spacing.lg },
+  header: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingBottom: spacing.md,
+  },
   centered: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   dots: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center', marginBottom: spacing.sm },
   progressLine: { textAlign: 'center', marginBottom: spacing.lg },
@@ -242,7 +271,7 @@ const makeStyles = (colors, font) =>
   },
   resultCard: { marginTop: spacing.md, padding: spacing.md, backgroundColor: colors.surfaceAlt, borderRadius: radius.md },
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  nav: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
+  nav: { marginBottom: 110, flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
   navButton: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   celebrationLayer: {
     position: 'absolute', top: 60, left: 0, right: 0, height: 200, alignItems: 'center', justifyContent: 'center', zIndex: 5,

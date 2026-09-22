@@ -1,20 +1,22 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import Anthropic from '@anthropic-ai/sdk';
 
 const here = dirname(fileURLToPath(import.meta.url)); // no __dirname in ESM
 
 /**
  * Where tomorrow's daily prompts come from.
  *
- * Three providers, chosen by what's configured, each falling back to the next
+ * Two providers, chosen by what's configured, each falling back to the next
  * so the app is never left without a prompt:
  *
- *   claude  — generates fresh questions on a random topic (needs an API key)
  *   http    — pulls from any URL returning a JSON array or newline-separated
  *             text, for a dataset you host or point at
  *   local   — recombines the seeded bank; always works, no network
+ *
+ * There was a third that generated questions from a hosted model. It is gone:
+ * it needed a paid API key nobody was going to buy, and the two that remain
+ * cover the job without one.
  */
 
 // Deliberately broad: a couple who've been together years shouldn't get the
@@ -118,69 +120,6 @@ export function htmlToQuestions(html) {
   return [...fromLines, ...fromProse];
 }
 
-const SCHEMA = {
-  type: 'object',
-  properties: {
-    questions: {
-      type: 'array',
-      items: { type: 'string' },
-      minItems: 1,
-    },
-  },
-  required: ['questions'],
-  additionalProperties: false,
-};
-
-/** Generates questions on a topic. Returns [] rather than throwing. */
-export async function fetchFromClaude(topic, count, { client } = {}) {
-  const apiKey = process.env.PROMPT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-  if (!client && !apiKey) return [];
-
-  const anthropic = client || new Anthropic({ apiKey });
-
-  const response = await anthropic.beta.messages.create({
-    model: 'claude-opus-5',
-    max_tokens: 2000,
-    // Opus 5 can decline; without this a refusal just stops. "default" routes
-    // by refusal category so there's no fallback model list to maintain.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: {
-      // Writing six short questions is not an intelligence-sensitive task.
-      effort: 'low',
-      format: { type: 'json_schema', schema: SCHEMA },
-    },
-    system:
-      'You write daily conversation prompts for a couple who use a private app together. ' +
-      'Each prompt is ONE open question, warm and specific, answerable in a few sentences by ' +
-      'either partner. Never assume gender, marital status, children, living arrangements or ' +
-      'sexuality. Avoid anything interrogating, therapeutic or accusatory. Vary the shape — ' +
-      'some memory, some imagination, some preference. No numbering, no preamble.',
-    messages: [
-      {
-        role: 'user',
-        content: `Write ${count} distinct questions on the theme: ${topic}.`,
-      },
-    ],
-  });
-
-  if (response.stop_reason === 'refusal') return [];
-
-  const text = response.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('');
-
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return [];
-  }
-
-  return normalizeQuestions(parsed?.questions, { limit: count });
-}
-
 /** Pulls from a URL returning a JSON array, {questions:[...]}, or plain lines. */
 export async function fetchFromHttp(url, count, { fetchImpl = fetch } = {}) {
   if (!url) return [];
@@ -273,8 +212,6 @@ export async function fetchQuestions({ count = 6, exclude = [], topic } = {}) {
   const chosenTopic = topic || pickTopic();
   const attempts = [];
 
-  const hasKey = Boolean(process.env.PROMPT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
-  if (hasKey) attempts.push(['claude', () => fetchFromClaude(chosenTopic, count)]);
   for (const url of sourceUrls()) {
     attempts.push([`http:${url}`, () => fetchFromHttp(url, count)]);
   }
