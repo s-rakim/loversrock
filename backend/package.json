@@ -23,7 +23,8 @@
     "test:calls": "node test/calls.mjs",
     "test:quiz-compare": "node test/quizCompare.mjs",
     "test:locket": "node test/locket.mjs",
-    "test:media": "node test/media.mjs"
+    "test:media": "node test/media.mjs",
+    "test:socket-auth": "node --env-file=.env test/socketAuth.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

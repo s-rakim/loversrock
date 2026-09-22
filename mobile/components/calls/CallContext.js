@@ -24,7 +24,7 @@ import {
   RTCPeerConnection, RTCSessionDescription, RTCIceCandidate,
   mediaDevices, registerGlobals,
 } from 'react-native-webrtc';
-import { apiFetch, connectSocket, getSocket } from '../../services/api';
+import { apiFetch, connectSocket, getSocket, waitForSocket } from '../../services/api';
 
 /**
  * Audio routing, the ringtone, the proximity sensor and the wake lock.
@@ -233,7 +233,12 @@ export function CallProvider({ children }) {
       });
       await connection.setLocalDescription(offer);
 
-      const socket = await connectSocket();
+      // The offer is the whole call. Emitting it into a socket that is not
+      // actually connected is how this used to sit on "Calling…" forever:
+      // socket.io buffers the emit, the handshake never completes, and the
+      // other phone simply never rings. Wait for a live socket, and say so
+      // if there isn't one.
+      const socket = await waitForSocket();
       socket.emit('call:offer', { callId: record.id, kind, sdp: offer.sdp, type: offer.type });
       audio.ringback();   // so the caller hears that it is ringing
     } catch (err) {
@@ -392,6 +397,17 @@ export function CallProvider({ children }) {
         .forEach((event) => live?.off(event));
     };
   }, [flushCandidates, teardown]);
+
+  // Nobody picks up forever. Without this the caller stares at "Calling…"
+  // until they kill the app, and the row stays 'ringing' in the history.
+  useEffect(() => {
+    if (call.phase !== 'ringing-out') return undefined;
+    const timer = setTimeout(() => {
+      setError('No answer.');
+      endCall('no-answer');
+    }, 45000);
+    return () => clearTimeout(timer);
+  }, [call.phase, endCall]);
 
   // A call that is still ringing when the app is killed would otherwise stay
   // "ringing" in the history forever.

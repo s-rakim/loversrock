@@ -8,6 +8,24 @@ import { radius, spacing } from '../theme';
 import { MorphButton } from './Motion';
 import { useTheme } from './ThemeContext';
 
+/**
+ * Ionicons ships most glyphs as a thin `-outline` and a filled solid, e.g.
+ * "heart-outline" and "heart". The app asked for the outline everywhere,
+ * which at 16-20px is a one-pixel hairline — thin, pale, and weightless.
+ *
+ * `solidOf` drops the suffix, but ONLY when the filled glyph genuinely
+ * exists: Ionicons renders an unknown name as a "?" box, so guessing would
+ * trade a thin icon for a broken one. The glyph map is bundled, so this is a
+ * lookup rather than a hope.
+ */
+const GLYPHS = Ionicons.glyphMap || {};
+
+export function solidOf(name) {
+  if (typeof name !== 'string' || !name.endsWith('-outline')) return name;
+  const filled = name.slice(0, -'-outline'.length);
+  return filled in GLYPHS ? filled : name;
+}
+
 // `name` is any Ionicons glyph name, e.g. "heart-outline", "flame".
 //
 // The colour defaults are resolved in the BODY, not as default parameters.
@@ -29,14 +47,37 @@ export default function Icon({
   chipColor,
   onPress,
   style,
+  // 'bold' fills the glyph where a filled variant exists. Chips default to
+  // bold because a chip is a deliberate emphasis; a bare inline icon does not.
+  weight,
 }) {
   const { colors } = useTheme();
-  const glyphColor = color ?? colors.accent;
-  const chipBackground = chipColor ?? colors.accentSoft;
-  const glyph = <Ionicons name={name} size={size} color={glyphColor} />;
+
+  // iconGlyph is a deep rose rather than the mid-pink accent. accent on
+  // accentSoft measured 2.02:1 — pink on pink — which is why every icon in
+  // the app read as washed out. This measures 4.66:1 on the same chip.
+  const glyphColor = color ?? colors.iconGlyph ?? colors.accent;
+  const chipBackground = chipColor ?? colors.iconChip ?? colors.accentSoft;
+  const bold = weight ? weight === 'bold' : chip;
+
+  const glyph = <Ionicons name={bold ? solidOf(name) : name} size={size} color={glyphColor} />;
 
   const wrapperStyle = chip
-    ? [styles.chip, { width: chipSize, height: chipSize, borderRadius: radius.icon, backgroundColor: chipBackground }, style]
+    ? [
+        styles.chip,
+        {
+          width: chipSize,
+          height: chipSize,
+          borderRadius: radius.icon,
+          backgroundColor: chipBackground,
+          // A hairline edge. On a translucent chip over a drifting
+          // background, the shape otherwise dissolves into whatever blob
+          // happens to be passing underneath.
+          borderWidth: StyleSheet.hairlineWidth * 2,
+          borderColor: colors.iconChipBorder ?? 'transparent',
+        },
+        style,
+      ]
     : style;
 
   if (onPress) {

@@ -214,13 +214,208 @@ export function mediaUrl(key) {
   return cachedAccessToken ? `${base}?token=${encodeURIComponent(cachedAccessToken)}` : base;
 }
 
+// ---------------------------------------------------------------- socket
+//
+// The socket is how the other phone finds out about anything in real time:
+// a message arriving, a game move, a thumb kiss, and — critically — the WebRTC
+// handshake that makes a call connect at all.
+//
+// It used to be built like this:
+//
+//     socket = io(url, { auth: { token }, transports: ['websocket'] });
+//
+// which reads fine and is broken in a way that only shows up after fifteen
+// minutes. The access token lives 15m. `auth` captured ONE token, at the
+// moment of the first connect. And a socket.io middleware rejection is not a
+// retryable error: the server calls next(new Error('Unauthorized')), the
+// client fires a single connect_error, sets socket.active = false, and gives
+// up permanently. No reconnect, no retry, nothing logged, nothing shown.
+//
+// So on any app launch more than fifteen minutes after the last one — which
+// is to say nearly all of them — the socket connected once, was rejected, and
+// stayed dead for the entire session. Messages still sent (that is a POST)
+// but the partner never saw them arrive, and a call emitted its SDP offer
+// into a closed socket and sat on "Calling…" forever.
+//
+// Three things fix it: `auth` as a CALLBACK, so every attempt fetches a live
+// token; an explicit reconnect on middleware rejection, because socket.io
+// will not do it; and a state anyone can subscribe to, so a dead socket is
+// visible instead of silent.
+
 let socket = null;
+let socketState = 'idle';   // idle | connecting | connected | disconnected | unauthorized
+const socketWatchers = new Set();
+let reconnectTimer = null;
+let reconnectDelay = 500;
+
+function setSocketState(next) {
+  if (socketState === next) return;
+  socketState = next;
+  socketWatchers.forEach((fn) => { try { fn(next); } catch { /* a bad watcher is not the socket's problem */ } });
+}
+
+export function getSocketState() {
+  return socketState;
+}
+
+/** Subscribe to connection state. Returns an unsubscribe function. */
+export function onSocketState(fn) {
+  socketWatchers.add(fn);
+  fn(socketState);
+  return () => socketWatchers.delete(fn);
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * Enough base64url to read a JWT payload.
+ *
+ * Hand-rolled because Hermes has no Buffer, and atob is not something to
+ * count on across every RN version this might run under. Only the ASCII a
+ * JWT payload actually contains needs to survive.
+ */
+function decodeBase64Url(input) {
+  const padded = String(input).replace(/-/g, '+').replace(/_/g, '/');
+  let out = '';
+  let bits = 0;
+  let value = 0;
+
+  for (const char of padded) {
+    if (char === '=') break;
+    const index = B64.indexOf(char);
+    if (index === -1) continue;
+    value = (value << 6) | index;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out += String.fromCharCode((value >> bits) & 0xff);
+    }
+  }
+  return out;
+}
+
+/** The `exp` claim, in ms, without verifying — the server still verifies. */
+function expiryOf(token) {
+  try {
+    const [, payload] = String(token).split('.');
+    if (!payload) return null;
+    const json = JSON.parse(decodeBase64Url(payload));
+    return json.exp ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A token with at least a minute of life left, refreshing it if not.
+ *
+ * The handshake is rejected outright for an expired token, and unlike an HTTP
+ * 401 there is no retry-after-refresh to fall back on — so it is checked
+ * before the attempt rather than after the failure.
+ */
+async function freshAccessToken() {
+  const token = await getAccessToken();
+  if (!token) return null;
+
+  const exp = expiryOf(token);
+  if (exp && exp - Date.now() > 60 * 1000) return token;
+
+  try {
+    return await refreshAccessToken();
+  } catch {
+    return token;   // let the server be the judge
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer || !socket) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (!socket || socket.connected) return;
+    setSocketState('connecting');
+    socket.connect();
+  }, reconnectDelay);
+  // Backs off to 10s. A phone with no signal should not spin.
+  reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+}
 
 export async function connectSocket() {
-  if (socket?.connected) return socket;
-  const token = await getAccessToken();
-  socket = io(currentUrl, { auth: { token }, transports: ['websocket'] });
+  // `active` means socket.io is connected or still trying. Rebuilding one in
+  // that state leaks the old instance and doubles every listener.
+  if (socket && (socket.connected || socket.active)) return socket;
+  if (socket) { socket.close(); socket = null; }
+
+  setSocketState('connecting');
+
+  socket = io(currentUrl, {
+    // A callback, NOT a value. socket.io invokes this before every attempt,
+    // including reconnects, so a socket that comes back after the phone has
+    // been asleep authenticates with a live token instead of a dead one.
+    auth: (cb) => {
+      freshAccessToken().then((token) => cb({ token })).catch(() => cb({}));
+    },
+    transports: ['websocket'],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 5000,
+    timeout: 10000,
+  });
+
+  socket.on('connect', () => {
+    reconnectDelay = 500;
+    setSocketState('connected');
+  });
+
+  socket.on('disconnect', (reason) => {
+    setSocketState('disconnected');
+    // 'io server disconnect' means the server hung up deliberately and
+    // socket.io will not reconnect on its own.
+    if (reason === 'io server disconnect') scheduleReconnect();
+  });
+
+  socket.on('connect_error', () => {
+    // socket.active distinguishes the two failure modes. True: an ordinary
+    // transport problem, and socket.io is already retrying. False: the
+    // handshake middleware rejected us and socket.io has given up for good —
+    // which is the case that was silently killing calls.
+    if (socket?.active) {
+      setSocketState('connecting');
+      return;
+    }
+    setSocketState('unauthorized');
+    scheduleReconnect();   // with a freshly-fetched token, via the auth callback
+  });
+
   return socket;
+}
+
+/**
+ * Resolves once the socket is actually usable, or rejects.
+ *
+ * Anything that is worthless if it silently fails to send — a call offer,
+ * above all — should wait on this rather than emitting into the void.
+ */
+export async function waitForSocket(timeoutMs = 8000) {
+  const live = await connectSocket();
+  if (live.connected) return live;
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      stop();
+      reject(new Error(
+        `Can't reach the server at ${currentUrl} for live updates. Check that Tailscale is connected on both phones and that the backend is running.`
+      ));
+    }, timeoutMs);
+
+    const stop = onSocketState((state) => {
+      if (state === 'connected') {
+        clearTimeout(timer);
+        stop();
+        resolve(live);
+      }
+    });
+  });
 }
 
 export function getSocket() {
@@ -228,6 +423,10 @@ export function getSocket() {
 }
 
 export function disconnectSocket() {
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  reconnectDelay = 500;
   socket?.disconnect();
   socket = null;
+  setSocketState('idle');
 }

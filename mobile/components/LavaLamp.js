@@ -3,6 +3,7 @@ import { Animated, AppState, Easing, StyleSheet, useWindowDimensions, View } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { useTheme } from './ThemeContext';
+import { BACKGROUND_SPEEDS } from '../theme';
 
 /**
  * The animated background that sits behind every screen.
@@ -43,7 +44,7 @@ const STARS = [
   [0.95, 0.58, 0.9], [0.04, 0.62, 1.2], [0.47, 0.55, 0.8],
 ];
 
-function Blob({ spec, colour, opacity, diameter, width, height, animate }) {
+function Blob({ spec, colour, opacity, diameter, width, height, animate, speedFactor }) {
   // One driver per blob, looping 0 -> 1 -> 0. Interpolating it onto both axes
   // with different ranges traces an ellipse rather than a straight line.
   const progress = useRef(new Animated.Value(0)).current;
@@ -55,17 +56,22 @@ function Blob({ spec, colour, opacity, diameter, width, height, animate }) {
       return undefined;
     }
 
+    // Calm stretches every period, Lively compresses it. Multiplying rather
+    // than replacing keeps the deliberately mismatched periods mismatched,
+    // which is what stops the whole field pulsing in unison.
+    const period = spec.period * speedFactor;
+
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(progress, {
           toValue: 1,
-          duration: spec.period,
+          duration: period,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(progress, {
           toValue: 0,
-          duration: spec.period,
+          duration: period,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -73,7 +79,7 @@ function Blob({ spec, colour, opacity, diameter, width, height, animate }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [animate, progress, spec.period]);
+  }, [animate, progress, spec.period, speedFactor]);
 
   const translateX = progress.interpolate({
     inputRange: [0, 1],
@@ -115,7 +121,7 @@ function Blob({ spec, colour, opacity, diameter, width, height, animate }) {
 }
 
 export default function LavaLamp() {
-  const { colors, isDark, reduceMotion } = useTheme();
+  const { colors, isDark, reduceMotion, backgroundIntensity, backgroundSpeed } = useTheme();
   const { width, height } = useWindowDimensions();
   const [active, setActive] = React.useState(AppState.currentState === 'active');
 
@@ -127,6 +133,12 @@ export default function LavaLamp() {
 
   const animate = active && !reduceMotion;
   const base = Math.max(width, height);
+
+  // Only ever dims. The palette's blobOpacity is the value every contrast
+  // figure in test/theme.mjs is measured at, so turning it UP would quietly
+  // push the app's own body text under 4.5:1.
+  const intensity = Math.min(1, Math.max(0.3, backgroundIntensity ?? 1));
+  const speedFactor = BACKGROUND_SPEEDS[backgroundSpeed]?.factor ?? 1;
 
   const stars = useMemo(
     () =>
@@ -151,11 +163,12 @@ export default function LavaLamp() {
           key={`${spec.x}-${spec.y}`}
           spec={spec}
           colour={colors.blobs[spec.tone % colors.blobs.length]}
-          opacity={colors.blobOpacity}
+          opacity={colors.blobOpacity * intensity}
           diameter={base * 0.55 * spec.size}
           width={width}
           height={height}
           animate={animate}
+          speedFactor={speedFactor}
         />
       ))}
     </View>

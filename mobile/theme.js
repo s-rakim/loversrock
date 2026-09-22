@@ -18,64 +18,90 @@ export const lightColors = {
   ...shared,
 
   // Semantic tokens
-  background: '#EDE9FB',
-  backgroundGradient: ['#EDE9FB', '#F8E8F1'],
-  card: 'rgba(255,255,255,0.95)',
-  cardBorder: '#E9E1DE',
+  background: '#E4DCFA',
+  backgroundGradient: ['#E4DCFA', '#FBE4EF'],
+  // 0.78, not 0.95. At 0.95 the cards were effectively opaque white and the
+  // lava lamp behind them may as well not have existed — which is precisely
+  // what it looked like.
+  card: 'rgba(255,255,255,0.78)',
+  cardBorder: 'rgba(120,90,140,0.20)',
   textPrimary: '#111111',
-  // Spec said #6B6B6B, which measures 4.48:1 on the light gradient - just
-  // under WCAG AA for body text. Nudged two steps darker to clear 4.5:1;
-  // visually indistinguishable, and test/theme.mjs holds the line.
-  textSecondary: '#696969',
-  accentIndigo: '#4B1FD1',
+  // Dark enough to clear 4.5:1 sitting DIRECTLY on the animated background,
+  // over the densest blob — not just on a card. The old #696969 measured
+  // 2.20:1 there, and the blobs below are far stronger than the pastels it
+  // was chosen against. Secondary text is also where "no weight" shows first.
+  textSecondary: '#363636',
+  accentIndigo: '#3A11B0',
   tabBarActivePill: '#FFD9E4',
-  categoryChip: 'rgba(255,92,141,0.12)',
+  categoryChip: 'rgba(255,92,141,0.18)',
 
-  // Lava lamp blobs (step 2) — pink, lavender, peach on the light gradient.
-  blobs: ['#FFC1CC', '#E3C9FF', '#FFDCA8', '#FFB3C1'],
+  // The lava lamp, made visible.
+  //
+  // These were '#FFC1CC', '#E3C9FF', '#FFDCA8', '#FFB3C1' — pale pastels
+  // drifting over a pale pastel gradient, which measured a luminance ratio of
+  // about 1.05 against the background. The animation ran perfectly and could
+  // not be seen. Saturated tones put it between 1.3x and 1.9x, which reads as
+  // a lava lamp instead of as a flat pink screen.
+  blobs: ['#FF5C93', '#8B55FF', '#FF922E', '#2FC6D6'],
   blobOpacity: 0.55,
+
+  // Icons. The glyph used to default to accent (#FF5C8D) on accentSoft
+  // (#FCE1E6): pink on pink, measuring 2.02:1, which is the washed-out
+  // weightlessness the whole icon set had. A deep rose on a denser tint,
+  // with a hairline edge, measures 4.66:1.
+  iconGlyph: '#A8003A',
+  iconChip: 'rgba(255,92,141,0.20)',
+  iconChipBorder: 'rgba(168,0,58,0.26)',
 
   // Names the existing screens already use. Kept so the whole app could move
   // onto the provider without every colour being renamed in the same change.
-  bg: '#EDE9FB',
+  bg: '#E4DCFA',
   // Translucent, not solid white: the lava lamp has to read through the cards.
-  surface: 'rgba(255,255,255,0.95)',
-  surfaceAlt: '#F3ECEA',
-  border: '#E9E1DE',
+  surface: 'rgba(255,255,255,0.78)',
+  surfaceAlt: 'rgba(255,255,255,0.55)',
+  border: 'rgba(120,90,140,0.20)',
   text: '#111111',
-  textMuted: '#6B6B6B',
+  textMuted: '#363636',
   accent: '#FF5C8D',
-  accentSoft: '#FCE1E6',
-  glassTintLight: 'rgba(255,255,255,0.7)',
-  glassBorder: 'rgba(255, 92, 141, 0.18)',
+  accentSoft: 'rgba(255,92,141,0.20)',
+  glassTintLight: 'rgba(255,255,255,0.62)',
+  glassBorder: 'rgba(255, 92, 141, 0.30)',
 };
 
 export const darkColors = {
   ...shared,
 
-  background: '#0B0B1A',
-  backgroundGradient: ['#0B0B1A', '#1A1030'],
-  card: 'rgba(20,20,35,0.6)',
-  cardBorder: 'rgba(255,255,255,0.12)',
+  background: '#07060F',
+  backgroundGradient: ['#07060F', '#170C2B'],
+  card: 'rgba(18,17,31,0.66)',
+  cardBorder: 'rgba(255,255,255,0.14)',
   textPrimary: '#FFFFFF',
-  textSecondary: '#B5B3C4',
-  accentIndigo: '#A99BF5',
+  // Same reasoning as light: bright enough to survive sitting on the
+  // animated background rather than only on a card.
+  textSecondary: '#E2E0EC',
+  accentIndigo: '#B9ADFF',
   tabBarActivePill: '#4A1428',
-  categoryChip: 'rgba(255,92,141,0.22)',
+  categoryChip: 'rgba(255,92,141,0.26)',
 
-  blobs: ['#5B2A8C', '#A3197D', '#3B2FA0', '#7A1F6B'],
-  blobOpacity: 0.7,
+  // Deeper and more saturated than the old muddy purples, so the drift is
+  // legible against near-black instead of being a faint smudge.
+  blobs: ['#7A34C9', '#D81B8C', '#4432E0', '#B02A8F'],
+  blobOpacity: 0.8,
 
-  bg: '#0B0B1A',
-  surface: 'rgba(20,20,35,0.6)',
-  surfaceAlt: 'rgba(255,255,255,0.06)',
-  border: 'rgba(255,255,255,0.12)',
+  iconGlyph: '#FFB3CB',
+  iconChip: 'rgba(255,92,141,0.26)',
+  iconChipBorder: 'rgba(255,179,203,0.34)',
+
+  bg: '#07060F',
+  surface: 'rgba(18,17,31,0.66)',
+  surfaceAlt: 'rgba(255,255,255,0.08)',
+  border: 'rgba(255,255,255,0.14)',
   text: '#FFFFFF',
-  textMuted: '#B5B3C4',
+  textMuted: '#E2E0EC',
   accent: '#FF5C8D',
-  accentSoft: 'rgba(255,92,141,0.22)',
-  glassTintLight: 'rgba(20,20,35,0.55)',
-  glassBorder: 'rgba(255, 92, 141, 0.28)',
+  accentSoft: 'rgba(255,92,141,0.26)',
+  glassTintLight: 'rgba(18,17,31,0.58)',
+  glassBorder: 'rgba(255, 92, 141, 0.34)',
 };
 
 /**
@@ -96,25 +122,37 @@ export const darkColors = {
  * tighter than body copy, which needs room to be comfortable over several
  * lines.
  */
-export function makeFont(colors, fontScale = 1) {
-  // Rounded to whole pixels: a fractional lineHeight is rounded
-  // inconsistently across Android versions and shows up as text that jitters
-  // by a pixel between lines.
-  const leading = (size, ratio) => Math.round(size * ratio * fontScale);
+export function makeFont(colors, fontScale = 1, textScale = 1) {
+  // Two different multipliers, because they are not the same thing.
+  //
+  // `fontScale` is the PHONE's font-size setting. React Native already
+  // multiplies every fontSize by it automatically, so applying it to fontSize
+  // here would square it. It does NOT scale lineHeight, which is the reason
+  // this function exists at all.
+  //
+  // `textScale` is the app's own Small/Default/Large control. Nothing applies
+  // it for us, so it has to reach fontSize directly — otherwise picking
+  // "Large" would stretch the line spacing and leave the glyphs exactly the
+  // size they were.
+  //
+  // Leading tracks both, since it has to accommodate whatever the glyphs
+  // actually end up being.
+  const size = (px) => Math.round(px * textScale);
+  const leading = (px, ratio) => Math.round(px * textScale * ratio * fontScale);
 
   return {
     wordmark: {
       fontFamily: 'serif',
-      fontSize: 34,
+      fontSize: size(34),
       lineHeight: leading(34, 1.18),
       color: colors.textPrimary,
       letterSpacing: 0.5,
     },
-    h1: { fontSize: 24, lineHeight: leading(24, 1.25), fontWeight: '700', color: colors.textPrimary },
-    h2: { fontSize: 18, lineHeight: leading(18, 1.3), fontWeight: '600', color: colors.textPrimary },
-    h3: { fontSize: 15, lineHeight: leading(15, 1.35), fontWeight: '600', color: colors.textPrimary },
-    body: { fontSize: 15, lineHeight: leading(15, 1.45), color: colors.textPrimary },
-    muted: { fontSize: 13, lineHeight: leading(13, 1.4), color: colors.textSecondary },
+    h1: { fontSize: size(24), lineHeight: leading(24, 1.25), fontWeight: '700', color: colors.textPrimary },
+    h2: { fontSize: size(18), lineHeight: leading(18, 1.3), fontWeight: '600', color: colors.textPrimary },
+    h3: { fontSize: size(15), lineHeight: leading(15, 1.35), fontWeight: '600', color: colors.textPrimary },
+    body: { fontSize: size(15), lineHeight: leading(15, 1.45), color: colors.textPrimary },
+    muted: { fontSize: size(13), lineHeight: leading(13, 1.4), color: colors.textSecondary },
   };
 }
 
@@ -177,3 +215,85 @@ export const DEFAULT_GLASS_INTENSITY = 55;
 // cannot use a hook (StyleSheet.create at module scope). Prefer useTheme().
 export const colors = lightColors;
 export const font = makeFont(lightColors, 1);
+
+
+/**
+ * Accent presets.
+ *
+ * Each one carries its own icon glyph colour per scheme rather than deriving
+ * one, because a derived tint is exactly how the old icons ended up at
+ * 2.02:1. Every pair below is measured against the real stack an <Icon chip>
+ * paints — chip tint over card over a blob over the gradient — and clears
+ * 4.5:1 in both schemes. test/theme.mjs recomputes it, so a new accent that
+ * looks nice and reads badly fails before it ships.
+ */
+export const ACCENTS = {
+  rose: {
+    label: 'Rose',
+    accent: '#FF5C8D',
+    light: { iconGlyph: '#A8003A', iconChipBorder: 'rgba(168,0,58,0.26)' },
+    dark: { iconGlyph: '#FFB3CB', iconChipBorder: 'rgba(255,179,203,0.34)' },
+  },
+  violet: {
+    label: 'Violet',
+    accent: '#7C4DFF',
+    light: { iconGlyph: '#43128F', iconChipBorder: 'rgba(67,18,143,0.26)' },
+    dark: { iconGlyph: '#CBB8FF', iconChipBorder: 'rgba(203,184,255,0.34)' },
+  },
+  ember: {
+    label: 'Ember',
+    accent: '#FF7043',
+    light: { iconGlyph: '#7E2600', iconChipBorder: 'rgba(126,38,0,0.26)' },
+    dark: { iconGlyph: '#FFC9B2', iconChipBorder: 'rgba(255,201,178,0.34)' },
+  },
+  ocean: {
+    label: 'Ocean',
+    accent: '#00ACC1',
+    light: { iconGlyph: '#00525E', iconChipBorder: 'rgba(0,82,94,0.26)' },
+    dark: { iconGlyph: '#8FE9F5', iconChipBorder: 'rgba(143,233,245,0.34)' },
+  },
+  forest: {
+    label: 'Forest',
+    accent: '#43A047',
+    light: { iconGlyph: '#14501A', iconChipBorder: 'rgba(20,80,26,0.26)' },
+    dark: { iconGlyph: '#B0E0B3', iconChipBorder: 'rgba(176,224,179,0.34)' },
+  },
+};
+
+export const ACCENT_NAMES = Object.keys(ACCENTS);
+export const DEFAULT_ACCENT = 'rose';
+
+/** How lively the background drifts. Multiplies each blob's period. */
+export const BACKGROUND_SPEEDS = {
+  calm: { label: 'Calm', factor: 1.8 },
+  gentle: { label: 'Gentle', factor: 1.0 },
+  lively: { label: 'Lively', factor: 0.55 },
+};
+
+/**
+ * The background can be dimmed but never boosted.
+ *
+ * The palette's blobOpacity is the value every contrast measurement in
+ * test/theme.mjs is taken at. Letting a slider push past it would put
+ * secondary text at 3.95:1 — the app would ship a setting that quietly
+ * breaks its own accessibility floor. Turning it down only ever helps.
+ */
+export const MIN_BACKGROUND_INTENSITY = 0.3;
+export const MAX_BACKGROUND_INTENSITY = 1;
+
+/** Applies an accent preset onto a base palette. */
+export function withAccent(colors, accentName, isDark) {
+  const preset = ACCENTS[accentName] || ACCENTS[DEFAULT_ACCENT];
+  const scheme = isDark ? preset.dark : preset.light;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(preset.accent.slice(i, i + 2), 16));
+  return {
+    ...colors,
+    accent: preset.accent,
+    accentPink: preset.accent,
+    accentSoft: `rgba(${r},${g},${b},${isDark ? 0.26 : 0.20})`,
+    iconChip: `rgba(${r},${g},${b},${isDark ? 0.26 : 0.20})`,
+    categoryChip: `rgba(${r},${g},${b},${isDark ? 0.26 : 0.18})`,
+    glassBorder: `rgba(${r},${g},${b},${isDark ? 0.34 : 0.30})`,
+    ...scheme,
+  };
+}

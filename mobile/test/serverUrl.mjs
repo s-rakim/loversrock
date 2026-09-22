@@ -63,7 +63,47 @@ module.exports = {
 module.exports.default = module.exports;
 `);
 
-stub('socket.io-client', `exports.io = (url) => ({ url, connected: false, disconnect() {} });`);
+// A fake socket.io that records what the real client would have been given.
+//
+// The old stub was `({ url, connected: false, disconnect() {} })`, which was
+// enough to assert that the socket followed the server address and nothing
+// else. It could not have caught what actually broke: `auth` was passed as a
+// VALUE, capturing one 15-minute access token forever, and a socket.io
+// middleware rejection is not retryable — one connect_error, active = false,
+// dead for the session. Calls sat on "Calling…" and live messages stopped.
+//
+// So this records the options, exposes the handlers, and lets a test drive
+// connect_error the way the server's `next(new Error('Unauthorized'))` does.
+stub('socket.io-client', `
+const sockets = [];
+exports.__sockets = sockets;
+exports.io = (url, opts) => {
+  const handlers = {};
+  const socket = {
+    url,
+    opts,
+    connected: false,
+    active: true,
+    connectCalls: 0,
+    on(event, fn) { (handlers[event] = handlers[event] || []).push(fn); return socket; },
+    off(event) { delete handlers[event]; return socket; },
+    emit() { return socket; },
+    connect() { socket.connectCalls++; return socket; },
+    disconnect() { socket.connected = false; return socket; },
+    close() { socket.closed = true; return socket; },
+    __fire(event, arg) { (handlers[event] || []).forEach((fn) => fn(arg)); },
+    /** What the real client does before each attempt, including reconnects. */
+    __requestAuth() {
+      return new Promise((resolve) => {
+        if (typeof opts.auth === 'function') opts.auth(resolve);
+        else resolve(opts.auth);
+      });
+    },
+  };
+  sockets.push(socket);
+  return socket;
+};
+`);
 
 // The module under test is the real one, transpiled to CJS so plain Node runs it.
 const src = fs.readFileSync(new URL('../services/api.js', import.meta.url), 'utf8');
@@ -184,6 +224,67 @@ await restarted.clearTokens();
 check('and signing out unsigns it', restarted.mediaUrl('k') === `http://${UP}/media/k`, restarted.mediaUrl('k'));
 check('a missing key is null, not the string "undefined" in a URL',
   restarted.mediaUrl(null) === null && restarted.mediaUrl(undefined) === null);
+
+console.log('\nThe live socket, which is what calls and live messages ride on');
+const socketIo = sandboxRequire('socket.io-client');
+await restarted.setApiUrl(UP);
+await restarted.setTokens({ accessToken: 'first-token', refreshToken: 'r' });
+
+const live = await restarted.connectSocket();
+check('a socket is created for the current address', live.url === `http://${UP}`, live.url);
+
+// The whole bug in one assertion. As a value, `auth` freezes one token at
+// first connect; the access token lives 15 minutes; every reconnect after
+// that is rejected forever.
+check('auth is a callback, not a captured value',
+  typeof live.opts.auth === 'function', typeof live.opts.auth);
+check('and it hands over the CURRENT token',
+  (await live.__requestAuth()).token === 'first-token');
+
+await restarted.setTokens({ accessToken: 'rotated-token', refreshToken: 'r' });
+check('so a reconnect after a refresh uses the new one, not the dead one',
+  (await live.__requestAuth()).token === 'rotated-token');
+
+check('reconnection is on and unlimited', live.opts.reconnection === true
+  && live.opts.reconnectionAttempts === Infinity, live.opts.reconnectionAttempts);
+
+let state = null;
+const unsubscribe = restarted.onSocketState((s2) => { state = s2; });
+check('state starts out connecting', state === 'connecting', state);
+
+live.connected = true;
+live.__fire('connect');
+check('and reports connected', state === 'connected' && restarted.getSocketState() === 'connected', state);
+
+// Rebuilding a live socket leaks the old instance and doubles every
+// listener registered on it, which is its own flavour of duplicate messages.
+const socketCountBefore = socketIo.__sockets.length;
+check('an already-connected socket is reused rather than rebuilt',
+  (await restarted.connectSocket()) === live && socketIo.__sockets.length === socketCountBefore,
+  { before: socketCountBefore, after: socketIo.__sockets.length });
+
+// A middleware rejection: socket.io sets active = false and stops trying.
+live.connected = false;
+live.active = false;
+live.__fire('connect_error', new Error('Unauthorized'));
+check('a handshake rejection is surfaced, not swallowed', state === 'unauthorized', state);
+
+await new Promise((r) => setTimeout(r, 900));
+check('and is retried anyway, because socket.io will not do it itself',
+  live.connectCalls >= 1, live.connectCalls);
+
+// An ordinary transport blip is socket.io's own job; retrying it here too
+// would mean two reconnect loops fighting each other.
+live.active = true;
+const before = live.connectCalls;
+live.__fire('connect_error', new Error('xhr poll error'));
+await new Promise((r) => setTimeout(r, 900));
+check('but a plain transport error is left to socket.io', live.connectCalls === before,
+  { before, after: live.connectCalls });
+
+unsubscribe();
+restarted.disconnectSocket();
+check('disconnecting clears the state', restarted.getSocketState() === 'idle');
 
 console.log('\nResetting');
 check('reverts to the build-time address', (await restarted.resetApiUrl()) === 'http://100.x.x.x:4000');

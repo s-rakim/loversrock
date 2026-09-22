@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Alert, Switch, ScrollView } from 'react-native'
 import Slider from '@react-native-community/slider';
 import { useNavigation } from '@react-navigation/native';
 import { apiFetch, clearTokens, disconnectSocket } from '../services/api';
+import Constants from 'expo-constants';
 import {
   clearWidgets,
   lockScreenStyle,
@@ -18,10 +19,17 @@ import NicknameCard from '../components/NicknameCard';
 import RemindersCard from '../components/RemindersCard';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
-import { useTheme, THEME_PREFERENCES } from '../components/ThemeContext';
+import ConnectionCard from '../components/ConnectionCard';
+import {
+  useTheme, THEME_PREFERENCES, ACCENTS, ACCENT_NAMES, BACKGROUND_SPEEDS, TEXT_SCALES,
+} from '../components/ThemeContext';
 
 export default function SettingsScreen() {
-  const { colors, font, preference, setPreference, motionPreference, setMotionPreference, reduceMotion } = useTheme();
+  const {
+    colors, font, preference, setPreference, motionPreference, setMotionPreference, reduceMotion,
+    accentName, setAccent, backgroundIntensity, setBackgroundIntensity,
+    backgroundSpeed, setBackgroundSpeed, textScale, setTextScale,
+  } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { intensity, setIntensity } = useGlass();
   const navigation = useNavigation();
@@ -115,6 +123,120 @@ export default function SettingsScreen() {
         </View>
       </FadeInUp>
 
+      <FadeInUp delay={45}>
+        <View style={styles.card}>
+          <Text style={font.h2}>Accent colour</Text>
+          <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.md }]}>
+            Changes buttons, icons and highlights. Each one carries its own
+            icon shade so the glyphs stay readable rather than washing out.
+          </Text>
+          <View style={styles.swatchRow}>
+            {ACCENT_NAMES.map((id) => {
+              const preset = ACCENTS[id];
+              const active = accentName === id;
+              return (
+                <MorphButton key={id} onPress={() => setAccent(id)} style={styles.swatchCell}>
+                  <View style={[styles.swatch, { backgroundColor: preset.accent }, active && styles.swatchActive]}>
+                    {active && <Icon name="checkmark" chip={false} size={18} color="#FFFFFF" />}
+                  </View>
+                  <Text style={[styles.swatchLabel, active && { color: colors.accent, fontWeight: '700' }]}>
+                    {preset.label}
+                  </Text>
+                </MorphButton>
+              );
+            })}
+          </View>
+        </View>
+      </FadeInUp>
+
+      <FadeInUp delay={47}>
+        <View style={styles.card}>
+          <Text style={font.h2}>Live background</Text>
+          <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.md }]}>
+            The drifting lava lamp behind every screen.
+          </Text>
+
+          <Text style={font.body}>Strength</Text>
+          <Slider
+            minimumValue={0.3}
+            maximumValue={1}
+            step={0.05}
+            value={backgroundIntensity}
+            onValueChange={setBackgroundIntensity}
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.accent}
+          />
+          <Text style={[font.muted, { textAlign: 'right' }]}>
+            {Math.round(backgroundIntensity * 100)}%
+          </Text>
+          {/* Deliberately caps at 100%. Every contrast measurement in the
+              theme is taken at full strength, so a slider that went higher
+              would be a setting that breaks the app's own readability. */}
+          <Text style={[font.muted, { marginTop: 2, fontSize: 11 }]}>
+            Turns down, not up — full strength is what the text colours are
+            measured against.
+          </Text>
+
+          <Text style={[font.body, { marginTop: spacing.md }]}>Drift</Text>
+          <View style={styles.segmentRow}>
+            {Object.entries(BACKGROUND_SPEEDS).map(([id, spec]) => {
+              const active = backgroundSpeed === id;
+              return (
+                <View key={id} style={{ flex: 1 }}>
+                  <MorphButton
+                    onPress={() => setBackgroundSpeed(id)}
+                    style={[styles.segment, active && styles.segmentActive]}
+                  >
+                    <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>{spec.label}</Text>
+                  </MorphButton>
+                </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.motionRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={font.body}>Chat wallpaper</Text>
+              <Text style={font.muted}>Yours alone, behind your message thread.</Text>
+            </View>
+            <MorphButton onPress={() => navigation.navigate('Wallpaper')} style={styles.linkButton}>
+              <Icon name="image-outline" chip={false} size={16} color={colors.accent} />
+              <Text style={{ color: colors.accent, fontWeight: '600' }}>Choose</Text>
+            </MorphButton>
+          </View>
+        </View>
+      </FadeInUp>
+
+      <FadeInUp delay={48}>
+        <View style={styles.card}>
+          <Text style={font.h2}>Text size</Text>
+          <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.md }]}>
+            On top of your phone's own font setting, which the app already
+            follows.
+          </Text>
+          <View style={styles.segmentRow}>
+            {TEXT_SCALES.map((option) => {
+              const active = textScale === option.id;
+              return (
+                <View key={option.id} style={{ flex: 1 }}>
+                  <MorphButton
+                    onPress={() => setTextScale(option.id)}
+                    style={[styles.segment, active && styles.segmentActive]}
+                  >
+                    <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>{option.label}</Text>
+                  </MorphButton>
+                </View>
+              );
+            })}
+          </View>
+          <Text style={[font.body, { marginTop: spacing.md }]}>
+            The quick brown fox jumps over the lazy dog.
+          </Text>
+          <Text style={font.muted}>And this is how the smaller print will look.</Text>
+        </View>
+      </FadeInUp>
+
       <FadeInUp delay={50}>
         <NicknameCard />
       </FadeInUp>
@@ -186,8 +308,32 @@ export default function SettingsScreen() {
         </View>
       </FadeInUp>
 
+      <FadeInUp delay={93}>
+        <ConnectionCard />
+      </FadeInUp>
+
       <FadeInUp delay={95}>
         <ServerAddress />
+      </FadeInUp>
+
+      <FadeInUp delay={97}>
+        <View style={styles.card}>
+          <Text style={font.h2}>About</Text>
+          <View style={styles.aboutRow}>
+            <Text style={font.muted}>Version</Text>
+            <Text style={font.body}>{Constants.expoConfig?.version || '—'}</Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={font.muted}>Build</Text>
+            <Text style={font.body}>
+              {Constants.expoConfig?.android?.versionCode ?? Constants.expoConfig?.ios?.buildNumber ?? '—'}
+            </Text>
+          </View>
+          <View style={styles.aboutRow}>
+            <Text style={font.muted}>Theme</Text>
+            <Text style={font.body}>{preference} · {ACCENTS[accentName]?.label}</Text>
+          </View>
+        </View>
       </FadeInUp>
 
       <FadeInUp delay={100}>
@@ -232,6 +378,33 @@ const makeStyles = (colors) =>
     borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt,
   },
   themeOptionActive: { backgroundColor: colors.tabBarActivePill, borderColor: colors.accentPink },
+  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  swatchCell: { alignItems: 'center', width: 64 },
+  swatch: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 3, borderColor: 'transparent',
+  },
+  swatchActive: { borderColor: colors.textPrimary },
+  swatchLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
+  segmentRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  segment: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: spacing.sm, borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt,
+  },
+  segmentActive: { backgroundColor: colors.tabBarActivePill, borderColor: colors.accentPink },
+  segmentLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
+  segmentLabelActive: { color: colors.accentPink },
+  linkButton: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: colors.accentSoft, borderRadius: radius.pill,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
+  },
+  aboutRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: spacing.sm,
+  },
   themeLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   themeLabelActive: { color: colors.accentPink },
   refreshButton: {

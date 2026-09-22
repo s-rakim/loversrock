@@ -20,7 +20,10 @@ const { code } = babel.transformSync(src, {
 });
 const module_ = { exports: {} };
 new Function('module', 'exports', 'require', code)(module_, module_.exports, require);
-const { lightColors, darkColors, makeFont, lineHeightFor, radius, spacing } = module_.exports;
+const {
+  lightColors, darkColors, makeFont, lineHeightFor, radius, spacing,
+  ACCENT_NAMES, withAccent, MIN_BACKGROUND_INTENSITY, MAX_BACKGROUND_INTENSITY,
+} = module_.exports;
 
 // ---------- colour maths ----------
 const parse = (c) => {
@@ -68,6 +71,92 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
   }
 }
 
+console.log('\n=== CONTRAST OVER THE LAVA LAMP, NOT JUST THE FLAT BACKGROUND ===');
+// The check above composites text onto `background` and onto the card over
+// `background`. Neither is what a screen actually shows: a blob is usually
+// drifting under both. With the old pastel blobs that barely mattered; with
+// blobs strong enough to SEE it matters a great deal, and getting it wrong
+// means text that is readable in a screenshot and not on a phone.
+//
+// So: the worst case any pixel can reach — the densest blob at full blob
+// opacity, over the darker gradient stop, with and without a card on top.
+const paint = (blob, opacity, backdrop) => over(`rgba(${parse(blob).slice(0, 3).join(',')},${opacity})`, backdrop);
+const asRgb = (t) => `rgb(${t.slice(0, 3).map(Math.round).join(',')})`;
+
+for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
+  const backdrops = [];
+  for (const stop of colors.backgroundGradient) {
+    for (const blob of colors.blobs) {
+      const painted = asRgb(paint(blob, colors.blobOpacity, stop));
+      backdrops.push([`blob ${blob}`, painted]);
+      backdrops.push([`card over blob ${blob}`, asRgb(over(colors.card, painted))]);
+    }
+  }
+
+  for (const text of ['textPrimary', 'textSecondary']) {
+    const worst = backdrops.reduce((acc, [label, bg]) => {
+      const r = contrast(colors[text], bg);
+      return r < acc.r ? { r, label } : acc;
+    }, { r: Infinity, label: '' });
+    check(`${name}: ${text} stays >= 4.5 over any blob (worst ${worst.r.toFixed(2)} on ${worst.label})`,
+      worst.r >= 4.5, worst.r.toFixed(2));
+  }
+
+  // The icon glyph on its own chip, over a card, over a blob. The default
+  // used to be accent on accentSoft, which measured 2.02:1 — pink on pink.
+  const chipWorst = backdrops
+    .filter(([label]) => label.startsWith('card over'))
+    .reduce((acc, [label, bg]) => {
+      const chip = asRgb(over(colors.iconChip, bg));
+      const r = contrast(colors.iconGlyph, chip);
+      return r < acc.r ? { r, label } : acc;
+    }, { r: Infinity, label: '' });
+  check(`${name}: icon glyph on its chip is >= 4.5 (worst ${chipWorst.r.toFixed(2)})`,
+    chipWorst.r >= 4.5, chipWorst.r.toFixed(2));
+}
+
+console.log('\n=== THE LAVA LAMP IS ACTUALLY VISIBLE ===');
+// The animation was never broken. It was invisible: pale pastels drifting
+// over a pale pastel gradient, about 1.05x the background's luminance, which
+// is below what an eye picks up on a phone in daylight. Asserting the
+// separation is the only way to stop it quietly fading back out.
+for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
+  for (const blob of colors.blobs) {
+    const stop = colors.backgroundGradient[0];
+    const painted = asRgb(paint(blob, colors.blobOpacity, stop));
+    const separation = contrast(painted, stop);
+    check(`${name}: blob ${blob} is distinguishable from the background (${separation.toFixed(2)}x)`,
+      separation >= 1.25, separation.toFixed(3));
+  }
+}
+
+console.log('\n=== EVERY ACCENT PRESET IS READABLE, NOT JUST THE DEFAULT ===');
+// A colour picker is a lovely way to ship five new contrast bugs. Each preset
+// carries its own per-scheme glyph shade rather than deriving one, and each
+// is measured here against the stack an <Icon chip> actually paints.
+for (const [scheme, base, isDark] of [['light', lightColors, false], ['dark', darkColors, true]]) {
+  for (const name of ACCENT_NAMES) {
+    const colors = withAccent(base, name, isDark);
+    let worst = Infinity;
+    for (const stop of colors.backgroundGradient) {
+      for (const blob of colors.blobs) {
+        const painted = asRgb(paint(blob, colors.blobOpacity, stop));
+        const card = asRgb(over(colors.card, painted));
+        worst = Math.min(worst, contrast(colors.iconGlyph, card));
+        worst = Math.min(worst, contrast(colors.iconGlyph, asRgb(over(colors.iconChip, card))));
+      }
+    }
+    check(`${scheme}: accent "${name}" icon glyph >= 4.5 (${worst.toFixed(2)})`, worst >= 4.5, worst.toFixed(2));
+  }
+}
+
+console.log('\n=== THE BACKGROUND SLIDER CANNOT BREAK THE CONTRAST IT IS MEASURED AT ===');
+// Every figure above is taken at the palette's own blobOpacity. At 1.3x,
+// secondary text measures 3.95:1 — so the control dims and never boosts.
+check('intensity is capped at full strength', MAX_BACKGROUND_INTENSITY === 1, MAX_BACKGROUND_INTENSITY);
+check('and has a floor, so it cannot be turned off into a flat screen',
+  MIN_BACKGROUND_INTENSITY > 0 && MIN_BACKGROUND_INTENSITY < 1, MIN_BACKGROUND_INTENSITY);
+
 console.log('\n=== LAVA LAMP TOKENS ===');
 for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
   check(`${name}: has a blob palette`, Array.isArray(colors.blobs) && colors.blobs.length >= 3, colors.blobs?.length);
@@ -76,6 +165,13 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
     Array.isArray(colors.backgroundGradient) && colors.backgroundGradient.length === 2, colors.backgroundGradient);
   check(`${name}: surface is translucent so the animation shows through`,
     colors.surface.startsWith('rgba'), colors.surface);
+  // 0.95 is translucent by the letter and opaque to the eye. The lava lamp
+  // sat behind cards that hid 95% of it, which is why it read as absent.
+  check(`${name}: and translucent enough to matter`,
+    parse(colors.surface)[3] <= 0.85, parse(colors.surface)[3]);
+  check(`${name}: icons have their own weighted tokens`,
+    Boolean(colors.iconGlyph && colors.iconChip && colors.iconChipBorder),
+    { iconGlyph: colors.iconGlyph, iconChip: colors.iconChip });
 }
 
 console.log('\n=== TEXT FOLLOWS THE PHONE\u2019S FONT SETTING ===');
@@ -131,7 +227,26 @@ const offenders = screens.filter((f) => {
 console.log('\n=== THE PROVIDER ACTUALLY READS THE SETTING ===');
 const ctxSource = fs.readFileSync(path.join(root, 'components', 'ThemeContext.js'), 'utf8');
 check('it reads fontScale from the OS', /useWindowDimensions\(\)/.test(ctxSource));
-check('and passes it to makeFont', /makeFont\(colors,\s*fontScale\)/.test(ctxSource));
+check('and passes it to makeFont', /makeFont\(colors,\s*fontScale\b/.test(ctxSource));
+// Two multipliers, not one. RN scales fontSize by the PHONE's setting on its
+// own, so passing that to fontSize would square it; the app's own Small/Large
+// control it knows nothing about, so that one must reach fontSize directly.
+// Collapsing them would make "Large" change line spacing and nothing else.
+check('the in-app text scale is passed separately from the OS one',
+  /makeFont\(colors,\s*fontScale,\s*textFactor\)/.test(ctxSource),
+  ctxSource.match(/makeFont\([^)]*\)/)?.[0]);
+const fontSmall = makeFont(lightColors, 1, 1);
+const fontLarge = makeFont(lightColors, 1, 1.3);
+check('picking a larger text size actually grows the glyphs',
+  fontLarge.body.fontSize > fontSmall.body.fontSize,
+  { small: fontSmall.body.fontSize, large: fontLarge.body.fontSize });
+check('and its leading grows with them',
+  fontLarge.body.lineHeight > fontSmall.body.lineHeight);
+const fontOsLarge = makeFont(lightColors, 1.5, 1);
+check('the phone setting still moves leading only, since RN owns fontSize',
+  fontOsLarge.body.fontSize === fontSmall.body.fontSize
+    && fontOsLarge.body.lineHeight > fontSmall.body.lineHeight,
+  { fontSize: fontOsLarge.body.fontSize, lineHeight: fontOsLarge.body.lineHeight });
 check('fontScale is in the memo deps, or the font would freeze at the first value',
   /\}, \[[^\]]*fontScale[^\]]*\]/.test(ctxSource));
 check('and it is exposed for one-off text', /^\s*fontScale,$/m.test(ctxSource));
@@ -166,6 +281,14 @@ check('no screen paints colors.bg over the lava lamp', painted.length === 0,
 
 const lava = fs.readFileSync(path.join(root, 'components', 'LavaLamp.js'), 'utf8');
 check('blob motion uses the native driver', /useNativeDriver: true/.test(lava));
+const lavaSource = fs.readFileSync(path.join(root, 'components', 'LavaLamp.js'), 'utf8');
+check('the lava lamp clamps it rather than trusting the caller',
+  /Math\.min\(1,\s*Math\.max\(/.test(lavaSource));
+check('and applies it to the blob opacity',
+  /blobOpacity\s*\*\s*intensity/.test(lavaSource));
+check('drift speed multiplies each blob period, keeping them out of sync',
+  /spec\.period\s*\*\s*speedFactor/.test(lavaSource));
+
 // Match imports only - the file explains in prose why those libraries are
 // not used, and that explanation should not trip the check.
 const lavaImports = (lava.match(/^import .*$/gm) || []).join('\n');
