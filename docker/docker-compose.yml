@@ -37,20 +37,33 @@ services:
 
   # The TURN relay. See docker/turnserver.conf for why a call needs one.
   #
-  # host networking on purpose: TURN hands out the relay ports it is actually
-  # listening on, and a bridged container would advertise addresses inside the
-  # Docker network that no phone can reach. This is the one service where the
-  # usual port mapping is actively wrong.
+  # Explicitly mapped ports rather than host networking. Host networking is a
+  # Linux-only feature — on Docker Desktop for Windows and macOS the container
+  # would land in the VM's network namespace, not the machine's, and nothing
+  # on the tailnet could reach the relay.
+  #
+  # The catch with bridging a TURN server is that it would otherwise advertise
+  # its container address, which no phone can route to. --external-ip is the
+  # answer: it tells coturn to hand out THIS address in its candidates
+  # regardless of what its own interface says. Set TURN_PUBLIC_IP to the
+  # server's Tailscale address.
+  #
+  # The relay range is deliberately small. Each call allocates a couple of
+  # ports and there are two people, so twenty is generous — and every mapped
+  # port costs a userland proxy process on Docker Desktop.
   coturn:
     image: coturn/coturn:4.6-alpine
     restart: unless-stopped
-    network_mode: host
     command: >
       -c /etc/coturn/turnserver.conf
       --static-auth-secret=${TURN_SECRET:-change-me-turn-secret}
       --external-ip=${TURN_PUBLIC_IP:-127.0.0.1}
       --min-port=${TURN_MIN_PORT:-49160}
-      --max-port=${TURN_MAX_PORT:-49200}
+      --max-port=${TURN_MAX_PORT:-49180}
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49180}:${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49180}/udp"
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
 
