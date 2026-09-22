@@ -55,9 +55,22 @@ export default function CallScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const {
-    call, localStream, remoteStream, muted, cameraOff, speakerOn, error,
+    call, localStream, remoteStream, muted, cameraOff, speakerOn, error, iceState, relayed,
     answerCall, endCall, toggleMute, toggleCamera, switchCamera, toggleSpeaker, clearError,
   } = useCall();
+
+  // "Connecting…" on its own is the least informative thing this screen can
+  // say, and it is what it said for the entire time calls were not working.
+  // ICE knows exactly which stage it is at, so show that.
+  const stageText = {
+    new: 'Starting…',
+    checking: 'Finding a path between your phones…',
+    connected: relayed ? 'Connected via relay' : 'Connected',
+    completed: relayed ? 'Connected via relay' : 'Connected',
+    disconnected: 'Connection dropped — trying to recover…',
+    failed: 'No path found',
+    closed: 'Closed',
+  }[iceState] || null;
 
   const [partnerName, setPartnerName] = useState('Your partner');
   const elapsed = useElapsed(call.phase === 'connected');
@@ -123,10 +136,19 @@ export default function CallScreen({ navigation }) {
           ) : (
             <Text style={[font.h3, styles.status]}>{statusLine}</Text>
           )}
+          {/* Which stage ICE is at. A call that is going to fail spends its
+              last thirty seconds in 'checking'; saying so is the difference
+              between "it's working on it" and "it is never going to work". */}
+          {stageText && call.phase !== 'connected' && (
+            <Text style={[font.muted, styles.status]}>{stageText}</Text>
+          )}
           {isVideo && call.phase === 'connected' && (
             <Text style={[font.muted, styles.status]}>
               {cameraOff ? 'Your camera is off' : 'Waiting for their video…'}
             </Text>
+          )}
+          {call.phase === 'connected' && relayed && (
+            <Text style={[font.muted, styles.status]}>Relayed through your server</Text>
           )}
         </View>
       )}

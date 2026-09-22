@@ -9,6 +9,7 @@
 // in sockets/index.js. It is deliberately not REST: those messages are
 // latency-critical and worthless a second late, and they are relayed
 // without being stored.
+import crypto from 'node:crypto';
 import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
@@ -22,30 +23,119 @@ router.use(requireAuth, requirePair);
 /**
  * The ICE servers the phone should use.
  *
- * Google's public STUN is enough whenever the two devices can reach each
- * other - which, for a couple on the same Tailscale tailnet, is the normal
- * case. A TURN server relays the media when they cannot (symmetric NAT on
- * both ends, some mobile carriers), and is configured only if the operator
- * has one: TURN_URL / TURN_USERNAME / TURN_PASSWORD. Without it, calls still
- * work in the common case and fail honestly in the uncommon one, which is
- * better than pretending to be configured.
+ * STUN alone only tells a phone its own public address. That is enough when
+ * a direct path between the two devices exists - same Wi-Fi, or across a
+ * tailnet. When it does not, and carrier-grade NAT on mobile data is the
+ * common way it does not, there is no path to find: the call rings, both
+ * ends negotiate, ICE runs out of candidate pairs, and the screen sits on
+ * "connecting" until it gives up. Nothing either phone can do fixes that.
+ * Only a relay both of them can reach does, which is what coturn is for
+ * (docker/docker-compose.yml, docker/turnserver.conf).
+ *
+ * The credentials are minted here, per request, and expire.
+ *
+ * coturn's `use-auth-secret` mode does not know about users: the username is
+ * an expiry timestamp and the password is its HMAC under a secret only the
+ * server and coturn share. So these are good for a few hours and cannot be
+ * lifted out of an APK and used for a month, which a static TURN password
+ * absolutely can.
  */
+const TURN_CREDENTIAL_TTL_SECONDS = 6 * 60 * 60;
+
+export function turnCredentials(secret, userId, now = Date.now()) {
+  const expiry = Math.floor(now / 1000) + TURN_CREDENTIAL_TTL_SECONDS;
+  // coturn parses everything up to the first colon as the expiry, and treats
+  // the rest as an opaque label. Carrying the user id makes a relay session
+  // traceable to an account without coturn needing an account database.
+  const username = `${expiry}:${userId}`;
+  const credential = crypto.createHmac('sha1', secret).update(username).digest('base64');
+  return { username, credential, expiresAt: new Date(expiry * 1000).toISOString() };
+}
+
+/** Where the phones should look for the relay. */
+function turnUrls() {
+  if (process.env.TURN_URL) return [process.env.TURN_URL];
+  if (!process.env.TURN_PUBLIC_IP) return [];
+  const host = process.env.TURN_PUBLIC_IP;
+  const port = process.env.TURN_PORT || 3478;
+  // UDP first because it is what media wants; the TCP entry is the fallback
+  // for networks that block UDP outright, which some do.
+  return [`turn:${host}:${port}?transport=udp`, `turn:${host}:${port}?transport=tcp`];
+}
+
 router.get('/config', async (req, res) => {
   const iceServers = [
     { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
   ];
-  if (process.env.TURN_URL) {
+
+  const urls = turnUrls();
+  const secret = process.env.TURN_SECRET;
+  let expiresAt = null;
+
+  if (urls.length && secret) {
+    const { username, credential, expiresAt: expiry } = turnCredentials(secret, req.userId);
+    iceServers.push({ urls, username, credential });
+    expiresAt = expiry;
+  } else if (urls.length && process.env.TURN_USERNAME) {
+    // A relay someone else runs, with credentials they issued.
     iceServers.push({
-      urls: process.env.TURN_URL,
+      urls,
       username: process.env.TURN_USERNAME,
       credential: process.env.TURN_PASSWORD,
     });
   }
-  res.json({ iceServers, hasTurn: Boolean(process.env.TURN_URL) });
+
+  res.json({
+    iceServers,
+    hasTurn: iceServers.length > 1,
+    turnExpiresAt: expiresAt,
+  });
 });
+
+/**
+ * How long a call may sit unanswered before it stops counting as live.
+ *
+ * Without this, a call that never got a clean ending blocks every future one
+ * forever, and there are two easy ways to leave one behind: kill the app
+ * while it is ringing, or lose the network before POST /:id/end lands. The
+ * row stays 'ringing', the partial unique index keeps refusing a second live
+ * call, and every subsequent tap on Call answers 409 "A call is already in
+ * progress" — for a call that ended days ago and nobody is on.
+ *
+ * Two minutes is past any real ring-out (the client gives up at 45 seconds)
+ * and short enough that a stuck row heals itself before anyone notices.
+ */
+const RING_TIMEOUT_SECONDS = 120;
+
+/**
+ * Retires calls that are plainly over.
+ *
+ * Run before anything reads the live call, so the answer is never a ghost:
+ * a ringing call older than the timeout was missed, and a 'connected' one
+ * with no end after twelve hours is a row whose hangup never arrived, not a
+ * call anybody is still on.
+ */
+async function expireStaleCalls(pairId) {
+  const { rows } = await query(
+    `UPDATE call_sessions
+        SET status = CASE WHEN answered_at IS NULL THEN 'missed' ELSE 'ended' END,
+            ended_at = COALESCE(ended_at, now()),
+            end_reason = COALESCE(end_reason, 'expired')
+      WHERE pair_id = $1
+        AND status IN ('ringing', 'connected')
+        AND (
+          (status = 'ringing' AND started_at < now() - ($2 || ' seconds')::interval)
+          OR (status = 'connected' AND started_at < now() - interval '12 hours')
+        )
+      RETURNING id`,
+    [pairId, RING_TIMEOUT_SECONDS]
+  );
+  return rows.length;
+}
 
 /** The live call for this pair, if there is one. */
 async function liveCall(pairId) {
+  await expireStaleCalls(pairId);
   const { rows } = await query(
     `SELECT * FROM call_sessions WHERE pair_id = $1 AND status IN ('ringing','connected')
      ORDER BY started_at DESC LIMIT 1`,
@@ -101,10 +191,25 @@ router.post('/start', async (req, res) => {
     call = rows[0];
   } catch (err) {
     if (err.code === '23505') {
+      // The partial unique index fired. That is either a genuine race — both
+      // phones tapping Call in the same instant — or a stale row that slipped
+      // in between the sweep above and this insert. liveCall sweeps again, so
+      // a ghost is retired and the insert retried rather than reported as a
+      // call in progress.
       const raced = await liveCall(req.pair.id);
-      return res.status(409).json({ error: 'A call is already in progress', call: view(raced, req.userId) });
+      if (!raced) {
+        const { rows } = await query(
+          `INSERT INTO call_sessions (pair_id, caller_id, callee_id, kind)
+           VALUES ($1, $2, $3, $4) RETURNING *`,
+          [req.pair.id, req.userId, req.partnerId, kind]
+        );
+        call = rows[0];
+      } else {
+        return res.status(409).json({ error: 'A call is already in progress', call: view(raced, req.userId) });
+      }
+    } else {
+      throw err;
     }
-    throw err;
   }
 
   // A socket only reaches a phone with the app open. The push is what makes

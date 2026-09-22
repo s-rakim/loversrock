@@ -336,6 +336,16 @@ export default function SettingsScreen() {
         </View>
       </FadeInUp>
 
+      <FadeInUp delay={98}>
+        <MorphButton onPress={() => navigation.navigate('Diagnostics')} style={styles.actionRow}>
+          <Icon name="pulse-outline" chip chipColor={colors.surfaceAlt} />
+          <View style={{ flex: 1 }}>
+            <Text style={font.body}>Diagnostics</Text>
+            <Text style={font.muted}>Check what is working: server, live connection, photos, calls.</Text>
+          </View>
+        </MorphButton>
+      </FadeInUp>
+
       <FadeInUp delay={100}>
         <MorphButton onPress={unlink} style={styles.actionRow}>
           <Icon name="person-remove-outline" chip chipColor={colors.surfaceAlt} color={colors.textMuted} />

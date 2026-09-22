@@ -76,6 +76,11 @@ export function CallProvider({ children }) {
   const [cameraOff, setCameraOff] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(false);
   const [error, setError] = useState(null);
+  // What ICE is actually doing. "Connecting" with no detail is the state this
+  // call spent most of its life in, and it told nobody anything.
+  const [iceState, setIceState] = useState(null);
+  const [relayed, setRelayed] = useState(false);
+  const restarted = useRef(false);
 
   const pc = useRef(null);
   const localStreamRef = useRef(null);
@@ -83,6 +88,7 @@ export function CallProvider({ children }) {
   // addIceCandidate throws if it does. They are queued and flushed after.
   const pendingCandidates = useRef([]);
   const callIdRef = useRef(null);
+  const hasTurn = useRef(false);
 
   const teardown = useCallback(() => {
     pc.current?.getSenders?.().forEach((sender) => {
@@ -101,6 +107,9 @@ export function CallProvider({ children }) {
 
     pendingCandidates.current = [];
     callIdRef.current = null;
+    restarted.current = false;
+    setIceState(null);
+    setRelayed(false);
     setLocalStream(null);
     setRemoteStream(null);
     setMuted(false);
@@ -159,12 +168,17 @@ export function CallProvider({ children }) {
   }, []);
 
   const buildPeerConnection = useCallback(async (kind, stream) => {
-    const { iceServers } = await apiFetch('/calls/config');
+    const config = await apiFetch('/calls/config');
+    hasTurn.current = Boolean(config?.hasTurn);
     const connection = new RTCPeerConnection({
-      iceServers,
+      iceServers: config.iceServers,
       // Bundling everything on one transport means one ICE negotiation
       // instead of one per track, which is noticeably faster to connect.
       bundlePolicy: 'max-bundle',
+      // Gather a few candidates before the offer is even built, so the first
+      // exchange already carries usable addresses instead of relying wholly
+      // on trickle. Shaves a visible beat off answering.
+      iceCandidatePoolSize: 4,
     });
 
     stream.getTracks().forEach((track) => connection.addTrack(track, stream));
@@ -191,10 +205,41 @@ export function CallProvider({ children }) {
       // 'failed' is terminal; 'disconnected' often recovers on its own, so
       // it is deliberately not treated as the end of the call.
       if (state === 'failed') {
-        setError('The connection failed. You may both be behind strict NAT — a TURN server would fix it.');
+        setError(hasTurn.current
+          ? 'The connection failed even through the relay. Check that both phones can reach the server.'
+          : 'Could not find a path between the two phones, and no TURN relay is configured. '
+            + 'Start the coturn service and set TURN_PUBLIC_IP — see docker/turnserver.conf.');
         setCall((c) => ({ ...c, phase: 'ended' }));
         teardown();
       }
+    });
+
+    connection.addEventListener('iceconnectionstatechange', () => {
+      const state = connection.iceConnectionState;
+      setIceState(state);
+
+      // One ICE restart before giving up. A candidate set gathered while the
+      // phone was switching from Wi-Fi to mobile data is stale rather than
+      // wrong, and re-gathering fixes it without dropping the call.
+      if (state === 'failed' && !restarted.current && pc.current) {
+        restarted.current = true;
+        (async () => {
+          try {
+            const offer = await pc.current.createOffer({ iceRestart: true });
+            await pc.current.setLocalDescription(offer);
+            getSocket()?.emit('call:renegotiate', {
+              callId: callIdRef.current, sdp: offer.sdp, type: offer.type,
+            });
+          } catch { /* the failure handler above still runs */ }
+        })();
+      }
+    });
+
+    // Which path the media actually took. "Connected" over a relay and
+    // connected directly are both fine; not knowing which is not.
+    connection.addEventListener('selectedcandidatepairchange', (event) => {
+      const local = event?.selectedCandidatePair?.local?.candidate || '';
+      setRelayed(/ relay /.test(local) || local.includes('typ relay'));
     });
 
     pc.current = connection;
@@ -356,6 +401,22 @@ export function CallProvider({ children }) {
         });
       });
 
+      // The other end restarted ICE. Answer it on the same connection rather
+      // than tearing the call down.
+      socket.on('call:renegotiate', async (payload) => {
+        if (!pc.current || !payload?.sdp) return;
+        try {
+          await pc.current.setRemoteDescription(new RTCSessionDescription({
+            type: payload.type || 'offer', sdp: payload.sdp,
+          }));
+          const answer = await pc.current.createAnswer();
+          await pc.current.setLocalDescription(answer);
+          socket.emit('call:answer', { callId: payload.callId, sdp: answer.sdp, type: answer.type });
+        } catch (err) {
+          setError(err.message);
+        }
+      });
+
       socket.on('call:answer', async (payload) => {
         if (!pc.current) return;
         try {
@@ -393,10 +454,28 @@ export function CallProvider({ children }) {
     return () => {
       cancelled = true;
       const live = getSocket();
-      ['call:offer', 'call:answer', 'call:ice', 'call:hangup', 'call:decline', 'call:peer-gone']
+      ['call:offer', 'call:answer', 'call:ice', 'call:hangup', 'call:decline', 'call:peer-gone', 'call:renegotiate']
         .forEach((event) => live?.off(event));
     };
   }, [flushCandidates, teardown]);
+
+  // Answered, but never actually connected.
+  //
+  // This is the other way a call hangs: both ends agree, ICE starts, and no
+  // path is ever found. Without a deadline the screen says "Connecting…"
+  // indefinitely, because 'failed' is a state ICE can take a very long time
+  // to admit to — and on some networks never does.
+  useEffect(() => {
+    if (call.phase !== 'connecting') return undefined;
+    const timer = setTimeout(() => {
+      setError(hasTurn.current
+        ? 'Could not connect. Both phones reached the relay but no media got through.'
+        : "Could not find a path between the two phones. There's no TURN relay configured — "
+          + 'start the coturn service and set TURN_PUBLIC_IP, then try again.');
+      endCall('ice-timeout');
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [call.phase, endCall]);
 
   // Nobody picks up forever. Without this the caller stares at "Calling…"
   // until they kill the app, and the row stays 'ringing' in the history.
@@ -422,11 +501,12 @@ export function CallProvider({ children }) {
 
   const value = useMemo(() => ({
     call, localStream, remoteStream, muted, cameraOff, speakerOn, error,
+    iceState, relayed,
     startCall, answerCall, endCall,
     toggleMute, toggleCamera, switchCamera, toggleSpeaker,
     clearError: () => setError(null),
     isBusy: call.phase !== 'idle' && call.phase !== 'ended',
-  }), [call, localStream, remoteStream, muted, cameraOff, speakerOn, error,
+  }), [call, localStream, remoteStream, muted, cameraOff, speakerOn, error, iceState, relayed,
     startCall, answerCall, endCall, toggleMute, toggleCamera, switchCamera, toggleSpeaker]);
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;

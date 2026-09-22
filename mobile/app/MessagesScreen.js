@@ -30,6 +30,7 @@ import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
 import Doodle from '../components/Doodle';
 import Wallpaper from '../components/Wallpaper';
+import { getKeyPair, encryptFor, decryptFrom, isEncrypted } from '../services/crypto';
 
 /**
  * Adds a message without ever adding it twice.
@@ -89,6 +90,13 @@ export default function MessagesScreen({ navigation }) {
   const [meId, setMeId] = useState(null);
   const [partnerName, setPartnerName] = useState(null);
   const [wallpaper, setWallpaper] = useState('none');
+  // Their public key, which is what outgoing messages are sealed to. Until it
+  // arrives there is nobody to encrypt for, and the composer says so rather
+  // than quietly sending in the clear.
+  const [partnerKey, setPartnerKey] = useState(null);
+  // Decrypted text by message id. Kept beside the list rather than written
+  // into it, so plaintext never ends up somewhere it could be persisted.
+  const [plain, setPlain] = useState({});
 
   const load = useCallback(() => {
     apiFetch('/messages').then((d) => setMessages(d.messages)).catch((err) => Alert.alert('Error', err.message));
@@ -99,16 +107,45 @@ export default function MessagesScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       apiFetch('/profile')
-        .then((d) => {
+        .then(async (d) => {
           setWallpaper(d?.me?.chatWallpaper || 'none');
           setMeId(d?.me?.id || null);
           setPartnerName(d?.partner?.displayName || null);
+          setPartnerKey(d?.partner?.publicKey || null);
+
+          // Publish our own key if the server does not have this device's
+          // yet — a fresh install, or the first run after encryption shipped.
+          const mine = await getKeyPair();
+          if (d?.me?.publicKey !== mine.publicKeyBase64) {
+            apiFetch('/profile/keys', { method: 'PUT', body: { publicKey: mine.publicKeyBase64 } })
+              .catch(() => { /* retried on the next focus */ });
+          }
         })
         .catch(() => {});
     }, [])
   );
 
   useFocusEffect(load);
+
+  // Decryption happens here rather than in render: it is async, and a render
+  // path that returns a promise shows nothing at all.
+  useEffect(() => {
+    let cancelled = false;
+    const pending = messages.filter((m) => isEncrypted(m.content) && plain[m.id] === undefined);
+    if (pending.length === 0) return undefined;
+
+    (async () => {
+      const opened = {};
+      for (const message of pending) {
+        // null when it cannot be opened, which is a real state worth
+        // distinguishing from "not tried yet" — hence undefined above.
+        opened[message.id] = await decryptFrom(partnerKey, message.content);
+      }
+      if (!cancelled) setPlain((prev) => ({ ...prev, ...opened }));
+    })();
+
+    return () => { cancelled = true; };
+  }, [messages, partnerKey, plain]);
 
   useEffect(() => {
     let socketRef;
@@ -125,7 +162,17 @@ export default function MessagesScreen({ navigation }) {
     setDraft('');          // cleared first: the keyboard should not wait on the network
     setSending(true);
     try {
-      const data = await apiFetch('/messages', { method: 'POST', body: { type: 'text', content: text } });
+      // Encrypted when there is a key to encrypt to, plain when there is not.
+      // The fallback is deliberate and visible — the composer says which is
+      // happening — because silently downgrading to plaintext while still
+      // showing a padlock is the worst thing this code could do.
+      const body = partnerKey
+        ? { type: 'text', content: await encryptFor(partnerKey, text), encrypted: true }
+        : { type: 'text', content: text };
+
+      const data = await apiFetch('/messages', { method: 'POST', body });
+      // Our own copy is decrypted locally rather than round-tripped.
+      if (body.encrypted) setPlain((prev) => ({ ...prev, [data.message.id]: text }));
       setMessages((prev) => mergeMessage(prev, data.message));
     } catch (err) {
       setDraft(text);      // put it back rather than losing what they typed
@@ -185,9 +232,26 @@ export default function MessagesScreen({ navigation }) {
         )}
         <View style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}>
           <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-            {item.type === 'text' && (
-              <Text style={[font.body, mine && styles.mineText]}>{item.content}</Text>
-            )}
+            {item.type === 'text' && (() => {
+              if (!isEncrypted(item.content)) {
+                return <Text style={[font.body, mine && styles.mineText]}>{item.content}</Text>;
+              }
+              const opened = plain[item.id];
+              if (opened === undefined) {
+                return <Text style={[font.muted, mine && styles.mineText]}>Decrypting…</Text>;
+              }
+              if (opened === null) {
+                // Not a crash and not a blank bubble: say what happened.
+                // Usually it means the other phone was reinstalled and has a
+                // new key, which cannot open messages sealed to the old one.
+                return (
+                  <Text style={[font.muted, mine && styles.mineText]}>
+                    Can&apos;t open this message — the keys don&apos;t match.
+                  </Text>
+                );
+              }
+              return <Text style={[font.body, mine && styles.mineText]}>{opened}</Text>;
+            })()}
             {item.type === 'photo' && (
               <Image source={{ uri: mediaUrl(item.image_url) }} style={styles.photo} resizeMode="cover" />
             )}
@@ -237,6 +301,20 @@ export default function MessagesScreen({ navigation }) {
           </View>
         }
       />
+
+      <View style={styles.encryptionRow}>
+        <Icon
+          name={partnerKey ? 'lock-closed' : 'lock-open-outline'}
+          chip={false}
+          size={12}
+          color={partnerKey ? colors.success : colors.textMuted}
+        />
+        <Text style={styles.encryptionText}>
+          {partnerKey
+            ? 'End-to-end encrypted'
+            : "Not encrypted yet — waiting for your partner's key"}
+        </Text>
+      </View>
 
       <View style={styles.inputBar}>
         <Icon name="brush-outline" chip chipColor={colors.surfaceAlt} onPress={() => navigation.navigate('Canvas')} />
@@ -305,6 +383,11 @@ const makeStyles = (colors) =>
     photo: { width: 200, height: 200, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt },
     doodleFrame: { width: 200, height: 150 },
 
+    encryptionRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      gap: 4, paddingBottom: 2,
+    },
+    encryptionText: { fontSize: 11, color: colors.textMuted },
     inputBar: {
       flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs, padding: spacing.md,
       borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 90,

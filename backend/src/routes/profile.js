@@ -45,6 +45,10 @@ function present(user, nickname) {
     themePreference: user.theme_preference || 'system',
     // Null for the partner by construction — see the query in GET /.
     chatWallpaper: user.chat_wallpaper || null,
+    // The public half of their encryption key. Public by design: it is what
+    // the other phone encrypts to, and it opens nothing on its own.
+    publicKey: user.public_key || null,
+    publicKeySetAt: user.public_key_set_at || null,
   };
 }
 
@@ -71,7 +75,7 @@ router.get('/', requireAuth, async (req, res) => {
   // to appear in the other direction - so the column is nulled out for
   // anyone who is not the person asking.
   const { rows: users } = await query(
-    `SELECT id, name, avatar_url, theme_preference,
+    `SELECT id, name, avatar_url, theme_preference, public_key, public_key_set_at,
             CASE WHEN id = $2 THEN chat_wallpaper ELSE NULL END AS chat_wallpaper
      FROM users WHERE id = ANY($1::uuid[])`,
     [partnerId ? [req.userId, partnerId] : [req.userId], req.userId]
@@ -98,6 +102,36 @@ router.get('/', requireAuth, async (req, res) => {
     me: present(byId.get(req.userId), nicknameTheyGaveMe),
     partner: present(partnerId ? byId.get(partnerId) : null, nicknameIGaveThem),
   });
+});
+
+/**
+ * Publishes this device's PUBLIC encryption key.
+ *
+ * Only ever your own row: the user id comes from the bearer token, never the
+ * body, so nobody can publish a key on someone else's behalf and read their
+ * mail. The server stores it and hands it to the partner; it has no use for
+ * it itself and no way to derive anything from it.
+ *
+ * Replacing a key is allowed — a reinstall generates a new one — and it
+ * changes the safety number, which is exactly the signal the other person
+ * should see.
+ */
+router.put('/keys', requireAuth, async (req, res) => {
+  const publicKey = String(req.body?.publicKey || '').trim();
+
+  // A Curve25519 public key is 32 bytes, which is 44 base64 characters.
+  // Refusing anything else keeps junk out of a column the other phone will
+  // try to encrypt to, where a bad value means a message that cannot be sent.
+  if (!/^[A-Za-z0-9+/]{43}=$/.test(publicKey)) {
+    return res.status(400).json({ error: 'publicKey must be a base64 32-byte key' });
+  }
+
+  const { rows } = await query(
+    `UPDATE users SET public_key = $1, public_key_set_at = now()
+      WHERE id = $2 RETURNING public_key, public_key_set_at`,
+    [publicKey, req.userId]
+  );
+  res.json({ publicKey: rows[0].public_key, publicKeySetAt: rows[0].public_key_set_at });
 });
 
 /**

@@ -24,7 +24,9 @@
     "test:quiz-compare": "node test/quizCompare.mjs",
     "test:locket": "node test/locket.mjs",
     "test:media": "node test/media.mjs",
-    "test:socket-auth": "node --env-file=.env test/socketAuth.mjs"
+    "test:socket-auth": "node --env-file=.env test/socketAuth.mjs",
+    "test:stale-calls": "node --env-file=.env test/staleCalls.mjs",
+    "test:e2ee": "node --env-file=.env test/e2ee.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

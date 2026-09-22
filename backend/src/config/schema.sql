@@ -212,6 +212,22 @@ CREATE TABLE IF NOT EXISTS deck_question_responses (
 -- one of the pair's own memories.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS chat_wallpaper TEXT;
 
+-- The PUBLIC half of this device's encryption keypair, base64.
+--
+-- The private half never leaves the phone's keychain and this server has no
+-- way to ask for it. All this column does is let each partner fetch the other's
+-- public key so they can encrypt to it; publishing public keys is what they
+-- are for. If this column leaked in full it would reveal nothing.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS public_key TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS public_key_set_at TIMESTAMPTZ;
+
+-- Whether `content` is ciphertext rather than text.
+--
+-- A column rather than sniffing the prefix, so a message that happens to
+-- begin with the marker is never mistaken for one, and so the server can say
+-- truthfully what it is storing without being able to read it.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS encrypted BOOLEAN NOT NULL DEFAULT FALSE;
+
 CREATE TABLE IF NOT EXISTS quiz_days (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pair_id         UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,

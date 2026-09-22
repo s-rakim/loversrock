@@ -66,6 +66,16 @@ function load(relative, extraStubs = {}) {
 
 const stubs = {
   '../services/api': { apiFetch: async () => ({}), connectSocket: async () => ({ on() {}, off() {} }), mediaUrl: (k) => `http://x/media/${k}` },
+  // The real crypto module is exercised by test/crypto.mjs against the real
+  // primitives. Here it is stubbed, because loading it through this walker
+  // would pull tweetnacl in through the catch-all proxy and hand it a string
+  // where it expects setPRNG.
+  '../services/crypto': {
+    getKeyPair: async () => ({ publicKeyBase64: 'stub' }),
+    encryptFor: async (_key, text) => `e2ee:v1:${text}`,
+    decryptFrom: async (_key, payload) => String(payload).replace('e2ee:v1:', ''),
+    isEncrypted: (v) => typeof v === 'string' && v.startsWith('e2ee:v1:'),
+  },
   '../components/ThemeContext': { useTheme: () => ({ colors: {}, font: {} }) },
   '../components/Motion': { MorphButton: ({ children }) => children, Stagger: ({ children }) => children },
   '../components/Icon': () => null,
@@ -133,6 +143,17 @@ console.log('\n=== AND THE THREAD SHOWS WHO SAID WHAT ===');
 // Every bubble used to be alignSelf: 'flex-start' in one colour, which is
 // most of why the screen read as unfinished.
 check('a bubble is placed by sender', /item\.sender_id === meId/.test(body), 'no sender comparison');
+
+console.log('\n=== AND THE THREAD IS ENCRYPTED ===');
+// The failure that matters here is not a crash, it is a silent downgrade:
+// sending plaintext while the composer still claims to be encrypted.
+check('outgoing text is sealed when a partner key exists', /encryptFor\(partnerKey/.test(body));
+check('and marked as encrypted for the server', /encrypted: true/.test(body));
+check('incoming ciphertext is opened rather than shown raw', /decryptFrom\(partnerKey/.test(body));
+check('a message that will not open says so instead of rendering blank',
+  /keys don&apos;t match|keys don't match/.test(body));
+check('and the composer states which mode is in force',
+  /End-to-end encrypted/.test(body) && /Not encrypted yet/.test(body));
 check('mine and theirs are styled apart', /styles\.mine/.test(body) && /styles\.theirs/.test(body));
 check('and the id it compares against is fetched', /setMeId/.test(body));
 

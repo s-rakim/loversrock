@@ -5,6 +5,7 @@ import { apiFetch, mediaUrl } from '../services/api';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton, PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
+import ShineBorder from '../components/ShineBorder';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
@@ -63,20 +64,27 @@ export default function HomeScreen({ navigation }) {
         </FadeInUp>
 
         <FadeInUp delay={60}>
+          {/* The two things that are new every day get the moving border, and
+              the phases are offset so they do not pulse in unison. */}
           <View style={styles.widgetRow}>
-            <MorphButton onPress={() => navigation.navigate('DailyPrompt')} style={[styles.widgetCard, { flex: 1 }]}>
-              <Icon name="chatbox-ellipses-outline" chip chipSize={36} style={{ marginBottom: spacing.xs }} />
-              <Text style={font.h2}>Daily Prompt</Text>
-              <Text style={font.muted}>Answer today's question</Text>
-            </MorphButton>
-            <MorphButton onPress={() => navigation.navigate('Quiz')} style={[styles.widgetCard, { flex: 1 }]}>
-              <Icon name="help-buoy-outline" chip chipSize={36} style={{ marginBottom: spacing.xs }} />
-              <Text style={font.h2}>Daily Quiz</Text>
-              <Text style={font.muted}>5 questions, revealed together</Text>
-            </MorphButton>
+            <ShineBorder variant="beam" radius={radius.card} style={{ flex: 1 }} phase={0}>
+              <MorphButton onPress={() => navigation.navigate('DailyPrompt')} style={styles.widgetCardInner}>
+                <Icon name="chatbox-ellipses-outline" chip chipSize={36} style={{ marginBottom: spacing.xs }} />
+                <Text style={font.h2}>Daily Prompt</Text>
+                <Text style={font.muted}>Answer today's question</Text>
+              </MorphButton>
+            </ShineBorder>
+            <ShineBorder variant="beam" radius={radius.card} style={{ flex: 1 }} phase={0.5}>
+              <MorphButton onPress={() => navigation.navigate('Quiz')} style={styles.widgetCardInner}>
+                <Icon name="help-buoy-outline" chip chipSize={36} style={{ marginBottom: spacing.xs }} />
+                <Text style={font.h2}>Daily Quiz</Text>
+                <Text style={font.muted}>5 questions, revealed together</Text>
+              </MorphButton>
+            </ShineBorder>
           </View>
 
-          <MorphButton onPress={() => navigation.navigate('WidgetPhoto')} style={styles.widgetWide}>
+          <ShineBorder variant="shine" radius={radius.card} phase={0.25} style={{ marginTop: spacing.md }}>
+          <MorphButton onPress={() => navigation.navigate('WidgetPhoto')} style={styles.widgetWideInner}>
             {widgetPhoto ? (
               <>
                 <Image source={{ uri: mediaUrl(widgetPhoto.imageUrl || widgetPhoto.image_url) }} style={styles.widgetPhoto} />
@@ -94,6 +102,7 @@ export default function HomeScreen({ navigation }) {
               </View>
             )}
           </MorphButton>
+          </ShineBorder>
 
           <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.doodleRow}>
             <Icon name="brush-outline" chip={false} size={16} color={colors.accent} />
@@ -179,6 +188,11 @@ const makeStyles = (colors, font) =>
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
     borderWidth: 1, borderColor: colors.border, marginRight: spacing.sm,
   },
+  // The inner halves of the ShineBorder cards. No border or background of
+  // their own — the wrapper paints both, and a second border on top of the
+  // moving one reads as a mistake.
+  widgetCardInner: { padding: spacing.md, minHeight: 104, justifyContent: 'center' },
+  widgetWideInner: { padding: spacing.md, minHeight: 90, justifyContent: 'center' },
   widgetWide: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
     borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, minHeight: 90, justifyContent: 'center',

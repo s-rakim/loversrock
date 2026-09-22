@@ -53,6 +53,22 @@ app.use('/period', periodRoutes);
 app.use('/widget', widgetRoutes);
 app.use('/profile', profileRoutes);
 
+/** image/jpeg for a .jpg, and so on. */
+const EXTENSION_TYPES = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
+  webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', bmp: 'image/bmp',
+};
+
+function contentTypeFor(key, meta) {
+  const stored = meta?.metaData
+    && Object.entries(meta.metaData)
+      .find(([name]) => name.toLowerCase() === 'content-type')?.[1];
+  if (stored && stored !== 'application/octet-stream') return stored;
+
+  const extension = String(key).split('.').pop().toLowerCase();
+  return EXTENSION_TYPES[extension] || stored || 'application/octet-stream';
+}
+
 // Auth-gated media streaming out of MinIO — mobile clients never get direct
 // storage credentials or presigned URLs, everything proxies through here.
 //
@@ -67,9 +83,15 @@ app.get(
       // Without a Content-Type the iOS image loader refuses the bytes
       // outright and Android only guesses right by luck, so the stored
       // type is read back rather than left to the default.
+      //
+      // Belt and braces on the lookup: metaData comes back from the storage
+      // backend, and the exact casing of its keys is the backend's business,
+      // not ours. Every key we store ends in a real image extension, so that
+      // is a reliable fallback and 'application/octet-stream' — which is what
+      // makes an <Image> render nothing — is a last resort rather than the
+      // default any hiccup lands on.
       const meta = await statObject(req.params.key).catch(() => null);
-      const type = meta?.metaData?.['content-type'] || 'application/octet-stream';
-      res.setHeader('Content-Type', type);
+      res.setHeader('Content-Type', contentTypeFor(req.params.key, meta));
       if (meta?.size) res.setHeader('Content-Length', meta.size);
       // Immutable: every key is a fresh UUID, so a cached copy can never
       // go stale. This is what stops the thread re-downloading every photo

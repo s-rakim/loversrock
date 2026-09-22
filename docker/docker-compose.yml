@@ -35,6 +35,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # The TURN relay. See docker/turnserver.conf for why a call needs one.
+  #
+  # host networking on purpose: TURN hands out the relay ports it is actually
+  # listening on, and a bridged container would advertise addresses inside the
+  # Docker network that no phone can reach. This is the one service where the
+  # usual port mapping is actively wrong.
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    restart: unless-stopped
+    network_mode: host
+    command: >
+      -c /etc/coturn/turnserver.conf
+      --static-auth-secret=${TURN_SECRET:-change-me-turn-secret}
+      --external-ip=${TURN_PUBLIC_IP:-127.0.0.1}
+      --min-port=${TURN_MIN_PORT:-49160}
+      --max-port=${TURN_MAX_PORT:-49200}
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+
   backend:
     build:
       context: ../backend
@@ -49,6 +68,10 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-loversrock}:${POSTGRES_PASSWORD:-loversrock}@postgres:5432/${POSTGRES_DB:-loversrock}
       STORAGE_ENDPOINT: minio
       STORAGE_PORT: "9000"
+      # The backend mints short-lived TURN credentials from this secret, so
+      # it must be the same string coturn was started with.
+      TURN_SECRET: ${TURN_SECRET:-change-me-turn-secret}
+      TURN_PUBLIC_IP: ${TURN_PUBLIC_IP:-}
     ports:
       # 0.0.0.0 on purpose: the phone reaches this over the Tailscale interface,
       # so binding to loopback would make the API unreachable from the app.

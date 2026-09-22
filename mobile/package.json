@@ -13,7 +13,8 @@
     "test:catalog": "node test/cycleCatalog.mjs",
     "test:doodle": "node test/doodle.mjs",
     "test:render": "node test/render.mjs",
-    "test:messages": "node test/messages.mjs"
+    "test:messages": "node test/messages.mjs",
+    "test:crypto": "node test/crypto.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^9.0.0",
@@ -26,6 +27,7 @@
     "expo": "~51.0.0",
     "expo-blur": "~13.0.2",
     "expo-constants": "~16.0.2",
+    "expo-crypto": "~13.0.2",
     "expo-dev-client": "~4.0.0",
     "expo-font": "~12.0.10",
     "expo-image-picker": "~15.0.7",
@@ -43,6 +45,8 @@
     "react-native-screens": "3.31.1",
     "react-native-svg": "15.2.0",
     "react-native-webrtc": "^124.0.8",
-    "socket.io-client": "^4.7.5"
+    "socket.io-client": "^4.7.5",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
   }
 }
