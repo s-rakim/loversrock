@@ -18,14 +18,23 @@ createdb loversrock && npm run migrate && npm run seed
 #    the same S3 API so the upload path runs unmodified.
 node test/local-s3.js
 
-# 3. The API itself
-npm start
+# 3. The API itself. The S3 stub only accepts its own fixed credentials,
+#    so point the API at them for test runs:
+STORAGE_ACCESS_KEY=S3RVER STORAGE_SECRET_KEY=S3RVER npm start
 
 # 4. The tests
 npm run test:integration   # ~160 assertions across every feature
 npm run test:contract      # response shapes the mobile screens destructure
 npm run test:cron          # scheduled jobs, executed for real
+npm run test:widget        # widget token, summary, security boundary
+npm run test:features      # ~150 assertions: profiles, mood, Sparks, feed, notes,
+                           # secrets, canvas, dates, check-ins, challenges, games,
+                           # achievements, timeline, widget fields
+npm run test:chess         # rules engine (perft to depth 4) + mobile copy in sync
 ```
+
+`test:features` also needs `psql` — it grants test Sparks and rewinds streaks
+the same way `test:integration` does.
 
 `test:integration` needs `psql` on PATH — it rewinds `last_active_date` to
 simulate consecutive days, which is the only way to catch streak regressions

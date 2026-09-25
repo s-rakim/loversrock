@@ -1,0 +1,242 @@
+[
+ {
+  "key": "compliments",
+  "title": "Five compliments",
+  "description": "Give each other five genuine compliments — no repeats, no 'you look nice'.",
+  "icon": "heart"
+ },
+ {
+  "key": "slow-dance",
+  "title": "Kitchen slow dance",
+  "description": "Put on a song you both love and slow dance wherever you are.",
+  "icon": "musical-notes"
+ },
+ {
+  "key": "love-note-hide",
+  "title": "Hidden love note",
+  "description": "Hide a handwritten note somewhere your partner will find it later.",
+  "icon": "document-text"
+ },
+ {
+  "key": "phone-free-hour",
+  "title": "Phone-free hour",
+  "description": "Spend one full hour together with both phones in another room.",
+  "icon": "phone-portrait"
+ },
+ {
+  "key": "recreate-photo",
+  "title": "Recreate a photo",
+  "description": "Find an old photo of the two of you and recreate it as closely as you can.",
+  "icon": "camera"
+ },
+ {
+  "key": "new-recipe",
+  "title": "Cook something new",
+  "description": "Cook a dish neither of you has made before, together.",
+  "icon": "restaurant"
+ },
+ {
+  "key": "gratitude-three",
+  "title": "Three thank-yous",
+  "description": "Tell each other three specific things you're grateful for this week.",
+  "icon": "sparkles"
+ },
+ {
+  "key": "childhood-story",
+  "title": "Childhood story swap",
+  "description": "Each share a childhood story the other has never heard.",
+  "icon": "book"
+ },
+ {
+  "key": "walk-no-destination",
+  "title": "Walk with no destination",
+  "description": "Go for a 20-minute walk with no plan — take turns choosing each turn.",
+  "icon": "walk"
+ },
+ {
+  "key": "playlist",
+  "title": "Make a playlist",
+  "description": "Build a 10-song playlist together: five picks each, no vetoes.",
+  "icon": "musical-note"
+ },
+ {
+  "key": "draw-each-other",
+  "title": "Draw each other",
+  "description": "Draw each other's portrait in two minutes. Share on the Canvas.",
+  "icon": "brush"
+ },
+ {
+  "key": "future-letter",
+  "title": "Letter to future us",
+  "description": "Write a short letter to open on your next anniversary.",
+  "icon": "mail"
+ },
+ {
+  "key": "massage",
+  "title": "Ten-minute massage",
+  "description": "Trade five-minute shoulder massages.",
+  "icon": "hand-left"
+ },
+ {
+  "key": "tiny-date",
+  "title": "Tiny date",
+  "description": "A ten-minute date: tea, a candle, and one question from a deck.",
+  "icon": "cafe"
+ },
+ {
+  "key": "learn-word",
+  "title": "Learn a word",
+  "description": "Teach each other one word in a language you don't speak.",
+  "icon": "language"
+ },
+ {
+  "key": "bucket-add",
+  "title": "Dream bigger",
+  "description": "Add three new items to your bucket list together.",
+  "icon": "checkbox"
+ },
+ {
+  "key": "memory-lane",
+  "title": "Memory lane",
+  "description": "Scroll back through your Memories and pick your favourite from each month.",
+  "icon": "images"
+ },
+ {
+  "key": "stargaze",
+  "title": "Look up",
+  "description": "Step outside tonight and find one star or the moon together — even if you're apart.",
+  "icon": "moon"
+ },
+ {
+  "key": "snack-swap",
+  "title": "Snack swap",
+  "description": "Each pick a snack for the other to try.",
+  "icon": "ice-cream"
+ },
+ {
+  "key": "hug-20",
+  "title": "Twenty-second hug",
+  "description": "Hug for a full twenty seconds. Count out loud if you have to.",
+  "icon": "people"
+ },
+ {
+  "key": "unplug-dinner",
+  "title": "Candlelit dinner",
+  "description": "Eat dinner by candlelight, even if it's takeout.",
+  "icon": "flame"
+ },
+ {
+  "key": "mirror-ask",
+  "title": "Ask me anything",
+  "description": "Ask each other three questions you've always wondered about.",
+  "icon": "help-circle"
+ },
+ {
+  "key": "song-dedication",
+  "title": "Song dedication",
+  "description": "Send each other a song that reminds you of them and explain why.",
+  "icon": "headset"
+ },
+ {
+  "key": "plan-trip",
+  "title": "Dream trip",
+  "description": "Plan a dream trip in 15 minutes: destination, three activities, one splurge.",
+  "icon": "airplane"
+ },
+ {
+  "key": "sunrise",
+  "title": "Catch the sunrise",
+  "description": "Wake up early and watch the sunrise together (video call counts).",
+  "icon": "sunny"
+ },
+ {
+  "key": "compliment-stranger",
+  "title": "Double kindness",
+  "description": "Each do one kind thing for a stranger today and tell the other about it.",
+  "icon": "gift"
+ },
+ {
+  "key": "board-game",
+  "title": "Game night",
+  "description": "Play any game together — the loser plans the next date.",
+  "icon": "game-controller"
+ },
+ {
+  "key": "movie-pick",
+  "title": "Blind movie pick",
+  "description": "One picks a movie, the other can't see the title until it starts.",
+  "icon": "film"
+ },
+ {
+  "key": "write-poem",
+  "title": "Four-line poem",
+  "description": "Write each other a four-line poem. Rhyming optional, love mandatory.",
+  "icon": "create"
+ },
+ {
+  "key": "goals-check",
+  "title": "Goal check",
+  "description": "Share one personal goal and one way the other can help.",
+  "icon": "flag"
+ },
+ {
+  "key": "photo-walk",
+  "title": "Photo walk",
+  "description": "Take five photos each on a walk and send your best as a Daily Snap.",
+  "icon": "aperture"
+ },
+ {
+  "key": "breakfast-bed",
+  "title": "Breakfast in bed",
+  "description": "Surprise the other with breakfast (or a delivered coffee if apart).",
+  "icon": "cafe"
+ },
+ {
+  "key": "voice-note",
+  "title": "Voice note",
+  "description": "Send a 60-second voice note about why you love them.",
+  "icon": "mic"
+ },
+ {
+  "key": "tech-free-morning",
+  "title": "Slow morning",
+  "description": "First hour of the day together, no screens.",
+  "icon": "time"
+ },
+ {
+  "key": "dance-party",
+  "title": "Dance party",
+  "description": "Three songs, full volume, dance like nobody's watching.",
+  "icon": "musical-notes"
+ },
+ {
+  "key": "favorites-quiz",
+  "title": "Favourites quiz",
+  "description": "Quiz each other on favourites: food, film, colour, song, place.",
+  "icon": "school"
+ },
+ {
+  "key": "love-map",
+  "title": "Love map",
+  "description": "Draw a map of your relationship's key places on the Canvas.",
+  "icon": "map"
+ },
+ {
+  "key": "thank-past",
+  "title": "Remember when",
+  "description": "Each describe the moment you knew you liked the other.",
+  "icon": "heart-circle"
+ },
+ {
+  "key": "picnic-floor",
+  "title": "Living-room picnic",
+  "description": "Blanket on the floor, snacks, and a deck of questions.",
+  "icon": "basket"
+ },
+ {
+  "key": "mood-board",
+  "title": "Mood board",
+  "description": "Make a Canvas mood board for your next date.",
+  "icon": "color-palette"
+ }
+]

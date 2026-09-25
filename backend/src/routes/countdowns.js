@@ -29,12 +29,14 @@ router.get('/archived', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { targetDate, label } = req.body;
+  const { targetDate, label, kind } = req.body;
   if (!targetDate || !label) return res.status(400).json({ error: 'targetDate and label are required' });
+  const KINDS = ['see_each_other', 'trip', 'date', 'anniversary', 'birthday', 'other'];
+  if (kind !== undefined && !KINDS.includes(kind)) return res.status(400).json({ error: `kind must be one of ${KINDS.join(', ')}` });
 
   const { rows } = await query(
-    `INSERT INTO countdowns (pair_id, target_date, label, created_by) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [req.pair.id, targetDate, label, req.userId]
+    `INSERT INTO countdowns (pair_id, target_date, label, created_by, kind) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [req.pair.id, targetDate, label, req.userId, kind || null]
   );
   res.status(201).json({ countdown: rows[0] });
 });
