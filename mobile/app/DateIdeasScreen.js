@@ -8,16 +8,18 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 
-export default function DateIdeasScreen() {
+export default function DateIdeasScreen({ navigation }) {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [tab, setTab] = useState('browse');
   const [browseIdeas, setBrowseIdeas] = useState([]);
   const [savedIdeas, setSavedIdeas] = useState([]);
+  const [matches, setMatches] = useState([]);
 
   const load = useCallback(() => {
     apiFetch('/date-ideas').then((d) => setBrowseIdeas(d.ideas)).catch((err) => Alert.alert('Error', err.message));
     apiFetch('/date-ideas/saved').then((d) => setSavedIdeas(d.ideas)).catch((err) => Alert.alert('Error', err.message));
+    apiFetch('/date-ideas/matches').then((d) => setMatches(d.matches)).catch(() => {});
   }, []);
 
   useFocusEffect(load);
@@ -40,14 +42,25 @@ export default function DateIdeasScreen() {
     }
   }
 
-  const list = tab === 'browse' ? browseIdeas : savedIdeas;
+  const list = tab === 'browse' ? browseIdeas : tab === 'matches' ? matches : savedIdeas;
 
   return (
     <View style={styles.container}>
       <StickerField variant="minimal" />
+      {/* The deck is where ideas get chosen; this screen is where the ones
+          you both said yes to end up. */}
+      <MorphButton onPress={() => navigation.navigate('SwipeDeck')} style={styles.swipeBanner}>
+        <Icon name="albums-outline" size={16} color="#fff" chip={false} />
+        <Text style={styles.swipeText}>Swipe through ideas together</Text>
+        <Icon name="chevron-forward" size={14} color="#fff" chip={false} />
+      </MorphButton>
+
       <View style={styles.tabs}>
         <MorphButton onPress={() => setTab('browse')} style={[styles.tab, tab === 'browse' && styles.tabActive]}>
           <Text style={font.body}>Browse</Text>
+        </MorphButton>
+        <MorphButton onPress={() => setTab('matches')} style={[styles.tab, tab === 'matches' && styles.tabActive]}>
+          <Text style={font.body}>Matches{matches.length ? ` (${matches.length})` : ''}</Text>
         </MorphButton>
         <MorphButton onPress={() => setTab('saved')} style={[styles.tab, tab === 'saved' && styles.tabActive]}>
           <Text style={font.body}>Saved</Text>
@@ -67,7 +80,12 @@ export default function DateIdeasScreen() {
                 {item.category ? <Text style={styles.tag}>{item.category}</Text> : null}
                 {item.cost_tier ? <Text style={styles.tag}>{item.cost_tier}</Text> : null}
               </View>
-              {tab === 'browse' ? (
+              {tab === 'matches' ? (
+                <View style={styles.doneRow}>
+                  <Icon name="heart" size={14} color={colors.accentPink} />
+                  <Text style={font.muted}>You both said yes</Text>
+                </View>
+              ) : tab === 'browse' ? (
                 <MorphButton onPress={() => save(item)} style={styles.actionButton}>
                   <Text style={styles.actionButtonText}>Save</Text>
                 </MorphButton>
@@ -84,7 +102,13 @@ export default function DateIdeasScreen() {
             </View>
           </FadeInUp>
         )}
-        ListEmptyComponent={<Text style={[font.muted, { padding: spacing.lg }]}>Nothing here yet.</Text>}
+        ListEmptyComponent={(
+          <Text style={[font.muted, { padding: spacing.lg }]}>
+            {tab === 'matches'
+              ? 'No matches yet. Swipe through the deck and a match appears the moment you both say yes to the same thing.'
+              : 'Nothing here yet.'}
+          </Text>
+        )}
       />
     </View>
   );
@@ -93,6 +117,12 @@ export default function DateIdeasScreen() {
 const makeStyles = (colors, font) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
+  swipeBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    backgroundColor: colors.accent, borderRadius: radius.pill,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.md, marginBottom: spacing.md,
+  },
+  swipeText: { flex: 1, color: '#fff', fontWeight: '700' },
   tabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   tab: { flex: 1, backgroundColor: colors.surface, borderRadius: radius.pill, paddingVertical: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   tabActive: { borderColor: colors.accent },

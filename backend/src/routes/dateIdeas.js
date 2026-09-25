@@ -108,6 +108,44 @@ router.put('/:id/vote', async (req, res) => {
   });
 });
 
+/**
+ * The swipe deck: what THIS person has not voted on yet.
+ *
+ * Deliberately not "what neither of you has voted on". The two of you swipe
+ * at different times, and a deck that emptied as soon as your partner got
+ * through it would mean whoever opens the app second never gets to vote — and
+ * a match needs both votes, so the whole feature would quietly stop working
+ * for one of you.
+ *
+ * Seeded ideas (pair_id IS NULL) are in the deck alongside your own, which is
+ * what stops a new couple opening it to an empty stack.
+ */
+router.get('/swipe', async (req, res) => {
+  const { rows } = await query(
+    `SELECT d.* FROM date_ideas d
+      WHERE (d.pair_id = $1 OR d.pair_id IS NULL)
+        AND d.is_completed = FALSE
+        AND d.status = 'idea'
+        AND NOT EXISTS (
+          SELECT 1 FROM date_idea_votes v
+           WHERE v.date_idea_id = d.id AND v.user_id = $2 AND v.pair_id = $1
+        )
+      -- Shuffled, and seeded with the pair id so both of you get the SAME
+      -- order. Swiping through the deck together on one sofa is most of how
+      -- this gets used, and two different orders makes that impossible.
+      ORDER BY md5(d.id::text || $1::text)
+      LIMIT 40`,
+    [req.pair.id, req.userId]
+  );
+
+  const { rows: counts } = await query(
+    `SELECT count(*)::int AS voted FROM date_idea_votes WHERE pair_id = $1 AND user_id = $2`,
+    [req.pair.id, req.userId]
+  );
+
+  res.json({ deck: rows, votedSoFar: counts[0].voted });
+});
+
 /** Everything you have both said yes to. */
 router.get('/matches', async (req, res) => {
   const { rows } = await query(

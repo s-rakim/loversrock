@@ -13,6 +13,9 @@ import CallButtons from '../components/calls/CallButtons';
 
 const QUICK_LINKS = [
   ['BucketList', 'Bucket List', 'checkbox-outline'],
+  // The deck first: choosing what to do is the thing people open this for,
+  // and the list is where the ones you both said yes to end up.
+  ['SwipeDeck', 'Swipe Dates', 'albums-outline'],
   ['DateIdeas', 'Date Ideas', 'bulb-outline'],
   ['Countdown', 'Countdowns', 'hourglass-outline'],
   ['DistanceApart', 'Distance Apart', 'navigate-outline'],
