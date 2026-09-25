@@ -18,7 +18,7 @@
 // and it tells you how they are.
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
-import Svg, { Path, Circle, Ellipse, G, Rect, Defs, ClipPath } from 'react-native-svg';
+import Svg, { Path, Circle, Ellipse, G, Rect, Defs, RadialGradient, LinearGradient, Stop } from 'react-native-svg';
 import { useTheme } from './ThemeContext';
 import { EXPRESSIONS } from './Mascot';
 
@@ -44,9 +44,54 @@ const shade = (hex, amount) => {
   return `#${[mix(r), mix(g), mix(b)].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 };
 
+/**
+ * What makes a flat vector character look three-dimensional.
+ *
+ * It is not actual 3D — that would mean a GL context, a rigged model and a
+ * renderer, for a figure about a hundred pixels tall. The avatars this is
+ * modelled on are not really 3D on screen either: they are flat shapes with
+ * carefully placed shading, and that is what reads as volume.
+ *
+ * Three things do almost all the work:
+ *
+ *   FORM SHADOW — every surface lit from the upper left and falling off to
+ *   the lower right, so a limb reads as a cylinder rather than a stripe.
+ *   RIM LIGHT — a thin bright edge on the shadow side, which is what stops
+ *   the figure looking pasted onto the background.
+ *   CONTACT SHADOW — a soft ellipse under the feet. Without it the character
+ *   floats, and nothing else you do will fix that.
+ */
+function Materials({ uid, tones }) {
+  return (
+    <Defs>
+      {Object.entries(tones).map(([name, base]) => (
+        <RadialGradient key={name} id={`${uid}-${name}`} cx="34%" cy="26%" r="86%">
+          <Stop offset="0%" stopColor={shade(base, 26)} />
+          <Stop offset="46%" stopColor={base} />
+          <Stop offset="100%" stopColor={shade(base, -34)} />
+        </RadialGradient>
+      ))}
+      {/* The floor shadow: opaque under the feet, gone by its edge. */}
+      <RadialGradient id={`${uid}-floor`} cx="50%" cy="50%" r="50%">
+        <Stop offset="0%" stopColor="#000000" stopOpacity={0.3} />
+        <Stop offset="60%" stopColor="#000000" stopOpacity={0.12} />
+        <Stop offset="100%" stopColor="#000000" stopOpacity={0} />
+      </RadialGradient>
+      {/* A cool light from behind, catching the right edge. */}
+      <LinearGradient id={`${uid}-rim`} x1="0" y1="0" x2="1" y2="0">
+        <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0} />
+        <Stop offset="82%" stopColor="#FFFFFF" stopOpacity={0} />
+        <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0.5} />
+      </LinearGradient>
+    </Defs>
+  );
+}
+
 /* ------------------------------------------------------------------ hair */
-function Hair({ style, colour, skin }) {
-  const dark = shade(colour, -18);
+function Hair({ style, colour, flat }) {
+  // `colour` is a gradient reference — it can only be used as a fill. Derived
+  // shades have to come from `flat`, the plain hex the gradient was built from.
+  const dark = shade(flat, -18);
   switch (style) {
     case 'bald':
       return null;
@@ -163,8 +208,8 @@ function Face({ mood, skin }) {
 }
 
 /* --------------------------------------------------------------- clothes */
-function Bottoms({ id, colour, skin }) {
-  const dark = shade(colour, -22);
+function Bottoms({ id, colour, flat }) {
+  const dark = shade(flat, -22);
   if (id === 'skirt') {
     return <Path d="M36 84 L64 84 L70 104 L30 104 Z" fill={colour} />;
   }
@@ -198,8 +243,8 @@ function Bottoms({ id, colour, skin }) {
   return legs(84, 124);   // jeans, trousers
 }
 
-function Top({ id, colour, accent, skin }) {
-  const dark = shade(colour, -20);
+function Top({ id, colour, accent, flat }) {
+  const dark = shade(flat, -20);
   const body = (extra = null, sleeveY = 78) => (
     <G>
       <Path d="M38 56 Q50 52 62 56 L66 60 L66 88 L34 88 L34 60 Z" fill={colour} />
@@ -265,9 +310,9 @@ function Top({ id, colour, accent, skin }) {
   return body();   // tee
 }
 
-function Shoes({ id, colour }) {
+function Shoes({ id, colour, flat }) {
   if (id === 'barefoot') return null;
-  const dark = shade(colour, -30);
+  const dark = shade(flat, -30);
   if (id === 'slides') {
     return (
       <G>
@@ -346,7 +391,14 @@ function Accessory({ id, colour }) {
  * @param avatar {skin, hair, hairColor, build, outfit}
  * @param mood   the expression to wear — normally the owner's current mood.
  */
-export default function Character({ avatar, mood, size = 120, animated = true, style }) {
+export default function Character({
+  avatar, mood,
+  // HEIGHT, not width. A person is taller than wide, and sizing by width made
+  // every call site guess at the aspect ratio — which is how the figure ended
+  // up filling about sixty per cent of its own box.
+  height = 140,
+  animated = true, style, shadow = true,
+}) {
   const { reduceMotion } = useTheme();
   const a = avatar || {};
   const skin = SKINS[a.skin] || SKINS.medium;
@@ -354,7 +406,22 @@ export default function Character({ avatar, mood, size = 120, animated = true, s
   const outfit = a.outfit || {};
   const expression = EXPRESSIONS[mood] || EXPRESSIONS.neutral;
 
-  const width = a.build === 'broad' ? 1.1 : a.build === 'slim' ? 0.92 : 1;
+  // Gradient ids are global to the SVG document. Two characters on one screen
+  // — the wardrobe preview beside the partner's, or both on the loading
+  // screen — would otherwise fight over the same ids and one would wear the
+  // other's skin tone.
+  const uid = useRef(`c${Math.random().toString(36).slice(2, 8)}`).current;
+
+  const widthScale = a.build === 'broad' ? 1.08 : a.build === 'slim' ? 0.93 : 1;
+
+  const topId = outfit.top?.id || 'tee';
+  const coversBottom = topId === 'dress';
+  const topColour = GARMENT_COLORS[outfit.top?.color] || GARMENT_COLORS.white;
+  const bottomColour = GARMENT_COLORS[outfit.bottom?.color] || GARMENT_COLORS.navy;
+  const shoeColour = GARMENT_COLORS[outfit.shoes?.color] || GARMENT_COLORS.white;
+
+  const tones = { skin, hair: hairColour, top: topColour, bottom: bottomColour, shoe: shoeColour };
+  const fill = (name) => `url(#${uid}-${name})`;
 
   const bob = useRef(new Animated.Value(0)).current;
   const moving = animated && !reduceMotion;
@@ -370,42 +437,47 @@ export default function Character({ avatar, mood, size = 120, animated = true, s
     return () => loop.stop();
   }, [moving, bob, expression.bob]);
 
-  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [2, -2] });
+  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [1.5, -1.5] });
 
-  const topId = outfit.top?.id || 'tee';
-  // A dress covers the bottom slot; drawing trousers under it looks like a
-  // mistake rather than a choice.
-  const coversBottom = topId === 'dress';
+  // The viewBox is the figure's real bounds plus a little room for the floor
+  // shadow, so `height` is the height you actually get on screen.
+  const VB = { x: 16, y: 6, w: 68, h: 134 };
+  const width = height * (VB.w / VB.h);
 
   return (
     <Animated.View
       pointerEvents="none"
-      style={[{ width: size, height: size * 1.4, transform: [{ translateY }] }, style]}
+      style={[{ width, height, transform: [{ translateY }] }, style]}
     >
-      <Svg width="100%" height="100%" viewBox="0 0 100 140">
-        <G transform={`translate(${50 - 50 * width} 0) scale(${width} 1)`}>
-          {/* legs and arms in skin, so a short sleeve or shorts shows limb */}
-          <G fill={skin}>
-            <Rect x="38" y="84" width="9" height="42" rx="4.5" />
-            <Rect x="53" y="84" width="9" height="42" rx="4.5" />
-            <Rect x="29" y="60" width="7" height="32" rx="3.5" />
-            <Rect x="64" y="60" width="7" height="32" rx="3.5" />
+      <Svg width="100%" height="100%" viewBox={`${VB.x} ${VB.y} ${VB.w} ${VB.h}`}>
+        <Materials uid={uid} tones={tones} />
+
+        {/* Grounded first: the shadow belongs under everything. */}
+        {shadow && <Ellipse cx="50" cy="134" rx="22" ry="5" fill={`url(#${uid}-floor)`} />}
+
+        <G transform={`translate(${50 - 50 * widthScale} 0) scale(${widthScale} 1)`}>
+          {/* Limbs in skin, so a short sleeve or shorts shows real leg. */}
+          <G fill={fill('skin')}>
+            <Rect x="38" y="84" width="9.5" height="42" rx="4.75" />
+            <Rect x="52.5" y="84" width="9.5" height="42" rx="4.75" />
+            <Rect x="29" y="60" width="7.5" height="32" rx="3.75" />
+            <Rect x="64" y="60" width="7.5" height="32" rx="3.75" />
           </G>
 
-          {!coversBottom && (
-            <Bottoms id={outfit.bottom?.id || 'jeans'}
-              colour={GARMENT_COLORS[outfit.bottom?.color] || GARMENT_COLORS.navy} skin={skin} />
-          )}
-          <Shoes id={outfit.shoes?.id || 'sneakers'}
-            colour={GARMENT_COLORS[outfit.shoes?.color] || GARMENT_COLORS.white} />
-          <Top id={topId}
-            colour={GARMENT_COLORS[outfit.top?.color] || GARMENT_COLORS.white}
-            accent={outfit.top?.accent} skin={skin} />
+          {!coversBottom && <Bottoms id={outfit.bottom?.id || 'jeans'} colour={fill('bottom')} flat={bottomColour} />}
+          <Shoes id={outfit.shoes?.id || 'sneakers'} colour={fill('shoe')} flat={shoeColour} />
+          <Top id={topId} colour={fill('top')} flat={topColour} accent={outfit.top?.accent} />
 
-          {/* neck, then head over the collar */}
-          <Rect x="46" y="48" width="8" height="10" fill={shade(skin, -14)} />
-          <Ellipse cx="50" cy="36" rx="20" ry="22" fill={skin} />
-          <Hair style={a.hair || 'short'} colour={hairColour} skin={skin} />
+          {/* Neck, shaded because it sits in the head's shadow — that one
+              darker band is most of what makes a head read as a sphere
+              sitting ON something rather than a circle floating above it. */}
+          <Rect x="45.5" y="47" width="9" height="11" rx="2" fill={shade(skin, -30)} />
+
+          <Ellipse cx="50" cy="36" rx="20" ry="22" fill={fill('skin')} />
+          {/* Rim light down the right edge of the head. */}
+          <Ellipse cx="50" cy="36" rx="20" ry="22" fill={`url(#${uid}-rim)`} />
+
+          <Hair style={a.hair || 'short'} colour={fill('hair')} flat={hairColour} />
           <Face mood={mood} skin={skin} />
           <Accessory id={outfit.accessory?.id || 'none'} colour={outfit.accessory?.color} />
         </G>

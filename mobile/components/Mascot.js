@@ -40,7 +40,7 @@ export const EXPRESSIONS = {
 export const MASCOT_MOODS = Object.keys(EXPRESSIONS).filter((m) => m !== 'neutral');
 
 /** Eyes, as SVG, per expression. */
-function Eyes({ kind, colour }) {
+function Eyes({ kind, colour, skin }) {
   const left = 38;
   const right = 62;
   const y = 46;
@@ -90,10 +90,15 @@ function Eyes({ kind, colour }) {
       <G>
         <Circle cx={left} cy={y + 1} r="5" fill={colour} />
         <Circle cx={right} cy={y + 1} r="5" fill={colour} />
-        {/* The lid is what turns an open eye into a tired or unimpressed
-            one — drawn in the body colour so it reads as skin, not a line. */}
-        <Path d={`M${left - 7} ${lidY} h14`} stroke={colour} strokeWidth="9"
-          strokeLinecap="round" opacity={0} />
+        {/* The lid is what turns an open eye into a tired or unimpressed one.
+            It is painted in the BODY colour, over the top of the eye, so it
+            reads as a heavy eyelid rather than a line drawn across a face. */}
+        <Path d={`M${left - 7} ${lidY} h14`} stroke={skin} strokeWidth="9" strokeLinecap="round" />
+        <Path d={`M${right - 7} ${lidY} h14`} stroke={skin} strokeWidth="9" strokeLinecap="round" />
+        {/* and a thin dark lash line along its edge, or the lid vanishes into
+            the body it is painted in. */}
+        <Path d={`M${left - 5.5} ${lidY + 4} h11`} stroke={colour} strokeWidth="2" strokeLinecap="round" />
+        <Path d={`M${right - 5.5} ${lidY + 4} h11`} stroke={colour} strokeWidth="2" strokeLinecap="round" />
       </G>
     );
   }
@@ -167,30 +172,77 @@ function Accessory({ kind, colour }) {
   return null;
 }
 
-/** The drawn character, used until real artwork is wired up. */
-function DrawnMascot({ expression, colors }) {
+/**
+ * The drawn character, used until real artwork is wired up.
+ *
+ * The body is one path. Everything that makes it look like a solid object
+ * rather than a coloured shape is lighting laid over that path, in the order
+ * a real one would fall:
+ *
+ *   FORM SHADOW  the body gradient, lit from the upper left, darkening to the
+ *                lower right. On its own this already reads as a sphere.
+ *   CORE SHADOW  a darker band just INSIDE the lower-right edge, with the
+ *                very rim left lighter. This is the counter-intuitive one and
+ *                it is what separates a ball from a flat disc with a gradient.
+ *   BOUNCE       light thrown back up off the floor onto the underside.
+ *   SPECULAR     a small bright highlight where the light source reflects,
+ *                plus a second weaker one, which reads as a glossy surface.
+ *   CONTACT      a soft ellipse on the floor. Without it the thing hovers.
+ *
+ * Gradient ids are global to the SVG document, so they are namespaced per
+ * instance — the loading screen draws two mascots at once and without this
+ * the second would wear the first one's colour.
+ */
+function DrawnMascot({ expression, colors, uid }) {
   const body = expression.tone || colors.accent;
   const ink = '#2A2333';
+  const BODY = 'M50 8 C58 24, 76 32, 76 54 C76 71, 64 82, 50 82 C36 82, 24 71, 24 54 C24 32, 42 24, 50 8 Z';
 
   return (
+    // Taller than wide, with room under the feet for the floor shadow.
     <Svg width="100%" height="100%" viewBox="0 0 100 100">
       <Defs>
-        <RadialGradient id="mascotBody" cx="42%" cy="34%" r="72%">
-          <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.45} />
-          <Stop offset="55%" stopColor={body} stopOpacity={1} />
+        <RadialGradient id={`${uid}-body`} cx="38%" cy="30%" r="78%">
+          <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.5} />
+          <Stop offset="46%" stopColor={body} stopOpacity={1} />
           <Stop offset="100%" stopColor={body} stopOpacity={1} />
+        </RadialGradient>
+        {/* Dark at the centre of the lower right, easing off before the very
+            edge — that untouched rim is the point of it. */}
+        <RadialGradient id={`${uid}-core`} cx="72%" cy="74%" r="56%">
+          <Stop offset="0%" stopColor="#1A1024" stopOpacity={0.34} />
+          <Stop offset="72%" stopColor="#1A1024" stopOpacity={0.1} />
+          <Stop offset="100%" stopColor="#1A1024" stopOpacity={0} />
+        </RadialGradient>
+        {/* Light coming back UP off the floor, warm and weak. */}
+        <RadialGradient id={`${uid}-bounce`} cx="50%" cy="98%" r="46%">
+          <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.3} />
+          <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
+        </RadialGradient>
+        <RadialGradient id={`${uid}-floor`} cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor="#000000" stopOpacity={0.28} />
+          <Stop offset="58%" stopColor="#000000" stopOpacity={0.1} />
+          <Stop offset="100%" stopColor="#000000" stopOpacity={0} />
         </RadialGradient>
       </Defs>
 
+      {/* Grounded before anything else is drawn. */}
+      <Ellipse cx="50" cy="88" rx="24" ry="6" fill={`url(#${uid}-floor)`} />
+
       {/* A flame-ish drop: round at the bottom, drawn to a point at the top.
           Reads as a little creature rather than a logo. */}
-      <Path
-        d="M50 8 C58 24, 76 32, 76 54 C76 71, 64 82, 50 82 C36 82, 24 71, 24 54 C24 32, 42 24, 50 8 Z"
-        fill="url(#mascotBody)"
-      />
-      <Ellipse cx="34" cy="64" rx="6" ry="4" fill="#FFFFFF" opacity={0.22} />
+      <Path d={BODY} fill={`url(#${uid}-body)`} />
+      <Path d={BODY} fill={`url(#${uid}-core)`} />
+      <Path d={BODY} fill={`url(#${uid}-bounce)`} />
 
-      <Eyes kind={expression.eyes} colour={ink} />
+      {/* Specular: a large soft one and a small hard one. Two highlights of
+          different sharpness is the whole trick to a glossy surface. */}
+      <Ellipse cx="36" cy="30" rx="8" ry="11" fill="#FFFFFF" opacity={0.3}
+        transform="rotate(-22 36 30)" />
+      <Ellipse cx="33.5" cy="26" rx="2.6" ry="3.6" fill="#FFFFFF" opacity={0.65}
+        transform="rotate(-22 33.5 26)" />
+
+      <Eyes kind={expression.eyes} colour={ink} skin={body} />
       <Mouth kind={expression.mouth} colour={ink} />
       <Accessory kind={expression.accessory} colour={ink} />
     </Svg>
@@ -206,6 +258,9 @@ export default function Mascot({ mood, size = 96, animated = true, style }) {
   const { colors, reduceMotion } = useTheme();
   const expression = EXPRESSIONS[mood] || EXPRESSIONS.neutral;
   const art = artFor(mood);
+  // Per-instance, because SVG gradient ids are document-global and the
+  // loading screen draws two of these side by side.
+  const uid = useRef(`m${Math.random().toString(36).slice(2, 8)}`).current;
 
   const bob = useRef(new Animated.Value(0)).current;
   const moving = animated && !reduceMotion;
@@ -239,7 +294,7 @@ export default function Mascot({ mood, size = 96, animated = true, style }) {
     >
       {art
         ? <Image source={art} style={StyleSheet.absoluteFill} resizeMode="contain" />
-        : <DrawnMascot expression={expression} colors={colors} />}
+        : <DrawnMascot expression={expression} colors={colors} uid={uid} />}
     </Animated.View>
   );
 }

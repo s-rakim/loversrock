@@ -63,7 +63,7 @@ export default function MoodBar({ partnerName }) {
     <View style={styles.wrap}>
       {/* THEIR character, wearing THEIR mood. Not yours — you already know
           how you feel; this is for noticing them. */}
-      <Character avatar={theirAvatar} mood={mood} size={74} />
+      <Character avatar={theirAvatar} mood={mood} height={96} />
 
       <View style={{ flex: 1 }}>
         {mood ? (

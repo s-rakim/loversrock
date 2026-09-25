@@ -98,7 +98,7 @@ export default function WardrobeScreen() {
       <View style={styles.stage}>
         {/* The real renderer, wearing your current mood — so you can see
             exactly what they see. */}
-        <Character avatar={avatar} mood={mine?.mood} size={150} />
+        <Character avatar={avatar} mood={mine?.mood} height={230} />
         <Text style={[font.muted, styles.stageNote]}>
           This is what they see on their phone.
         </Text>
