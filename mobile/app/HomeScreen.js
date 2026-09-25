@@ -22,6 +22,7 @@ const QUICK_LINKS = [
   ['DistanceApart', 'Distance Apart', 'navigate-outline'],
   ['PeriodTracker', 'Cycle Tracker', 'water-outline'],
   ['Checkin', 'Monthly Check-In', 'clipboard-outline'],
+  ['Feed', 'Your Story', 'time-outline'],
 ];
 
 export default function HomeScreen({ navigation }) {

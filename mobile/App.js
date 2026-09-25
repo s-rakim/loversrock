@@ -30,6 +30,7 @@ import BucketListScreen from './app/BucketListScreen';
 import DateIdeasScreen from './app/DateIdeasScreen';
 import SwipeDeckScreen from './app/SwipeDeckScreen';
 import CheckinScreen from './app/CheckinScreen';
+import FeedScreen from './app/FeedScreen';
 import CountdownScreen from './app/CountdownScreen';
 import MessagesScreen from './app/MessagesScreen';
 import CanvasScreen from './app/CanvasScreen';
@@ -232,6 +233,9 @@ function Root() {
                 the ones you both said yes to end up. */}
             <Stack.Screen name="SwipeDeck" component={SwipeDeckScreen} options={{ title: 'Swipe' }} />
             <Stack.Screen name="Checkin" component={CheckinScreen} options={{ title: 'Monthly Check-In' }} />
+            {/* What the two of you did, as opposed to what you said — which is
+                the message thread's job. */}
+            <Stack.Screen name="Feed" component={FeedScreen} options={{ title: 'Your story' }} />
             <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
             {/* The shelf, and the canvas itself. The gallery is the entry
                 point of the two: you arrive wanting to see what is there far

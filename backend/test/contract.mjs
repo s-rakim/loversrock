@@ -203,5 +203,16 @@ const chal = await req('/checkins/challenge', { token: A.token });
 check('ChallengeCard: challenge/history/completed present',
   ['challenge', 'history', 'completed'].every((k) => k in chal.data), Object.keys(chal.data || {}));
 
+// FeedScreen reads these off every item, whatever kind it is — the layout is
+// shared, so a kind missing one of them renders a blank card rather than
+// erroring.
+const feed = await req('/feed', { token: A.token });
+check('FeedScreen: items/nextCursor present', ['items', 'nextCursor'].every((k) => k in feed.data), Object.keys(feed.data || {}));
+check('FeedScreen: every item has kind/id/at/comments/reactions',
+  feed.data.items.every((i) => i.kind && i.id && i.at && Array.isArray(i.comments) && Array.isArray(i.reactions)),
+  feed.data.items?.[0]);
+check('FeedScreen: the profile id it compares comments against is `me`',
+  Boolean((await req('/profile', { token: A.token })).data.me?.id));
+
 console.log(`\nCONTRACT RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 process.exit(fails.length ? 1 : 0);

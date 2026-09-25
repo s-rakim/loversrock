@@ -806,3 +806,47 @@ CREATE UNIQUE INDEX IF NOT EXISTS pair_challenges_one_open
 
 CREATE INDEX IF NOT EXISTS pair_challenges_history_idx
   ON pair_challenges (pair_id, drawn_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- The joint feed.
+-- ---------------------------------------------------------------------------
+
+-- DERIVED, not materialised, and that is the whole design decision.
+--
+-- The obvious alternative is a `feed_items` table written to by every feature
+-- that produces one. It paginates beautifully and it is wrong here: every
+-- future feature has to remember to write its row, a missed write is an
+-- invisible hole in your history, an edit or delete needs a matching update,
+-- and getting any of it wrong is only discovered months later when somebody
+-- notices a day is missing.
+--
+-- A UNION over the source tables cannot drift, needs no backfill, and for two
+-- people with a few thousand rows between them is not remotely a performance
+-- problem. If it ever becomes one, a materialised view is a change to one
+-- query rather than to nine features.
+--
+-- So the only new table here is the one with genuinely new data in it.
+CREATE TABLE IF NOT EXISTS feed_comments (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id    UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  author_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- (kind, id) rather than a foreign key, because the target lives in one of
+  -- eight tables. The trade is that a deleted source leaves an orphan, which
+  -- the feed query drops on its own by never selecting it.
+  item_kind  TEXT NOT NULL,
+  item_id    UUID NOT NULL,
+  body       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS feed_comments_item_idx
+  ON feed_comments (pair_id, item_kind, item_id, created_at);
+
+-- Reactions already existed for messages and memories; the feed adds the rest
+-- of the things worth reacting to.
+ALTER TABLE reactions DROP CONSTRAINT IF EXISTS reactions_target_kind_check;
+ALTER TABLE reactions ADD CONSTRAINT reactions_target_kind_check
+  CHECK (target_kind IN (
+    'message', 'memory', 'note', 'doodle',
+    'prompt', 'quiz', 'locket', 'drawing', 'date', 'challenge', 'checkin', 'milestone'
+  ));

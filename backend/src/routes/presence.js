@@ -9,6 +9,7 @@ import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { NUDGE_LABELS, normalizeKind, NUDGE_THROTTLE_SECONDS } from '../models/nudges.js';
+import { REACTION_TARGETS } from '../models/reactions.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { normalizeAvatar, catalogue } from '../models/wardrobe.js';
 
@@ -149,7 +150,9 @@ router.delete('/notes/:id', async (req, res) => {
 
 // --------------------------------------------------------------- reactions
 
-const TARGETS = ['message', 'memory', 'note', 'doodle'];
+// Shared with the database's CHECK constraint — see models/reactions.js for
+// why that pairing is tested rather than trusted.
+const TARGETS = REACTION_TARGETS;
 
 router.get('/reactions/:kind', async (req, res) => {
   if (!TARGETS.includes(req.params.kind)) return res.status(400).json({ error: 'Unknown target' });
