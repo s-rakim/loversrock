@@ -1,5 +1,5 @@
-const S3rver = require('s3rver');
-const fs = require('fs');
+import S3rver from 's3rver';
+import fs from 'fs';
 
 fs.rmSync('./.s3-data', { recursive: true, force: true });
 fs.mkdirSync('./.s3-data', { recursive: true });

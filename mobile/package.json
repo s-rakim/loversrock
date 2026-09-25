@@ -7,7 +7,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "test:server-url": "node test/serverUrl.mjs"
+    "test:server-url": "node test/serverUrl.mjs",
+    "test:i18n": "node test/i18n.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",
@@ -22,6 +23,7 @@
     "expo-image-picker": "~15.0.7",
     "expo-linear-gradient": "~13.0.2",
     "expo-location": "~17.0.1",
+    "expo-notifications": "~0.28.19",
     "expo-secure-store": "~13.0.2",
     "expo-sensors": "~13.0.9",
     "expo-status-bar": "~1.12.1",

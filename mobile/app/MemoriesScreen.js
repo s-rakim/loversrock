@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, Image, Alert, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { apiFetch, mediaUrl } from '../services/api';
@@ -8,10 +8,11 @@ import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 
-export default function MemoriesScreen() {
+export default function MemoriesScreen({ navigation }) {
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [caption, setCaption] = useState('');
 
   const load = useCallback(() => {
     apiFetch('/memories')
@@ -43,9 +44,10 @@ export default function MemoriesScreen() {
     try {
       const data = await apiFetch('/memories', {
         method: 'POST',
-        body: { image: `data:${mimeType};base64,${asset.base64}` },
+        body: { image: `data:${mimeType};base64,${asset.base64}`, caption: caption.trim() || undefined },
       });
       setMemories((prev) => [data.memory, ...prev]);
+      setCaption('');
     } catch (err) {
       Alert.alert('Upload failed', err.message);
     } finally {
@@ -73,7 +75,21 @@ export default function MemoriesScreen() {
   return (
     <View style={styles.container}>
       <StickerField variant="minimal" />
-      <Text style={[font.h1, { marginBottom: spacing.md }]}>Memories</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+        <Text style={font.h1}>Memories</Text>
+        <MorphButton onPress={() => navigation.navigate('Timeline')} style={styles.timelineButton}>
+          <Icon name="calendar-number-outline" chip={false} size={16} />
+          <Text style={{ color: colors.accent, fontWeight: '700' }}>Calendar</Text>
+        </MorphButton>
+      </View>
+      <TextInput
+        value={caption}
+        onChangeText={setCaption}
+        placeholder="Caption for your next memory (optional)"
+        placeholderTextColor={colors.textMuted}
+        style={styles.captionInput}
+        maxLength={140}
+      />
       <MorphButton onPress={addMemory} disabled={uploading} style={styles.addButton}>
         <Icon name="add-circle-outline" chip={false} color="#fff" size={18} />
         <Text style={styles.addButtonText}>{uploading ? 'Uploading…' : 'Add memory'}</Text>
@@ -116,4 +132,6 @@ const styles = StyleSheet.create({
   image: { width: '100%', aspectRatio: 1 },
   caption: { ...font.muted, padding: spacing.xs },
   emptyRow: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg },
+  timelineButton: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accentSoft, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  captionInput: { backgroundColor: colors.surface, color: colors.text, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm },
 });

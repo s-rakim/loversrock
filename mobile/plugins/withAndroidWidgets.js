@@ -55,6 +55,19 @@ function withWidgetManifest(config) {
     const receivers = [
       { name: '.widgets.SummaryWidgetProvider', info: '@xml/widget_summary_info' },
       { name: '.widgets.PhotoWidgetProvider', info: '@xml/widget_photo_info' },
+      // Candle-style glance widgets (MomentWidgets.kt) + the shared Canvas.
+      { name: '.widgets.DaysTogetherWidget', info: '@xml/widget_days_together_info' },
+      { name: '.widgets.AnniversaryWidget', info: '@xml/widget_anniversary_info' },
+      { name: '.widgets.StreakWidget', info: '@xml/widget_streak_info' },
+      { name: '.widgets.CountdownWidget', info: '@xml/widget_countdown_info' },
+      { name: '.widgets.DistanceWidget', info: '@xml/widget_distance_info' },
+      { name: '.widgets.PartnerMoodWidget', info: '@xml/widget_partner_mood_info' },
+      { name: '.widgets.NextDateWidget', info: '@xml/widget_next_date_info' },
+      { name: '.widgets.LoveNoteWidget', info: '@xml/widget_love_note_info' },
+      { name: '.widgets.SecretMessageWidget', info: '@xml/widget_secret_message_info' },
+      { name: '.widgets.DailyQuestionWidget', info: '@xml/widget_daily_question_info' },
+      { name: '.widgets.QuickKissWidget', info: '@xml/widget_quick_kiss_info' },
+      { name: '.widgets.CanvasWidget', info: '@xml/widget_canvas_info' },
     ];
 
     for (const { name, info } of receivers) {

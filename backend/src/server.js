@@ -23,6 +23,19 @@ import gamesRoutes from './routes/games.js';
 import locationRoutes from './routes/location.js';
 import periodRoutes from './routes/period.js';
 import widgetRoutes from './routes/widget.js';
+import profileRoutes from './routes/profile.js';
+import sparksRoutes from './routes/sparks.js';
+import achievementsRoutes from './routes/achievements.js';
+import feedRoutes from './routes/feed.js';
+import notesRoutes from './routes/notes.js';
+import secretsRoutes from './routes/secrets.js';
+import canvasRoutes from './routes/canvas.js';
+import datesRoutes from './routes/dates.js';
+import checkinsRoutes from './routes/checkins.js';
+import challengesRoutes from './routes/challenges.js';
+import gamesExtraRoutes from './routes/gamesExtra.js';
+import nudgesRoutes from './routes/nudges.js';
+import timelineRoutes from './routes/timeline.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -48,6 +61,19 @@ app.use('/games', gamesRoutes);
 app.use('/location', locationRoutes);
 app.use('/period', periodRoutes);
 app.use('/widget', widgetRoutes);
+app.use('/profile', profileRoutes);
+app.use('/sparks', sparksRoutes);
+app.use('/achievements', achievementsRoutes);
+app.use('/feed', feedRoutes);
+app.use('/notes', notesRoutes);
+app.use('/secrets', secretsRoutes);
+app.use('/canvas', canvasRoutes);
+app.use('/dates', datesRoutes);
+app.use('/checkins', checkinsRoutes);
+app.use('/challenges', challengesRoutes);
+app.use('/games', gamesExtraRoutes); // /games/wml, /games/chess — GET /games itself stays in games.js
+app.use('/nudges', nudgesRoutes);
+app.use('/timeline', timelineRoutes);
 
 // Auth-gated media streaming out of MinIO — mobile clients never get direct
 // storage credentials or presigned URLs, everything proxies through here.

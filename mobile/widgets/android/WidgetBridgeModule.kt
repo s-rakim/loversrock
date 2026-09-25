@@ -75,5 +75,6 @@ class WidgetBridgeModule(private val reactContext: ReactApplicationContext) :
     private fun refreshWidgets() {
         SummaryWidgetProvider.refreshAll(reactContext)
         PhotoWidgetProvider.refreshAll(reactContext)
+        MomentWidgets.refreshAll(reactContext)
     }
 }

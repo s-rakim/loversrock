@@ -18,6 +18,37 @@ The substitute is an ongoing, silent, `IMPORTANCE_LOW` notification
 and distance render on the lock screen without making a sound or a heads-up
 banner. It's toggled from Settings → Widgets.
 
+## Candle-style widgets (added)
+
+Twelve more widgets sit next to "At a glance" and "Partner photo". They share
+the same scoped token and the same cached `/widget/summary` payload (which
+gained optional fields: `partnerName`, `partnerMood`, `daysTogether`,
+`anniversary`, `nextDate`, `latestNote`, `secretMessageWaiting`,
+`todayQuestion`, `latestPhotoCaption`, `canvasStrokeCount`, …), so adding a
+widget never adds a network call. Each opens the app on the matching screen
+through a `loversrock://` deep link.
+
+| Widget | Shows | Opens | iOS lock screen |
+|---|---|---|---|
+| Days together | ❤️ 1234 days together | Home | ✅ |
+| Anniversary | 💍 42d until our anniversary | Home | ✅ |
+| Streak | 🔥 streak + banked freezes | Achievements | ✅ |
+| Countdown | ⏳ next countdown | Countdowns | ✅ |
+| Distance | 📍 km apart | Distance | rectangular |
+| Partner mood | their emoji + note | Profile | ✅ |
+| Next date | 📅 next scheduled date | Our dates | rectangular |
+| Love note | 💌 partner's newest note | Notes | rectangular |
+| Secret message | "You have a message ❤️" — **never the text** | Secret messages | ✅ |
+| Daily question | today's question | Today's question | rectangular |
+| Quick kiss | 💋 one tap to Thumb Kiss | Thumb Kiss | circular |
+| Canvas | the shared drawing, rendered natively from vector strokes (`GET /widget/canvas`) | Canvas | — |
+
+Android: `widgets/android/MomentWidgets.kt` (one shared layout,
+`widget_moment.xml`) and `MomentRepository.kt`; iOS:
+`widgets/ios/MomentWidgets.swift`. Both config plugins register them —
+verified with `expo prebuild` (14 receivers in the merged manifest; the Swift
+file in the extension target). Like everything else here, not yet compiled.
+
 ## Architecture
 
 Widgets run in a **separate OS process** from the React Native app, on a

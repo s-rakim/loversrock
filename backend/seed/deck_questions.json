@@ -77,5 +77,72 @@
     "What's your partner's go-to karaoke song?",
     "What's the first thing your partner does when they get home?",
     "What's your partner's biggest pet peeve?"
+  ],
+  "seasonal-valentines": [
+    "What's the most romantic thing I've ever done for you?",
+    "Describe our perfect Valentine's Day in three words.",
+    "What song makes you think of us?",
+    "What's a love tradition you want us to start?",
+    "What did you first notice about me?"
+  ],
+  "seasonal-spring": [
+    "What's one thing you want to grow in our relationship this spring?",
+    "Where should our first picnic of the year be?",
+    "What habit would you like us to start fresh?",
+    "Which flower reminds you of me, and why?"
+  ],
+  "seasonal-summer": [
+    "What's your dream summer day with me?",
+    "Beach, mountains or city this summer?",
+    "What's the best summer memory we have together?",
+    "What would we do on a totally unplanned summer road trip?"
+  ],
+  "seasonal-autumn": [
+    "What's your ideal cozy night in with me?",
+    "Which autumn tradition should we make ours?",
+    "What are you most grateful for about us this year?",
+    "Pumpkin spice: love it or hate it — defend your answer.",
+    "What would you want to learn together this winter?"
+  ],
+  "seasonal-halloween": [
+    "What couples costume should we do this year?",
+    "What's the scariest film you've ever watched?",
+    "Which horror villain could you actually beat?",
+    "What's something that genuinely scares you?"
+  ],
+  "seasonal-holidays": [
+    "What's your favourite holiday memory from childhood?",
+    "What gift would you love that costs nothing?",
+    "Whose family traditions should we keep?",
+    "What's the cosiest thing we could do this December?"
+  ],
+  "seasonal-new-year": [
+    "What's one thing you want us to do together this year?",
+    "What was our best moment of last year?",
+    "What's a resolution we could share?",
+    "Where do you see us a year from now?"
+  ],
+  "sparks-intimacy": [
+    "When do you feel most desired by me?",
+    "What's something small I do that you find incredibly attractive?",
+    "What's a new way you'd like us to be close?",
+    "How do you like to be comforted when you're stressed?",
+    "What's a moment you felt completely safe with me?",
+    "What does intimacy mean to you beyond the physical?"
+  ],
+  "sparks-debates": [
+    "Is a hot dog a sandwich?",
+    "Should couples share passwords?",
+    "Pineapple on pizza — final answer?",
+    "Is it ever okay to read the last page of a book first?",
+    "Are birthdays or anniversaries more important?",
+    "Should you ever go to bed angry?"
+  ],
+  "sparks-memory-lane": [
+    "What's your favourite photo of us and why?",
+    "What moment did you know this was serious?",
+    "What's the funniest thing that's happened to us?",
+    "What's a trip we took that you'd relive tomorrow?",
+    "What's a small moment you think about more than I'd guess?"
   ]
 }

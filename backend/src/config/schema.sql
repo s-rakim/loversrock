@@ -247,3 +247,256 @@ CREATE INDEX IF NOT EXISTS idx_widget_photos_pair_created_at ON widget_photos(pa
 CREATE INDEX IF NOT EXISTS idx_period_cycles_user_start ON period_cycles(user_id, start_date);
 CREATE INDEX IF NOT EXISTS idx_period_daily_logs_user_date ON period_daily_logs(user_id, log_date);
 CREATE INDEX IF NOT EXISTS idx_widget_tokens_active ON widget_tokens(token_hash) WHERE revoked_at IS NULL;
+
+-- ============================================================================
+-- Candle / Lovers X parity additions. Everything below is additive: new
+-- tables, plus new nullable/defaulted columns on existing ones. Nothing above
+-- this line changes meaning.
+-- ============================================================================
+
+-- Profiles (Lovers X "partner profiles") and mood.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio               TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday          DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS love_language     TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS favorites         JSONB;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_emoji        TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_text         TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mood_updated_at   TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS language          TEXT NOT NULL DEFAULT 'en';
+-- Per-category push opt-outs, e.g. {"mood": false}. Missing key = enabled.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_prefs JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+CREATE TABLE IF NOT EXISTS mood_history (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  emoji       TEXT NOT NULL,
+  text        TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Relationship dates, streak protection and date-idea location tailoring.
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS anniversary_date   DATE;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS together_since     DATE;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS streak_freezes     INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS lost_streak        INTEGER;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS lost_streak_on     DATE;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS date_setting       TEXT;
+
+-- Sparks: an append-only ledger. A user's balance is SUM(amount).
+CREATE TABLE IF NOT EXISTS spark_ledger (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount      INTEGER NOT NULL,
+  reason      TEXT NOT NULL,
+  ref         TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- One-shot earn events (e.g. "answered prompt on 2026-09-25") are unique by
+-- (user, reason, ref) so a retried request can never double-pay.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_spark_ledger_once
+  ON spark_ledger(user_id, reason, ref) WHERE ref IS NOT NULL AND amount > 0;
+
+-- Anything a pair has bought with Sparks, e.g. 'deck:<slug>', 'dates:premium'.
+CREATE TABLE IF NOT EXISTS pair_unlocks (
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  item_key    TEXT NOT NULL,
+  unlocked_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (pair_id, item_key)
+);
+
+CREATE TABLE IF NOT EXISTS pair_achievements (
+  pair_id      UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  key          TEXT NOT NULL,
+  unlocked_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (pair_id, key)
+);
+
+-- Seasonal and Sparks-exclusive decks. NULL season = always available.
+ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS season_start TEXT; -- 'MM-DD'
+ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS season_end   TEXT; -- 'MM-DD'
+ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS spark_cost   INTEGER;
+
+-- Adaptive questions: skips teach the "For you" feed what to show less of.
+CREATE TABLE IF NOT EXISTS question_skips (
+  pair_id           UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  deck_question_id  UUID NOT NULL REFERENCES deck_questions(id) ON DELETE CASCADE,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, deck_question_id)
+);
+
+-- Chat reactions (one per user per message per emoji).
+CREATE TABLE IF NOT EXISTS message_reactions (
+  message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  emoji       TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (message_id, user_id, emoji)
+);
+
+-- Lovers X joint feed.
+CREATE TABLE IF NOT EXISTS feed_posts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  author_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body        TEXT,
+  image_url   TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_at  TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS feed_reactions (
+  post_id     UUID NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL CHECK (kind IN ('like', 'love')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, user_id, kind)
+);
+CREATE TABLE IF NOT EXISTS feed_comments (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id     UUID NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+  author_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body        TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Shared notes / love notes.
+CREATE TABLE IF NOT EXISTS notes (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  author_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title       TEXT,
+  body        TEXT NOT NULL,
+  color       TEXT,
+  is_pinned   BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Secret messages: the widget only ever learns that one exists, never its body.
+CREATE TABLE IF NOT EXISTS secret_messages (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  sender_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body        TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  opened_at   TIMESTAMPTZ
+);
+
+-- Shared live canvas (one per pair) + the saved gallery.
+CREATE TABLE IF NOT EXISTS pair_canvas (
+  pair_id     UUID PRIMARY KEY REFERENCES pairs(id) ON DELETE CASCADE,
+  strokes     JSONB NOT NULL DEFAULT '[]'::jsonb,
+  background  TEXT NOT NULL DEFAULT '#FFFFFF',
+  updated_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS canvas_drawings (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  created_by  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title       TEXT,
+  strokes     JSONB NOT NULL,
+  background  TEXT NOT NULL DEFAULT '#FFFFFF',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Date matching + scheduling.
+ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS settings    JSONB;   -- e.g. ["city","rural","long_distance"]
+ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS is_premium  BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS date_idea_votes (
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  idea_id     UUID NOT NULL REFERENCES date_ideas(id) ON DELETE CASCADE,
+  liked       BOOLEAN NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, idea_id)
+);
+CREATE TABLE IF NOT EXISTS date_plans (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id        UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  idea_id        UUID REFERENCES date_ideas(id) ON DELETE SET NULL,
+  title          TEXT NOT NULL,
+  notes          TEXT,
+  scheduled_for  TIMESTAMPTZ,
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('idea', 'planned', 'confirmed', 'done', 'cancelled')),
+  created_by     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  completed_at   TIMESTAMPTZ,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Countdown flavour (trip, date, anniversary, see_each_other, other).
+ALTER TABLE countdowns ADD COLUMN IF NOT EXISTS kind TEXT;
+
+-- Monthly check-ins, revealed once both partners submit.
+CREATE TABLE IF NOT EXISTS checkins (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month       TEXT NOT NULL, -- 'YYYY-MM' in the pair's timezone
+  answers     JSONB NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pair_id, user_id, month)
+);
+
+-- Random challenges.
+CREATE TABLE IF NOT EXISTS challenge_completions (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id        UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  challenge_key  TEXT NOT NULL,
+  day            DATE NOT NULL,
+  completed_by   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pair_id, challenge_key, day)
+);
+CREATE TABLE IF NOT EXISTS challenge_rerolls (
+  pair_id  UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  day      DATE NOT NULL,
+  count    INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (pair_id, day)
+);
+
+-- Who's More Likely: votes per question, revealed once both vote.
+CREATE TABLE IF NOT EXISTS wml_votes (
+  pair_id       UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  question_key  TEXT NOT NULL,
+  vote_for      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, pair_id, question_key)
+);
+
+-- Chess between the two partners. The move list is the source of truth; the
+-- client replays it. The server enforces turn order and optimistic ordering.
+CREATE TABLE IF NOT EXISTS chess_games (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  white_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  black_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  moves       JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'checkmate', 'stalemate', 'draw', 'resigned')),
+  winner_id   UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_spark_ledger_user ON spark_ledger(user_id);
+CREATE INDEX IF NOT EXISTS idx_feed_posts_pair_created ON feed_posts(pair_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_feed_comments_post ON feed_comments(post_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notes_pair ON notes(pair_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_secret_messages_pair ON secret_messages(pair_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_canvas_drawings_pair ON canvas_drawings(pair_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_date_plans_pair ON date_plans(pair_id, scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_mood_history_pair ON mood_history(pair_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chess_games_pair ON chess_games(pair_id, updated_at);
+
+-- Onboarding questionnaire answers (relationship type, goals, daily time,
+-- how you found us, ...). Free-form JSON: the app owns the question set.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding     JSONB;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarded_at   TIMESTAMPTZ;
+
+-- The couple's live characters: each person's wardrobe (skin, hair, top,
+-- bottom, shoes, accessories) as drawn by mobile/components/avatar.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB;

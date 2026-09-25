@@ -15,7 +15,7 @@ export default function DeckDetailScreen({ route, navigation }) {
     navigation.setOptions({ title });
     apiFetch(`/decks/${slug}/questions`)
       .then((data) => setQuestions(data.questions))
-      .catch((err) => Alert.alert('Could not load deck', err.message))
+      .catch((err) => Alert.alert(/Sparks/.test(err.message) ? 'Locked deck' : 'Could not load deck', err.message))
       .finally(() => setLoading(false));
   }, [slug]);
 
@@ -30,6 +30,11 @@ export default function DeckDetailScreen({ route, navigation }) {
     } catch (err) {
       Alert.alert('Could not submit answer', err.message);
     }
+  }
+
+  async function skip(questionId) {
+    await apiFetch(`/decks/questions/${questionId}/skip`, { method: 'POST' }).catch(() => {});
+    setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, skipped: true } : q)));
   }
 
   if (loading) {
@@ -59,9 +64,15 @@ export default function DeckDetailScreen({ route, navigation }) {
                     style={styles.input}
                     multiline
                   />
-                  <MorphButton onPress={() => submit(q.id)} style={styles.submitButton}>
-                    <Text style={styles.submitButtonText}>Answer</Text>
-                  </MorphButton>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+                    <MorphButton onPress={() => submit(q.id)} style={styles.submitButton}>
+                      <Text style={styles.submitButtonText}>Answer</Text>
+                    </MorphButton>
+                    {/* Adaptive questions: a skip teaches "For you" what to show less of. */}
+                    <MorphButton onPress={() => skip(q.id)} style={[styles.submitButton, { backgroundColor: colors.surfaceAlt }]}>
+                      <Text style={[styles.submitButtonText, { color: colors.text }]}>{q.skipped ? 'Skipped' : 'Skip'}</Text>
+                    </MorphButton>
+                  </View>
                 </>
               ) : (
                 <View style={{ marginTop: spacing.sm }}>
