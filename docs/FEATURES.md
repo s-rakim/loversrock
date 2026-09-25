@@ -4,17 +4,16 @@ Every feature from the Candle / Lovers X brief, where it lives, and what to
 know about it. Everything here was added **alongside** the original app —
 no existing screen, route or behaviour was removed or rewritten.
 
-## The couple's characters (mascots)
+## The couple's mascot
 
 | | |
 |---|---|
-| What | Two live **3D** characters — you and your partner — drawn from the couple's photo: her high puff, green fitted top, jeans, sneakers and gold hoops; his twists, blue football jersey, cargo shorts, tall white socks, teal slides and microphone. |
-| Where | Loading screen, top of Home, profiles, onboarding, Wardrobe, Who's More Likely, mood picker. |
-| Live | Breathe, blink, bob, sway (so the 3D reads), act out a mood with pose + face + motion (cheer, hands-on-heart, hands-on-hips, droop, hug, …). Tap: wave + spin. |
-| Mood | On **your** phone your partner's character wears **their** mood and yours wears yours; the same on theirs. Updates live over the socket the moment either of you sets a mood. |
-| Wardrobe | Skin tone, 8 hairstyles + colour, 7 tops, 5 bottoms, 5 shoes (+ tall socks), 10 accessories, all recolourable. Saved to the account (`users.avatar`) so the partner sees it. |
-| Scale | Sized per screen (`components/avatar/sizing.js`) and always the **same height** as each other. |
-| Code | `components/avatar3d/` (three.js on `expo-gl`), `components/Mascot.js`, `components/avatar/wardrobe.js`. If a phone can't create a GL context the app falls back to the 2D drawing in `components/avatar/Avatar.js` automatically. |
+| What | **Your own image** of the two of you, used exactly as it is. `mobile/assets/mascot/original.png` is the untouched file (byte-identical to the one you sent). `mobile/assets/mascot/couple.png` is the same pixels with only the gallery background made transparent — a pixel comparison confirms 0 visible pixels differ from the original. Nothing is redrawn, recoloured or edited. |
+| Where | Loading screen, top of Home, profiles, onboarding ("which one is you?"), the mood picker, Who's More Likely. |
+| Live | Motion around the image, never on it: breathing, a slow 3D sway in perspective, a hop when tapped, a pop when a mood changes, and shake/jitter/heartbeat for grumpy/stressed/loved moods. |
+| Mood | Each of you gets a mood bubble above your **own** head (her on the left, you on the right), plus a small effect — hearts, sparkles, music notes, z's, a tear. On your phone the mascot's energy follows your partner's mood; on theirs, yours. Updates live over the socket. |
+| Scale | Sized per screen (`components/mascotSizing.js`); bubbles sit above the hair so they never cover either of you. |
+| Code | `components/Mascot.js`. Which side is you is chosen in onboarding and stored on your profile. |
 
 ## Candle
 
@@ -65,10 +64,8 @@ no existing screen, route or behaviour was removed or rewritten.
 
 ## Known limits
 
-- **Nothing native has been compiled** (widgets, 3D on device) — same situation
-  as the original widgets; `expo prebuild` was run and the output inspected.
-  The 3D characters were rendered through WebGL in a browser with the exact
-  same scene code to check them, not on a phone.
+- **Nothing native has been compiled** (widgets) — same situation as the
+  original widgets; `expo prebuild` was run and the output inspected.
 - **iOS push** needs the Firebase iOS SDK (FCM rejects raw APNs tokens); Android
   works with the existing FCM setup.
 - Screen titles pick up a language change on the next launch.

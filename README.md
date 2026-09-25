@@ -148,9 +148,9 @@ git push -u origin main
 
 See [`docs/FEATURES.md`](docs/FEATURES.md) for the full Candle / Lovers X
 feature map. After pulling: `npm run migrate && npm run seed` on the backend
-(new tables and content), and `npm install` in `mobile/` (adds `expo-gl`,
-`three`, `expo-notifications`). The 3D characters run in Expo Go; widgets
-and push still need a real build.
+(new tables and content), and `npm install` in `mobile/` (adds
+`expo-notifications`). The mascot runs in Expo Go; widgets and push still
+need a real build.
 
 ## Pinned architectural decisions
 
@@ -183,7 +183,7 @@ they're load-bearing and shouldn't be casually reversed:
 | Games: Four in a Row, Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All 7 genuinely playable |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
 | Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |
-| Live 3D couple characters (mood-driven, customizable wardrobe, 2D fallback) | ✅ Implemented — see `docs/FEATURES.md` |
+| Couple mascot — your own image, unchanged, animated live with each partner's mood | ✅ Implemented — see `docs/FEATURES.md` |
 | Lovers X: joint feed (likes, loves, comments), partner profiles, moods + mood pushes | ✅ Implemented |
 | Sparks, streak freeze/restore, achievements | ✅ Implemented |
 | Shared live Canvas (eyedropper, zoom, sizes) + Gallery, Daily Snap with captions | ✅ Implemented |

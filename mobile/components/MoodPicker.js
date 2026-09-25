@@ -36,7 +36,7 @@ export default function MoodPicker({ visible, onClose }) {
       <View style={styles.sheet}>
         <Text style={font.h1}>{t('mood.title')}</Text>
         <Text style={[font.muted, { marginBottom: spacing.sm }]}>{t('mood.subtitle')}</Text>
-        <Mascot avatar={me?.avatar} emotion={preview?.emotion || 'neutral'} context="sheet" style={{ marginVertical: spacing.sm }} />
+        <Mascot avatar={me?.avatar} emotion={preview?.emotion || 'neutral'} emoji={preview?.emoji} context="sheet" style={{ marginVertical: spacing.sm }} />
         <View style={styles.grid}>
           {MOODS.map((m) => (
             <Pressable key={m.emoji} onPress={() => setSelected(m.emoji)} style={[styles.mood, selected === m.emoji && styles.moodActive]}>

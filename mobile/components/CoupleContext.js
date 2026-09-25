@@ -1,12 +1,12 @@
 // "Us" state shared across the app: who I am, who my partner is, both moods
-// and both wardrobes. Kept live over the socket (mood:update, avatar:update)
+// and which side of the mascot image each of you is. Kept live over the
+// socket (mood:update, avatar:update)
 // and cached on the device so the loading screen can show the characters
 // before the network answers.
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiFetch, connectSocket, getAccessToken } from '../services/api';
 import { emotionForMood } from './moods';
-import { PRESETS } from './avatar/wardrobe';
 
 const CACHE_KEY = 'loversrock_couple_cache';
 
@@ -21,16 +21,18 @@ export async function loadCachedCouple() {
   }
 }
 
-// Until someone picks their character in the Wardrobe, guess sensibly: if I
-// chose one preset, my partner defaults to the other.
+// Which of the two people in the mascot image each of you is ("her" on the
+// left, "him" on the right). Chosen during onboarding; if only one of you has
+// chosen, the other is the other side.
 function withDefaults(data) {
   if (!data?.me) return data;
-  const myPreset = data.me.avatar?.preset || data.me.onboarding?.character || 'him';
-  const other = myPreset === 'her' ? 'him' : 'her';
+  const mySide = data.me.avatar?.preset || data.me.onboarding?.character
+    || (data.partner?.avatar?.preset === 'her' ? 'him' : data.partner?.avatar?.preset === 'him' ? 'her' : 'him');
+  const other = mySide === 'her' ? 'him' : 'her';
   return {
     ...data,
-    me: { ...data.me, avatar: data.me.avatar || PRESETS[myPreset] || PRESETS.him },
-    partner: data.partner ? { ...data.partner, avatar: data.partner.avatar || PRESETS[other] } : null,
+    me: { ...data.me, avatar: { preset: mySide } },
+    partner: data.partner ? { ...data.partner, avatar: { preset: other } } : null,
   };
 }
 
@@ -40,6 +42,7 @@ export function characterFor(person) {
     name: person.name,
     avatar: person.avatar,
     emotion: emotionForMood(person.mood),
+    emoji: person.mood?.emoji || null,
     moodText: person.mood ? `${person.mood.emoji} ${person.mood.text || ''}`.trim() : null,
   };
 }
@@ -106,11 +109,6 @@ export function CoupleProvider({ children }) {
     return mood;
   }, [apply]);
 
-  const saveAvatar = useCallback(async (avatar) => {
-    const { me } = await apiFetch('/profile', { method: 'PATCH', body: { avatar } });
-    const cur = dataRef.current;
-    if (cur) apply({ ...cur, me: { ...cur.me, avatar: me.avatar } });
-  }, [apply]);
 
   const value = useMemo(() => ({
     me: data?.me || null,
@@ -121,9 +119,8 @@ export function CoupleProvider({ children }) {
     partnerCharacter: characterFor(data?.partner),
     refresh,
     setMyMood,
-    saveAvatar,
     clear: () => { setData(null); AsyncStorage.removeItem(CACHE_KEY).catch(() => {}); },
-  }), [data, refresh, setMyMood, saveAvatar]);
+  }), [data, refresh, setMyMood]);
 
   return <CoupleContext.Provider value={value}>{children}</CoupleContext.Provider>;
 }
@@ -131,6 +128,6 @@ export function CoupleProvider({ children }) {
 export function useCouple() {
   return useContext(CoupleContext) || {
     me: null, partner: null, pair: null, sparks: 0, myCharacter: null, partnerCharacter: null,
-    refresh: async () => null, setMyMood: async () => null, saveAvatar: async () => null, clear: () => {},
+    refresh: async () => null, setMyMood: async () => null, clear: () => {},
   };
 }

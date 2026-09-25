@@ -7,7 +7,7 @@ import { View, Text, TextInput, StyleSheet, Animated, Easing, Alert, ScrollView 
 import { apiFetch } from '../services/api';
 import { registerForPush } from '../services/push';
 import { useCouple } from '../components/CoupleContext';
-import { PRESETS } from '../components/avatar/wardrobe';
+import { apiFetch as saveSide } from '../services/api';
 import Mascot from '../components/Mascot';
 import { Button, Chip, ui } from '../components/ui';
 import { ProgressDot } from '../components/Motion';
@@ -19,7 +19,7 @@ const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 export default function OnboardingScreen({ navigation }) {
   const { t } = useI18n();
-  const { me, refresh, saveAvatar } = useCouple();
+  const { me, refresh } = useCouple();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({ goals: [] });
   const [tailoring, setTailoring] = useState(false);
@@ -41,15 +41,20 @@ export default function OnboardingScreen({ navigation }) {
       render: () => (
         <>
           <Text style={ui.bigQuestion}>{t('onboarding.character')}</Text>
-          <View style={styles.characters}>
+          <Mascot
+            side={answers.character || 'him'}
+            emotion={answers.character ? 'excited' : 'happy'}
+            emoji={answers.character ? '👈' : '❓'}
+            bubbleLabel={answers.character ? t('common.me') : null}
+            context="picker"
+            style={{ marginVertical: spacing.md }}
+          />
+          <View style={[ui.row, { justifyContent: 'center' }]}>
             {['her', 'him'].map((p) => (
-              <View key={p} style={{ alignItems: 'center' }}>
-                <Mascot avatar={PRESETS[p]} emotion={answers.character === p ? 'excited' : 'happy'} context="picker" onPress={() => set('character', p)} />
-                <Chip label={t(`onboarding.character.${p}`)} active={answers.character === p} onPress={() => set('character', p)} />
-              </View>
+              <Chip key={p} label={t(`onboarding.character.${p}`)} active={answers.character === p} onPress={() => set('character', p)} />
             ))}
           </View>
-          <Text style={[font.muted, { textAlign: 'center' }]}>{t('onboarding.characterHint')}</Text>
+          <Text style={[font.muted, { textAlign: 'center', marginTop: spacing.sm }]}>{t('onboarding.characterHint')}</Text>
         </>
       ),
       valid: () => Boolean(answers.character),
@@ -153,7 +158,8 @@ export default function OnboardingScreen({ navigation }) {
     setTailoring(true);
     try {
       await apiFetch('/profile/onboarding', { method: 'POST', body: { answers } });
-      if (answers.character) await saveAvatar(PRESETS[answers.character]);
+      // Remembers which side of the mascot image is you.
+      if (answers.character) await saveSide('/profile', { method: 'PATCH', body: { avatar: { preset: answers.character } } });
       await refresh();
     } catch (err) {
       Alert.alert(t('common.error'), err.message);
@@ -168,7 +174,7 @@ export default function OnboardingScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.dots}>{STEPS.map((s, i) => <ProgressDot key={s.key} active={i === step} />)}</View>
         {current.key !== 'character' && (
-          <Mascot avatar={me?.avatar || PRESETS[answers.character || 'him']} emotion={['happy', 'excited', 'love', 'calm'][step % 4]} context="picker" style={{ marginBottom: spacing.lg }} />
+          <Mascot side={answers.character || me?.avatar?.preset || 'him'} emotion={['happy', 'excited', 'love', 'calm'][step % 4]} context="hero" style={{ marginBottom: spacing.lg }} />
         )}
         {current.render()}
       </ScrollView>
@@ -202,7 +208,7 @@ function Tailoring({ character, onDone }) {
   return (
     <View style={[styles.tailor, { backgroundColor: colors.bg }]}>
       <StickerField variant="celebrate" />
-      <Mascot avatar={PRESETS[character === 'her' ? 'her' : 'him']} emotion="excited" context="hero" />
+      <Mascot side={character === 'her' ? 'her' : 'him'} emotion="excited" emoji="✨" context="hero" />
       <Text style={[font.h1, { textAlign: 'center', marginTop: spacing.lg }]}>{t('onboarding.tailorTitle')}</Text>
       <Text style={[font.muted, { textAlign: 'center', marginTop: spacing.sm }]}>{t(lines[line])}</Text>
       <View style={styles.bar}>
@@ -215,7 +221,6 @@ function Tailoring({ character, onDone }) {
 const styles = StyleSheet.create({
   container: { padding: spacing.lg, paddingTop: spacing.xl * 1.5, paddingBottom: 140 },
   dots: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginBottom: spacing.lg },
-  characters: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: spacing.lg },
   bigInput: { fontSize: 22, marginTop: spacing.lg, textAlign: 'center' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.bg },
   tailor: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },

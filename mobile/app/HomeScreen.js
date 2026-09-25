@@ -34,7 +34,6 @@ const MORE_LINKS = [
   ['Timeline', 'home.link.timeline', 'calendar-number-outline'],
   ['Achievements', 'home.link.achievements', 'trophy-outline'],
   ['Sparks', 'home.link.sparks', 'sparkles-outline'],
-  ['Wardrobe', 'home.link.wardrobe', 'shirt-outline'],
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -125,9 +124,9 @@ export default function HomeScreen({ navigation }) {
                 <Text style={{ fontSize: 16 }}>{me?.mood?.emoji || '🙂'}</Text>
                 <Text style={styles.coupleButtonText}>{t('mood.set')}</Text>
               </MorphButton>
-              <MorphButton onPress={() => navigation.navigate('Wardrobe')} style={styles.coupleButton}>
-                <Icon name="shirt-outline" size={15} chip={false} />
-                <Text style={styles.coupleButtonText}>{t('wardrobe.title')}</Text>
+              <MorphButton onPress={() => navigation.navigate('DailySnap')} style={styles.coupleButton}>
+                <Icon name="camera-outline" size={15} chip={false} />
+                <Text style={styles.coupleButtonText}>{t('home.link.snap')}</Text>
               </MorphButton>
               <MorphButton onPress={() => apiFetch('/nudges', { method: 'POST', body: { kind: 'kiss' } }).catch(() => {})} style={styles.coupleButton}>
                 <Text style={{ fontSize: 15 }}>😘</Text>

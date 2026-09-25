@@ -1,6 +1,6 @@
 // Partner profiles (Lovers X). Shows either person: their character in their
 // current mood, bio, love language, favourites, and their posts. Your own
-// profile is editable and links to the Wardrobe and mood picker.
+// profile is editable and links to the mood picker.
 import React, { useCallback, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Image, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -75,7 +75,7 @@ export default function ProfileScreen({ route, navigation }) {
   return (
     <Screen sticker="home">
       <View style={styles.hero}>
-        <Mascot avatar={person.avatar} emotion={character.emotion} context="hero" onLongPress={who === 'me' ? () => setMoodOpen(true) : undefined} />
+        <Mascot avatar={person.avatar} emotion={character.emotion} emoji={character.emoji} bubbleLabel={person.name} context="hero" onLongPress={who === 'me' ? () => setMoodOpen(true) : undefined} />
         <View style={styles.nameRow}>
           {person.avatarUrl ? <Image source={{ uri: mediaUrl(person.avatarUrl) }} style={styles.photo} /> : null}
           <Text style={font.h1}>{person.name}</Text>
@@ -89,7 +89,6 @@ export default function ProfileScreen({ route, navigation }) {
       {who === 'me' && (
         <View style={[ui.row, { justifyContent: 'center', marginBottom: spacing.md }]}>
           <Button small icon="happy-outline" title={t('mood.set')} onPress={() => setMoodOpen(true)} />
-          <Button small kind="secondary" icon="shirt-outline" title={t('wardrobe.title')} onPress={() => navigation.navigate('Wardrobe')} />
           <Button small kind="secondary" icon="camera-outline" title={t('profile.photo')} onPress={changePhoto} />
         </View>
       )}

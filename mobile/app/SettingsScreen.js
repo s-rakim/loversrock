@@ -142,11 +142,6 @@ export default function SettingsScreen() {
               <Icon name="chevron-forward" chip={false} size={16} color={colors.textMuted} />
             </MorphButton>
           )}
-          <MorphButton onPress={() => navigation.navigate('Wardrobe')} style={styles.linkRow}>
-            <Icon name="shirt-outline" chip chipColor={colors.surfaceAlt} />
-            <Text style={[font.body, { flex: 1 }]}>{t('wardrobe.title')}</Text>
-            <Icon name="chevron-forward" chip={false} size={16} color={colors.textMuted} />
-          </MorphButton>
           <MorphButton onPress={() => navigation.navigate('NotificationSettings')} style={styles.linkRow}>
             <Icon name="notifications-outline" chip chipColor={colors.surfaceAlt} />
             <Text style={[font.body, { flex: 1 }]}>{t('screen.notifications')}</Text>

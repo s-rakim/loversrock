@@ -5,7 +5,8 @@ import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch, connectSocket } from '../../services/api';
 import { useCouple } from '../../components/CoupleContext';
-import Mascot from '../../components/Mascot';
+import { CoupleMascots } from '../../components/Mascot';
+import { characterFor } from '../../components/CoupleContext';
 import { Button, Card, Pill, ui } from '../../components/ui';
 import { FadeInUp } from '../../components/Motion';
 import CelebrationBurst from '../../components/Celebration';
@@ -62,8 +63,13 @@ export default function WhosMoreLikelyScreen() {
         </Card>
       </FadeInUp>
       <View style={styles.people}>
-        <Mascot avatar={me?.avatar} emotion={shown?.myVote === data.myId ? 'excited' : 'happy'} context="game" label={t('common.me')} onPress={() => !shown && vote('me')} />
-        <Mascot avatar={partner?.avatar} emotion={shown?.myVote === data.partnerId ? 'excited' : 'happy'} context="game" label={partner?.name} onPress={() => !shown && vote('partner')} />
+        <CoupleMascots
+          context="game"
+          me={{ ...characterFor(me), emotion: shown?.myVote === data.myId ? 'excited' : 'happy', emoji: shown?.myVote === data.myId ? '👈' : '🙋' }}
+          partner={{ ...characterFor(partner), emotion: shown?.myVote === data.partnerId ? 'excited' : 'happy', emoji: shown?.myVote === data.partnerId ? '👈' : '🙋' }}
+          onPressMe={() => !shown && vote('me')}
+          onPressPartner={() => !shown && vote('partner')}
+        />
       </View>
       <CelebrationBurst trigger={burst} size={200} />
       {!shown ? (
@@ -89,5 +95,5 @@ export default function WhosMoreLikelyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
-  people: { flexDirection: 'row', justifyContent: 'space-around', marginVertical: spacing.md },
+  people: { alignItems: 'center', marginVertical: spacing.sm },
 });

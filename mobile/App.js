@@ -39,7 +39,6 @@ import WhosMoreLikelyScreen from './app/games/WhosMoreLikelyScreen';
 import ChessScreen from './app/games/ChessScreen';
 import FeedScreen from './app/FeedScreen';
 import ProfileScreen from './app/ProfileScreen';
-import WardrobeScreen from './app/WardrobeScreen';
 import OnboardingScreen from './app/OnboardingScreen';
 import ConnectScreen from './app/ConnectScreen';
 import SparksScreen from './app/SparksScreen';
@@ -194,7 +193,6 @@ export default function App() {
             <Stack.Screen name="Chess" component={ChessScreen} options={{ title: t('screen.chess') }} />
             <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: t('screen.profile') }} />
-            <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: t('screen.wardrobe') }} />
             <Stack.Screen name="Connect" component={ConnectScreen} options={{ title: t('screen.connect') }} />
             <Stack.Screen name="Sparks" component={SparksScreen} options={{ title: t('screen.sparks') }} />
             <Stack.Screen name="Achievements" component={AchievementsScreen} options={{ title: t('screen.achievements') }} />
