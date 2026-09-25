@@ -138,8 +138,8 @@ export const SCREEN_FOR_TYPE = {
   // and the second silently won. It happened to be the right one, which is
   // why nothing ever looked wrong.
   call: 'Call',
-  period_reminder: 'PeriodTracker',
-  water: 'PeriodTracker',
+  period_reminder: 'Cycle',
+  water: 'Cycle',
   memory: 'Memories',
   message: 'Messages',
 };

@@ -15,7 +15,8 @@
     "test:render": "node test/render.mjs",
     "test:messages": "node test/messages.mjs",
     "test:crypto": "node test/crypto.mjs",
-    "test:widgets": "node test/widgets.mjs"
+    "test:widgets": "node test/widgets.mjs",
+    "test:nav": "node test/nav.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^9.0.0",
@@ -34,6 +35,7 @@
     "expo-font": "~12.0.10",
     "expo-image-picker": "~15.0.7",
     "expo-linear-gradient": "~13.0.2",
+    "expo-localization": "~15.0.3",
     "expo-location": "~17.0.1",
     "expo-notifications": "^0.28.19",
     "expo-secure-store": "~13.0.2",

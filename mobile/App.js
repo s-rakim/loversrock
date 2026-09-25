@@ -15,7 +15,7 @@ import Mascot from './components/Mascot';
 import { PAIR_ART } from './assets/mascot';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification } from './services/notifications';
-import GlassTabBar from './components/GlassTabBar';
+import LumaBar, { TAB_ROUTES } from './components/LumaBar';
 import { CallProvider, useCall } from './components/calls/CallContext';
 import { fadeOnFocus } from './components/Motion';
 
@@ -64,7 +64,7 @@ const Tab = createBottomTabNavigator();
 
 
 // The five primary destinations live behind the floating liquid-glass tab
-// bar (components/GlassTabBar.js); everything else is pushed on top of it
+// bar (components/LumaBar.js); everything else is pushed on top of it
 // as a normal stack screen so the glass bar stays visible on the tabs but
 // out of the way on deep/focused screens (quiz, canvas, games, etc).
 // Navigation and the status bar have to be told about the theme separately —
@@ -111,15 +111,16 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{ headerShown: false }}
       sceneContainerStyle={{ backgroundColor: 'transparent' }}
-      tabBar={(props) => <GlassTabBar {...props} />}
+      tabBar={(props) => <LumaBar {...props} />}
     >
       <Tab.Screen name="Home" component={fadeOnFocus(HomeScreen)} />
-      {/* The quiz is the thing there is a new one of every day, and it was
-          buried two taps deep behind a Home card. It gets its own tab. */}
-      <Tab.Screen name="Quiz" component={fadeOnFocus(QuizScreen)} />
+      {/* The two widget screens get tabs of their own: they are what this app
+          is FOR, and both were a tap down inside Home. */}
+      <Tab.Screen name="Locket" component={fadeOnFocus(PhotoWidgetScreen)} />
+      <Tab.Screen name="Doodle" component={fadeOnFocus(CanvasGalleryScreen)} />
       <Tab.Screen name="Games" component={fadeOnFocus(GamesScreen)} />
       <Tab.Screen name="Messages" component={fadeOnFocus(MessagesScreen)} />
-      <Tab.Screen name="Memories" component={fadeOnFocus(MemoriesScreen)} />
+      <Tab.Screen name="Cycle" component={fadeOnFocus(PeriodTrackerScreen)} />
       <Tab.Screen name="Settings" component={fadeOnFocus(SettingsScreen)} />
     </Tab.Navigator>
   );
@@ -164,13 +165,14 @@ function Root() {
   // second returns the response that launched the app, which is easy to miss.
   useEffect(() => {
     // Routes that live inside the bottom tabs rather than the root stack.
-    // navigate('Quiz') from the root would otherwise have nothing to match.
-    const TAB_ROUTES = new Set(['Home', 'Quiz', 'Games', 'Messages', 'Memories', 'Settings']);
+    // navigate('Cycle') from the root would otherwise have nothing to match.
+    // Taken from the tab bar itself rather than copied, so it cannot go stale.
+    const tabs = new Set(TAB_ROUTES);
 
     const go = (response) => {
       const route = routeForNotification(response);
       if (!route || !navigationRef.isReady()) return;
-      if (TAB_ROUTES.has(route.screen)) {
+      if (tabs.has(route.screen)) {
         navigationRef.navigate('MainTabs', { screen: route.screen, params: route.params });
       } else {
         navigationRef.navigate(route.screen, route.params);
@@ -226,6 +228,11 @@ function Root() {
             <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
             <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
             <Stack.Screen name="DailyPrompt" component={DailyPromptScreen} options={{ title: "Today's Prompt" }} />
+            {/* Quiz and Memories lost their tabs to the two widget screens.
+                Both keep a card at the top of Home, which is where the quiz
+                was always actually opened from. */}
+            <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Daily Quiz' }} />
+            <Stack.Screen name="Memories" component={MemoriesScreen} options={{ title: 'Memories' }} />
             <Stack.Screen name="DeckDetail" component={DeckDetailScreen} options={{ title: 'Deck' }} />
             <Stack.Screen name="BucketList" component={BucketListScreen} options={{ title: 'Bucket List' }} />
             <Stack.Screen name="DateIdeas" component={DateIdeasScreen} options={{ title: 'Date Ideas' }} />
@@ -240,19 +247,16 @@ function Root() {
             {/* The shelf, and the canvas itself. The gallery is the entry
                 point of the two: you arrive wanting to see what is there far
                 more often than with a blank drawing already in mind. */}
-            <Stack.Screen name="CanvasGallery" component={CanvasGalleryScreen} options={{ title: 'Drawings' }} />
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
             {/* The locket, as its own section: a camera screen and the wall of
                 everything sent. headerShown false on the camera because the
                 camera IS the screen — a title bar over it is just a bar. */}
-            <Stack.Screen name="PhotoWidget" component={PhotoWidgetScreen} options={{ headerShown: false }} />
             <Stack.Screen name="PhotoHistory" component={PhotoHistoryScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Chat Wallpaper' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
-            <Stack.Screen name="PeriodTracker" component={PeriodTrackerScreen} options={{ title: 'Cycle Tracker' }} />
             <Stack.Screen
               name="Call"
               component={CallScreen}

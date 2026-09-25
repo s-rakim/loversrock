@@ -188,7 +188,7 @@ export default function PhotoHistoryScreen({ navigation }) {
     >
       <View style={styles.header}>
         <Text style={font.h1}>Memories</Text>
-        <Pressable onPress={() => navigation.navigate('PhotoWidget')} style={styles.cameraButton}>
+        <Pressable onPress={() => navigation.navigate('Locket')} style={styles.cameraButton}>
           <Ionicons name="camera" size={20} color={colors.accent} />
         </Pressable>
       </View>
@@ -203,7 +203,7 @@ export default function PhotoHistoryScreen({ navigation }) {
               other one&apos;s home screen.
             </Text>
             <Pressable
-              onPress={() => navigation.navigate('PhotoWidget')}
+              onPress={() => navigation.navigate('Locket')}
               style={styles.emptyButton}
             >
               <Text style={styles.emptyButtonText}>Send the first one</Text>
@@ -222,7 +222,7 @@ export default function PhotoHistoryScreen({ navigation }) {
                 onPress={(photo) => navigation.navigate('Memories', { focus: photo.image_url })}
                 // Only the newest month offers the shortcut back to the camera.
                 showAdd={i === 0}
-                onAdd={() => navigation.navigate('PhotoWidget')}
+                onAdd={() => navigation.navigate('Locket')}
               />
             </View>
           </FadeInUp>

@@ -133,7 +133,7 @@ export default function FeedScreen({ navigation }) {
         // thumbnails is exactly the weight the gallery's split avoids. So the
         // card says what it is and opens the real thing.
         return (
-          <Pressable onPress={() => navigation.navigate('CanvasGallery')}>
+          <Pressable onPress={() => navigation.navigate('Doodle')}>
             <View style={[styles.drawingChip, { backgroundColor: item.meta?.canvasColor || colors.surfaceAlt }]}>
               <Ionicons name="brush" size={18} color={colors.textPrimary} />
             </View>

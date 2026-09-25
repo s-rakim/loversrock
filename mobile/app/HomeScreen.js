@@ -20,7 +20,7 @@ const QUICK_LINKS = [
   ['DateIdeas', 'Date Ideas', 'bulb-outline'],
   ['Countdown', 'Countdowns', 'hourglass-outline'],
   ['DistanceApart', 'Distance Apart', 'navigate-outline'],
-  ['PeriodTracker', 'Cycle Tracker', 'water-outline'],
+  ['Cycle', 'Cycle Tracker', 'water-outline'],
   ['Checkin', 'Monthly Check-In', 'clipboard-outline'],
   ['Feed', 'Your Story', 'time-outline'],
 ];
@@ -106,7 +106,7 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           <ShineBorder variant="shine" radius={radius.card} phase={0.25} style={{ marginTop: spacing.md }}>
-          <MorphButton onPress={() => navigation.navigate('PhotoWidget')} style={styles.widgetWideInner}>
+          <MorphButton onPress={() => navigation.navigate('Locket')} style={styles.widgetWideInner}>
             {widgetPhoto ? (
               <>
                 <Image source={{ uri: mediaUrl(widgetPhoto.imageUrl || widgetPhoto.image_url) }} style={styles.widgetPhoto} />
@@ -133,7 +133,7 @@ export default function HomeScreen({ navigation }) {
             </MorphButton>
             {/* The shelf. Worth its own way in from Home: a drawing you can
                 reopen is only useful if finding it is one tap. */}
-            <MorphButton onPress={() => navigation.navigate('CanvasGallery')} style={styles.doodleRow}>
+            <MorphButton onPress={() => navigation.navigate('Doodle')} style={styles.doodleRow}>
               <Icon name="images-outline" chip={false} size={16} color={colors.accent} />
               <Text style={font.body}>Your drawings</Text>
             </MorphButton>
