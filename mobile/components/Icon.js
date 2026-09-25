@@ -26,6 +26,18 @@ export function solidOf(name) {
   return filled in GLYPHS ? filled : name;
 }
 
+/**
+ * The other direction, for the same reason: a set of icon names written as
+ * solids (the way a nav or a segmented control names them) still wants a
+ * hairline version for the inactive state. Falls back to the solid when
+ * Ionicons has no outline for that glyph, rather than rendering a "?" box.
+ */
+export function outlineOf(name) {
+  if (typeof name !== 'string' || name.endsWith('-outline')) return name;
+  const thin = `${name}-outline`;
+  return thin in GLYPHS ? thin : name;
+}
+
 // `name` is any Ionicons glyph name, e.g. "heart-outline", "flame".
 //
 // The colour defaults are resolved in the BODY, not as default parameters.

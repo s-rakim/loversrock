@@ -469,5 +469,145 @@ const bytes = ['me-neutral.jpg', 'partner-neutral.jpg', 'pair.jpg']
   .reduce((n, f) => n + fs.statSync(path.join(root, 'assets', 'mascot', f)).size, 0);
 check(`all three together are ${Math.round(bytes / 1024)}KB, not a megabyte`, bytes < 400 * 1024, bytes);
 
+
+console.log('\n=== THE SECTION BAR, WHICH THE BUILD SERVER FOUND MISSING ===');
+
+// PhotoSectionScreen and PlaySectionScreen both imported withSectionBar from
+// a file that did not exist. Every static check passed; the first thing that
+// noticed was a release build, which failed at
+// ':app:createBundleReleaseJsAndAssets' with "node finished with non-zero
+// exit value 1" and nothing more specific. test/imports.mjs now catches the
+// missing file. This catches the next question, which is whether the thing
+// that replaced it actually runs.
+
+const sectionTheme = {
+  useTheme: () => ({
+    colors: {
+      accent: '#d9647f', accentSoft: '#fbe4ea', textMuted: '#8a8189',
+      glassBorder: 'rgba(255,255,255,0.4)', iconGlyph: '#8a3550', iconChip: '#fbe4ea',
+    },
+    font: { muted: { fontSize: 12 } },
+    reduceMotion: false,
+    isDark: false,
+  }),
+};
+
+// A glyph map with the outline variants in it, so outlineOf is genuinely
+// exercised rather than silently falling back because the stub was empty.
+const glyphMap = {};
+for (const n of ['brush', 'game-controller', 'grid', 'home', 'chatbubble']) {
+  glyphMap[n] = 1;
+  glyphMap[`${n}-outline`] = 1;
+}
+
+const insetsSeen = [];
+const sectionStubs = {
+  // The same hook stub the mascot tests use: this walker calls components
+  // directly rather than through a reconciler, so real hooks have no
+  // dispatcher to attach to.
+  react: reactStub,
+  './ThemeContext': sectionTheme,
+  './GlassContext': { useGlass: () => ({ intensity: 55 }) },
+  // Ionicons renders to a marker the walker below can find, rather than to
+  // null: the whole point of these three checks is WHICH glyph and colour
+  // came out, and a stub that returns nothing discards exactly that.
+  '@expo/vector-icons': {
+    Ionicons: Object.assign((props) => ({ type: 'Ionicons', props }), { glyphMap }),
+  },
+  'react-native-safe-area-context': {
+    useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
+    SafeAreaInsetsContext: {
+      Provider: (props) => { insetsSeen.push(props.value); return props.children; },
+    },
+  },
+};
+
+const SectionBarMod = load('components/SectionBar.js', sectionStubs);
+
+/** Every element in a tree whose type matches, with its props. */
+function collect(element, wanted, out = [], depth = 0) {
+  if (element === null || element === undefined || typeof element !== 'object') return out;
+  if (Array.isArray(element)) { element.forEach((e) => collect(e, wanted, out, depth)); return out; }
+  if (depth > 14) return out;
+  const { type, props } = element;
+  if (type === wanted) out.push(props);
+  if (typeof type === 'function') { collect(type(props), wanted, out, depth + 1); return out; }
+  if (props?.children) collect(props.children, wanted, out, depth + 1);
+  return out;
+}
+
+// The two real item sets, read off the screens rather than retyped, so this
+// keeps testing what actually ships.
+const sectionSets = ['PhotoSectionScreen', 'PlaySectionScreen'].map((name) => {
+  const src = fs.readFileSync(path.join(root, 'app', `${name}.js`), 'utf8');
+  const body = src.match(/const ITEMS = \[([\s\S]*?)\];/)[1];
+  const items = [...body.matchAll(/key: '([^']+)', icon: '([^']+)', label: '([^']+)'/g)]
+    .map(([, key, icon, label]) => ({ key, icon, label }));
+  return { name, items };
+});
+
+for (const { name, items } of sectionSets) {
+  check(`${name} declares its items`, items.length >= 2, JSON.stringify(items));
+
+  for (const active of items) {
+    let error = null;
+    let presses = [];
+    try {
+      const el = React.createElement(SectionBarMod.SectionBar, {
+        items, active: active.key, onSelect: (k) => presses.push(k),
+      });
+      const buttons = collect(el, 'Pressable');
+      check(`  ${name}/${active.key}: one button per item`,
+        buttons.length === items.length, `${buttons.length} vs ${items.length}`);
+
+      // Pressing the one you are already on must do nothing: navigate() to
+      // the current screen pushes a duplicate, and the slide animation makes
+      // that very visible.
+      buttons.forEach((b) => b.onPress());
+      check(`  ${name}/${active.key}: tapping the active item is inert`,
+        !presses.includes(active.key), presses.join(','));
+      check(`  ${name}/${active.key}: every other item navigates`,
+        presses.length === items.length - 1, presses.join(','));
+    } catch (e) { error = e; }
+    check(`  ${name}/${active.key}: renders`, error === null, error && `${error.name}: ${error.message}`);
+  }
+}
+
+// The active item has to be distinguishable by more than position.
+{
+  const { items } = sectionSets[0];
+  const el = React.createElement(SectionBarMod.SectionBar, {
+    items, active: items[1].key, onSelect: () => {},
+  });
+  const icons = collect(el, 'Ionicons');
+  const accent = icons.filter((i) => i.color === '#d9647f');
+  check('exactly one icon is drawn in the accent colour', accent.length === 1, icons.map((i) => i.color).join(' '));
+  check('the active icon is the larger one',
+    accent[0] && accent[0].size > icons.filter((i) => i.color !== '#d9647f')[0].size,
+    icons.map((i) => `${i.name}:${i.size}`).join(' '));
+  check('and the inactive ones are drawn as outlines',
+    icons.filter((i) => i.name.endsWith('-outline')).length === items.length - 1,
+    icons.map((i) => i.name).join(' '));
+}
+
+// The reason withSectionBar overrides the inset: without it, a screen that
+// pads for the notch pads again below a bar that already cleared it.
+{
+  insetsSeen.length = 0;
+  let receivedProps = null;
+  const Screen = (props) => { receivedProps = props; return null; };
+  const Wrapped = SectionBarMod.withSectionBar(Screen, sectionSets[0].items, 'Camera');
+  const nav = { navigate: () => {} };
+  render(React.createElement(Wrapped, { navigation: nav, route: { name: 'Camera' } }));
+
+  check('the wrapped screen is told the notch is already covered',
+    insetsSeen.length === 1 && insetsSeen[0].top === 0, JSON.stringify(insetsSeen));
+  check('but keeps the bottom inset, which nothing above it covers',
+    insetsSeen[0] && insetsSeen[0].bottom === 34, JSON.stringify(insetsSeen[0]));
+  check('and still receives its own navigation and route',
+    receivedProps?.navigation === nav && receivedProps?.route?.name === 'Camera',
+    JSON.stringify(Object.keys(receivedProps || {})));
+}
+
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
