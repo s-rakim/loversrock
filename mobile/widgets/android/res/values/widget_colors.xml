@@ -9,4 +9,10 @@
 
     <string name="widget_summary_description">Your streak, next countdown, and distance apart</string>
     <string name="widget_photo_description">The latest photo from your partner</string>
+    <string name="widget_anniversary_description">Days together, and the next milestone</string>
+    <string name="widget_question_description">Today\'s question, so you think about it before 11pm</string>
+    <string name="widget_nextdate_description">What you have planned, and how soon</string>
+    <string name="widget_secret_description">A note from them — sealed ones stay sealed</string>
+    <string name="widget_kiss_description">One tap to tell them you are thinking of them</string>
+    <string name="widget_canvas_description">The newest drawing from the two of you</string>
 </resources>

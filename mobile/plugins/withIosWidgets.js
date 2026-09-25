@@ -43,6 +43,19 @@ const ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
+// Swift files belonging to the APP target rather than the widget extension.
+// WidgetBridge is the RCT module the app uses to hand credentials across; it
+// imports React and would not compile inside an extension.
+const APP_TARGET_SOURCES = new Set(['WidgetBridge.swift']);
+
+/** Every Swift file in widgets/ios that belongs to the extension target. */
+function extensionSources(dir) {
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.swift') && !APP_TARGET_SOURCES.has(f))
+    .sort();
+}
+
 /** Copies the widget Swift sources and writes the extension's plist/entitlements. */
 function withWidgetSources(config) {
   return withDangerousMod(config, [
@@ -55,8 +68,13 @@ function withWidgetSources(config) {
 
       fs.mkdirSync(targetDir, { recursive: true });
 
-      // Widget extension sources (the RN bridge belongs to the app target, not here).
-      for (const file of ['WidgetData.swift', 'LoversRockWidgets.swift']) {
+      // Widget extension sources, DISCOVERED rather than listed.
+      //
+      // A hardcoded list is how a new widget file gets silently dropped from
+      // the build: everything compiles, the extension just quietly has fewer
+      // widgets in it than the repo does, and nothing says so until you go
+      // looking in the gallery on a device.
+      for (const file of extensionSources(source)) {
         fs.copyFileSync(path.join(source, file), path.join(targetDir, file));
       }
       fs.writeFileSync(path.join(targetDir, 'Info.plist'), INFO_PLIST);
@@ -100,7 +118,8 @@ function withWidgetTarget(config) {
     project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', target.uuid);
 
     const group = project.addPbxGroup(
-      ['WidgetData.swift', 'LoversRockWidgets.swift', 'Info.plist', `${TARGET_NAME}.entitlements`],
+      [...extensionSources(path.join(cfg.modRequest.projectRoot, 'widgets', 'ios')),
+        'Info.plist', `${TARGET_NAME}.entitlements`],
       TARGET_NAME,
       TARGET_NAME
     );
@@ -163,3 +182,9 @@ module.exports = function withIosWidgets(config) {
   config = withWidgetTarget(config);
   return config;
 };
+
+// Exported so the widget test can assert that every Swift file in
+// widgets/ios actually reaches the extension target — the check that stops a
+// new widget being written, committed, and silently left out of the build.
+module.exports.extensionSources = extensionSources;
+module.exports.APP_TARGET_SOURCES = APP_TARGET_SOURCES;

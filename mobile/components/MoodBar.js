@@ -14,6 +14,7 @@ import Mascot, { MASCOT_MOODS } from './Mascot';
 import Character from './Character';
 import useAvatars from './useAvatars';
 import usePartnerMood from './usePartnerMood';
+import useNudges from './useNudges';
 
 const LABELS = {
   happy: 'Happy', loved: 'Loved', calm: 'Calm', tired: 'Tired', stressed: 'Stressed',
@@ -41,6 +42,7 @@ export default function MoodBar({ partnerName }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mood, note, updatedAt, mine, setMyMood } = usePartnerMood();
   const { theirs: theirAvatar } = useAvatars();
+  const nudges = useNudges();
 
   const [picking, setPicking] = useState(false);
   const [draftNote, setDraftNote] = useState('');
@@ -66,6 +68,15 @@ export default function MoodBar({ partnerName }) {
       <Character avatar={theirAvatar} mood={mood} who="partner" height={96} />
 
       <View style={{ flex: 1 }}>
+        {nudges.unseen > 0 && (
+          <Pressable onPress={nudges.markSeen} style={styles.kissBanner}>
+            <Ionicons name="heart" size={13} color={colors.accentPink} />
+            <Text style={styles.kissBannerText}>
+              {nudges.unseen === 1 ? `${who} kissed you` : `${nudges.unseen} kisses from ${who}`}
+              {nudges.theirs ? ` · ${ago(nudges.theirs.created_at)}` : ''}
+            </Text>
+          </Pressable>
+        )}
         {mood ? (
           <>
             <Text style={font.h3}>{who} is feeling {LABELS[mood].toLowerCase()}</Text>
@@ -81,16 +92,36 @@ export default function MoodBar({ partnerName }) {
           </>
         )}
 
-        <MorphButton onPress={() => setPicking(true)} style={styles.setButton}>
-          <Ionicons
-            name={mine ? ICONS[mine.mood] : 'add'}
-            size={14}
-            color={colors.accent}
-          />
-          <Text style={styles.setText}>
-            {mine ? `You: ${LABELS[mine.mood]}` : 'Set your mood'}
-          </Text>
-        </MorphButton>
+        <View style={styles.actionRow}>
+          <MorphButton onPress={() => setPicking(true)} style={styles.setButton}>
+            <Ionicons
+              name={mine ? ICONS[mine.mood] : 'add'}
+              size={14}
+              color={colors.accent}
+            />
+            <Text style={styles.setText}>
+              {mine ? `You: ${LABELS[mine.mood]}` : 'Set your mood'}
+            </Text>
+          </MorphButton>
+
+          {/* The same kiss the home-screen widget sends. A throttled press —
+              the pocket case — comes back sent:false, and saying "sent" for
+              one would be a small lie the app tells often. */}
+          <MorphButton
+            onPress={() => nudges.send('kiss').catch(() => {})}
+            disabled={nudges.sending}
+            style={[styles.kissButton, nudges.sending && { opacity: 0.6 }]}
+          >
+            <Ionicons
+              name={nudges.mine ? 'heart' : 'heart-outline'}
+              size={14}
+              color={colors.accentPink}
+            />
+            <Text style={styles.kissText}>
+              {nudges.mine ? ago(nudges.mine.created_at) : 'Kiss'}
+            </Text>
+          </MorphButton>
+        </View>
       </View>
 
       <Modal visible={picking} transparent animationType="fade" onRequestClose={() => setPicking(false)}>
@@ -147,6 +178,22 @@ const makeStyles = (colors) =>
       marginBottom: spacing.md,
     },
     note: { marginTop: 2, fontStyle: 'italic' },
+    actionRow: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
+    kissButton: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+      alignSelf: 'flex-start', marginTop: spacing.sm,
+      paddingVertical: 6, paddingHorizontal: spacing.sm,
+      borderRadius: radius.pill, backgroundColor: colors.surfaceAlt,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    kissText: { fontSize: 12, color: colors.accentPink, fontWeight: '600' },
+    kissBanner: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+      alignSelf: 'flex-start', marginBottom: 4,
+      paddingVertical: 3, paddingHorizontal: spacing.sm,
+      borderRadius: radius.pill, backgroundColor: colors.accentSoft,
+    },
+    kissBannerText: { fontSize: 11, color: colors.accentPink, fontWeight: '700' },
     setButton: {
       flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
       alignSelf: 'flex-start', marginTop: spacing.sm,

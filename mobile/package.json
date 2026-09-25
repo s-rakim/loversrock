@@ -14,7 +14,8 @@
     "test:doodle": "node test/doodle.mjs",
     "test:render": "node test/render.mjs",
     "test:messages": "node test/messages.mjs",
-    "test:crypto": "node test/crypto.mjs"
+    "test:crypto": "node test/crypto.mjs",
+    "test:widgets": "node test/widgets.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^9.0.0",

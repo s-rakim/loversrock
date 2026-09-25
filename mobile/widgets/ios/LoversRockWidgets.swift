@@ -274,5 +274,12 @@ struct LoversRockWidgetBundle: WidgetBundle {
         SummaryWidget()
         PhotoWidget()
         LockScreenWidget()
+        // The six in GlanceWidgets.swift.
+        AnniversaryWidget()
+        QuestionWidget()
+        NextDateWidget()
+        SecretMessageWidget()
+        KissWidget()
+        CanvasWidget()
     }
 }

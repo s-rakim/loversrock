@@ -6,6 +6,7 @@ import { getObjectStream } from '../config/storage.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
+import { NUDGE_LABELS, normalizeKind, NUDGE_THROTTLE_SECONDS } from '../models/nudges.js';
 
 const router = asyncRouter();
 
@@ -20,12 +21,7 @@ const hashToken = (raw) => createHash('sha256').update(raw).digest('hex');
 // detail that survives anyway.
 const WIDGET_DRAWING = { strokes: 120, points: 2400, minStep: 3 };
 
-const LABELS = {
-  kiss: { title: 'A kiss 💋', body: 'Sent from their home screen.' },
-  hug: { title: 'A hug', body: 'They are thinking of you.' },
-  thinking: { title: 'Thinking of you', body: 'Straight from their home screen.' },
-  miss: { title: 'They miss you', body: 'Tap to say something back.' },
-};
+
 
 // Deliberately NOT requireAuth: this is the widget's own read-only credential,
 // usable on this endpoint alone. It can never reach messages, memories, or
@@ -390,15 +386,16 @@ router.post('/kiss', requireWidgetToken, async (req, res) => {
   const pair = pairRows[0];
   if (!pair) return res.status(409).json({ error: 'Not paired' });
 
-  const kind = ['kiss', 'hug', 'thinking', 'miss'].includes(req.body?.kind) ? req.body.kind : 'kiss';
+  const kind = normalizeKind(req.body?.kind);
 
   // One every thirty seconds. Not an error — a pocket press should be a
   // no-op, not a red banner the next time the widget refreshes.
   const { rows: recent } = await query(
     `SELECT created_at FROM nudges
-      WHERE pair_id = $1 AND from_id = $2 AND created_at > now() - interval '30 seconds'
+      WHERE pair_id = $1 AND from_id = $2
+        AND created_at > now() - ($3 || ' seconds')::interval
       ORDER BY created_at DESC LIMIT 1`,
-    [pair.id, req.userId]
+    [pair.id, req.userId, NUDGE_THROTTLE_SECONDS]
   );
   if (recent[0]) return res.json({ sent: false, throttled: true, at: recent[0].created_at });
 
@@ -413,7 +410,7 @@ router.post('/kiss', requireWidgetToken, async (req, res) => {
   const tokens = await getUserDeviceTokens(partnerId);
   await sendNotification(
     tokens,
-    { title: LABELS[kind].title, body: LABELS[kind].body },
+    NUDGE_LABELS[kind],
     deepLink('home'),
     { channel: CHANNELS.partner }
   ).catch((err) => console.error('[widget] kiss push failed:', err.message));

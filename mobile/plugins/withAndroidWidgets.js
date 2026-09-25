@@ -44,7 +44,7 @@ function withWidgetSources(config) {
   ]);
 }
 
-/** Registers both AppWidgetProviders plus the notification permission. */
+/** Registers every AppWidgetProvider plus the notification permission. */
 function withWidgetManifest(config) {
   return withAndroidManifest(config, (cfg) => {
     const manifest = cfg.modResults;
@@ -55,6 +55,12 @@ function withWidgetManifest(config) {
     const receivers = [
       { name: '.widgets.SummaryWidgetProvider', info: '@xml/widget_summary_info' },
       { name: '.widgets.PhotoWidgetProvider', info: '@xml/widget_photo_info' },
+      { name: '.widgets.AnniversaryWidgetProvider', info: '@xml/widget_anniversary_info' },
+      { name: '.widgets.DailyQuestionWidgetProvider', info: '@xml/widget_question_info' },
+      { name: '.widgets.NextDateWidgetProvider', info: '@xml/widget_nextdate_info' },
+      { name: '.widgets.SecretMessageWidgetProvider', info: '@xml/widget_secret_info' },
+      { name: '.widgets.KissWidgetProvider', info: '@xml/widget_kiss_info' },
+      { name: '.widgets.CanvasWidgetProvider', info: '@xml/widget_canvas_info' },
     ];
 
     for (const { name, info } of receivers) {

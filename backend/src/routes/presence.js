@@ -8,6 +8,7 @@ import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
+import { NUDGE_LABELS, normalizeKind, NUDGE_THROTTLE_SECONDS } from '../models/nudges.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { normalizeAvatar, catalogue } from '../models/wardrobe.js';
 
@@ -239,6 +240,79 @@ router.put('/avatars', async (req, res) => {
   emit(req, 'avatar:changed', { userId: req.userId });
 
   res.json({ avatar: normalizeAvatar({ ...rows[0], hairColor: rows[0].hair_color, outfit: rows[0].outfit }) });
+});
+
+/* ----------------------------------------------------------------- nudges */
+//
+// The in-app half of the quick-kiss widget. Same table, ordinary auth.
+//
+// Two routes rather than one shared with /widget/kiss because the two callers
+// hold different credentials: the widget has the weak read-mostly token that
+// lives in SharedPreferences, the app has the real session. Giving the app
+// its own route means the widget token's permissions stay exactly as narrow
+// as they were designed to be.
+
+router.get('/nudges', async (req, res) => {
+  const [fromThem, fromMe] = await Promise.all([
+    query(
+      `SELECT kind, created_at, seen_at FROM nudges
+        WHERE pair_id = $1 AND from_id = $2 ORDER BY created_at DESC LIMIT 1`,
+      [req.pair.id, req.partnerId]
+    ),
+    query(
+      `SELECT kind, created_at FROM nudges
+        WHERE pair_id = $1 AND from_id = $2 ORDER BY created_at DESC LIMIT 1`,
+      [req.pair.id, req.userId]
+    ),
+  ]);
+  const { rows: unseen } = await query(
+    'SELECT count(*)::int AS n FROM nudges WHERE pair_id = $1 AND from_id = $2 AND seen_at IS NULL',
+    [req.pair.id, req.partnerId]
+  );
+  res.json({
+    theirs: fromThem.rows[0] || null,
+    mine: fromMe.rows[0] || null,
+    unseen: unseen[0].n,
+  });
+});
+
+router.post('/nudges', async (req, res) => {
+  const kind = normalizeKind(req.body?.kind);
+
+  // The same thirty seconds the widget gets. A double-tap is one kiss.
+  const { rows: recent } = await query(
+    `SELECT created_at FROM nudges
+      WHERE pair_id = $1 AND from_id = $2
+        AND created_at > now() - ($3 || ' seconds')::interval
+      ORDER BY created_at DESC LIMIT 1`,
+    [req.pair.id, req.userId, NUDGE_THROTTLE_SECONDS]
+  );
+  if (recent[0]) return res.json({ sent: false, throttled: true, at: recent[0].created_at });
+
+  const { rows } = await query(
+    'INSERT INTO nudges (pair_id, from_id, kind) VALUES ($1, $2, $3) RETURNING id, kind, created_at',
+    [req.pair.id, req.userId, kind]
+  );
+
+  emit(req, 'nudge:received', { nudge: rows[0], from: req.userId });
+
+  const tokens = await getUserDeviceTokens(req.partnerId);
+  await sendNotification(
+    tokens,
+    NUDGE_LABELS[kind],
+    deepLink('home'),
+    { channel: CHANNELS.partner }
+  ).catch((err) => console.error('[presence] nudge push failed:', err.message));
+
+  res.status(201).json({ sent: true, nudge: rows[0] });
+});
+
+router.post('/nudges/seen', async (req, res) => {
+  const { rowCount } = await query(
+    'UPDATE nudges SET seen_at = now() WHERE pair_id = $1 AND from_id = $2 AND seen_at IS NULL',
+    [req.pair.id, req.partnerId]
+  );
+  res.json({ seen: rowCount });
 });
 
 export default router;

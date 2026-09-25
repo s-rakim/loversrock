@@ -7,6 +7,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
+import com.loversrock.app.R
 
 /**
  * The shared machinery behind every one-fact widget.

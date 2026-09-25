@@ -4,8 +4,69 @@
 
 | | Home screen | Lock screen |
 |---|---|---|
-| **iOS 16+** | ✅ WidgetKit (`systemSmall`, `systemMedium`) | ✅ WidgetKit accessory families (`accessoryCircular`, `accessoryRectangular`, `accessoryInline`) |
-| **Android** | ✅ `AppWidgetProvider` (summary + photo) | ⚠️ Not possible — see below |
+| **iOS 16+** | ✅ WidgetKit (`systemSmall`, `systemMedium`, `systemLarge`) | ✅ WidgetKit accessory families (`accessoryCircular`, `accessoryRectangular`, `accessoryInline`) |
+| **Android** | ✅ `AppWidgetProvider` × 8 | ⚠️ Not possible — see below |
+
+### The nine widgets
+
+| Widget | Shows | Reads |
+|---|---|---|
+| **Summary** | Streak, next countdown, distance apart | `/widget/summary` |
+| **Partner photo** | The latest locket photo | `/widget/photo` |
+| **Together** | Days together, and the next milestone | `daysTogether`, `togetherSince` |
+| **Today's question** | The question itself, and whether you have answered | `todaysQuestion`, `promptAnsweredToday` |
+| **Next date** | What is planned and how soon | `nextDate` |
+| **From them** | Their latest note — sealed ones announced, never printed | `sealedNoteWaiting`, `latestNote` |
+| **Quick kiss** | One tap to send; a badge when one is waiting | `unseenKisses`, `POST /widget/kiss` |
+| **Latest drawing** | The newest canvas drawing, replayed as vectors | `/widget/drawing` |
+| **Lock screen glance** *(iOS)* | Streak, countdown, distance | `/widget/summary` |
+
+The six added after the first two share one provider on each platform
+(`GlanceWidgetProvider.kt`, `GlanceProvider` in `GlanceWidgets.swift`) because
+they read one payload. Four of them read one payload and differ only in which
+three strings they put in it, so they share a layout too — `widget_glance.xml`
+and `GlanceCard`.
+
+### The kiss is the only write a widget can do
+
+The widget token lives in `SharedPreferences` / an App Group container, because
+a widget process has to be able to read it. That is a weaker place than the
+keychain the real session lives in, so the rule is that **anything the widget
+token can do must be something you would not mind a thief of that phone doing**:
+read a summary, and tell your partner you are thinking of them. It cannot read a
+message, post one, see a sealed note, or touch anything else. `test/widget.mjs`
+asserts each of those.
+
+On iOS the tap is an `AppIntent`, which is iOS 17+. Before that the only thing a
+widget tap could do was open the app — for a one-tap gesture that is the entire
+feature gone, so on iOS 16 the heart opens the app instead.
+
+### The drawing is sent as strokes, not an image
+
+`/widget/drawing` returns the stroke list, thinned to ~2400 points, and each
+platform replays it — `Canvas`/`Path` on Android, SwiftUI `Path` on iOS. No
+image is stored or transferred, and the drawing stays crisp at whatever size
+the widget is resized to. Thinning is **geometric**, not every-Nth: a slowly
+drawn stroke has hundreds of points a fraction of a pixel apart and loses
+nothing, while a fast flick has few points that all matter.
+
+### What can silently go wrong, and the test for it
+
+A widget that is written, committed and reviewed can still be missing from the
+gallery on the phone, because one of four lists did not get the new name —
+and none of them is a compile error on either platform:
+
+* the Kotlin class exists but there is no `<receiver>` in the manifest
+* the receiver points at an `@xml/..._info` that does not exist
+* the info xml points at a `@layout` or `@string` that does not
+* the Swift file is not copied into the extension target, or the `Widget`
+  struct is not in the `@main` bundle
+
+`mobile/test/widgets.mjs` checks all four, plus that every `R.id` a provider
+writes to is actually present in the layout it inflates (a missing id is a
+silent no-op, not an error). The iOS plugin now **discovers** the extension
+sources from the folder rather than listing them, which removes one of the
+four failure modes outright.
 
 ### Why Android has no lock screen widget
 
@@ -62,7 +123,7 @@ policies block outright. So:
 cd mobile && bash widgets/android/tools/typecheck.sh
 ```
 
-It compiles all six widget sources against the **real** Android framework
+It compiles every widget source against the **real** Android framework
 (Robolectric's `android-all` from Maven Central), a generated `R` that mirrors
 what aapt emits from `widgets/android/res`, and hand-written stubs for
 `androidx.core` notifications and the React Native bridge — the two artifacts
@@ -72,6 +133,14 @@ It catches syntax errors, type errors, bad framework calls and missing `R`
 symbols. It cannot catch a mismatch between a stub and the real androidx/RN
 signature, so **green here is strong evidence, not proof** — only a Gradle
 build proves it. Dependencies are cached after the first run.
+
+The wiring between "the code exists" and "the widget ships" is checked
+separately, and it is the check that matters most — see *What can silently go
+wrong* above:
+
+```bash
+cd mobile && npm run test:widgets
+```
 
 `LOVERSROCK_WIDGETS=0` drops both widget plugins from a build. That is for
 bisecting a native failure, not a normal build — widgets ship by default.

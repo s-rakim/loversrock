@@ -201,6 +201,36 @@ console.log('\n=== CHARACTERS AND THE WARDROBE ===');
     after.skin === before.skin, { before: before.skin, after: after.skin });
 }
 
+console.log('\n=== NUDGES: THE IN-APP HALF OF THE QUICK-KISS WIDGET ===');
+const quiet = await req('/presence/nudges', { token: A.token });
+check('nobody has nudged yet', quiet.data.theirs === null && quiet.data.mine === null && quiet.data.unseen === 0, quiet.data);
+
+const sent = await req('/presence/nudges', { method: 'POST', token: A.token, body: { kind: 'kiss' } });
+check('a kiss sends from the app', sent.status === 201 && sent.data.sent === true, sent.data);
+// Same thirty seconds the widget gets: a double-tap is one kiss, and a
+// second press is a no-op rather than an error to render.
+const twice = await req('/presence/nudges', { method: 'POST', token: A.token });
+check('a second one straight away is throttled', twice.data.throttled === true && twice.data.sent === false, twice.data);
+
+const seenByThem = await req('/presence/nudges', { token: B.token });
+check('they see it as theirs', seenByThem.data.theirs?.kind === 'kiss', seenByThem.data);
+check('with one unseen', seenByThem.data.unseen === 1, seenByThem.data.unseen);
+check('and their own side is still empty', seenByThem.data.mine === null);
+
+const mineBack = await req('/presence/nudges', { token: A.token });
+check('the sender sees it as mine', mineBack.data.mine?.kind === 'kiss', mineBack.data);
+check('and has nothing unseen of their own', mineBack.data.unseen === 0);
+
+await req('/presence/nudges/seen', { method: 'POST', token: B.token });
+check('marking seen clears the badge', (await req('/presence/nudges', { token: B.token })).data.unseen === 0);
+check('but the nudge itself is still there', Boolean((await req('/presence/nudges', { token: B.token })).data.theirs));
+check('and marking seen does not clear the SENDER’s view',
+  Boolean((await req('/presence/nudges', { token: A.token })).data.mine));
+
+check('an unknown kind falls back to a kiss rather than 400ing',
+  ['kiss'].includes((await req('/presence/nudges', { method: 'POST', token: B.token, body: { kind: 'headbutt' } })).data.nudge?.kind));
+check('a third party sees none of it', (await req('/presence/nudges', { token: C.token })).status === 403);
+
 console.log(`\nPRESENCE RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
 process.exit(0);
