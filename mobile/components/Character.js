@@ -395,6 +395,10 @@ function Accessory({ id, colour }) {
  *               to be explicit: both characters take the same props and
  *               nothing in an avatar row says whose it is.
  */
+const styles = StyleSheet.create({
+  artFrame: { borderRadius: 18, overflow: 'hidden' },
+});
+
 export default function Character({
   avatar, mood, who = 'partner',
   // HEIGHT, not width. A person is taller than wide, and sizing by width made
@@ -456,14 +460,38 @@ export default function Character({
   const width = height * (VB.w / VB.h);
 
   if (art) {
+    // The artwork's OWN shape, read from the asset rather than assumed. The
+    // drawn character's box is 0.51 wide to tall; the supplied crops are
+    // nearer 0.4, and forcing one into the other either letterboxes it with
+    // dead space down both sides or crops somebody's head off.
+    // resolveAssetSource is what turns a require()'d asset into something
+    // with a width and a height on a device. Off-device — in a test, or in
+    // any renderer that hands the asset straight through — the descriptor
+    // already carries them, so the raw value is the right fallback rather
+    // than a crash.
+    const meta = Image.resolveAssetSource ? Image.resolveAssetSource(art) : art;
+    const artWidth = meta?.width && meta?.height
+      ? height * (meta.width / meta.height)
+      : width;
+
     return (
       <Animated.View
         pointerEvents="none"
-        style={[{ width, height, transform: [{ translateY }] }, style]}
+        style={[
+          styles.artFrame,
+          { width: artWidth, height, transform: [{ translateY }] },
+          style,
+        ]}
       >
-        {/* `contain`, so a character is never stretched to fill a box whose
-            aspect ratio does not match the artwork's. */}
-        <Image source={art} style={StyleSheet.absoluteFill} resizeMode="contain" />
+        {/* The supplied crops carry the room they were photographed in. A
+            rounded frame makes that read as a portrait somebody chose rather
+            than a cut-out that went wrong — and it is the only thing done to
+            the image, which is otherwise used exactly as given: no tint, no
+            recolouring, nothing drawn over it.
+
+            `cover` with a box already at the art's aspect ratio fills it
+            exactly and crops nothing. */}
+        <Image source={art} style={StyleSheet.absoluteFill} resizeMode="cover" />
       </Animated.View>
     );
   }

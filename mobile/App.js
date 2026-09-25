@@ -213,7 +213,20 @@ function Root() {
             of you leaning on each other is a single picture, and there is no
             arrangement of two cut-outs that reproduces it. */}
         {PAIR_ART
-          ? <Image source={PAIR_ART} style={{ width: 240, height: 240 }} resizeMode="contain" />
+          ? (
+            <Image
+              source={PAIR_ART}
+              // The pair image is portrait, so a square box would letterbox
+              // it. Sized from the asset itself and rounded to match the
+              // character frames.
+              style={{
+                width: 220 * (600 / 990),
+                height: 220,
+                borderRadius: 18,
+              }}
+              resizeMode="cover"
+            />
+          )
           : <Mascot size={140} />}
         <ActivityIndicator color={colors.accentPink} size="large" style={{ marginTop: 24 }} />
       </View>

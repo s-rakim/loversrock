@@ -43,6 +43,37 @@ function render(element, depth = 0) {
   if (props?.children) render(props.children, depth + 1);
 }
 
+/**
+ * The pixel size of a JPEG or PNG, read from its header.
+ *
+ * Needed because Character sizes its box from the artwork's own aspect ratio,
+ * and a stub that reports the wrong shape would let a real mismatch through.
+ * Twenty lines of header parsing beats a dependency for two formats.
+ */
+function imageSize(file) {
+  if (!fs.existsSync(file)) return [0, 0];
+  const buf = fs.readFileSync(file);
+  // PNG: IHDR width/height are big-endian at bytes 16 and 20.
+  if (buf.slice(1, 4).toString('latin1') === 'PNG') {
+    return [buf.readUInt32BE(16), buf.readUInt32BE(20)];
+  }
+  // JPEG: walk the segments to the first start-of-frame, which carries the
+  // dimensions. Everything before it is metadata of some length.
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    let i = 2;
+    while (i < buf.length - 9) {
+      if (buf[i] !== 0xff) { i++; continue; }
+      const marker = buf[i + 1];
+      // SOF0..SOF15, skipping the four that are not frame headers.
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+        return [buf.readUInt16BE(i + 7), buf.readUInt16BE(i + 5)];
+      }
+      i += 2 + buf.readUInt16BE(i + 2);
+    }
+  }
+  return [0, 0];
+}
+
 /** Loads a component module with react-native and friends stubbed out. */
 function load(relative, extraStubs = {}) {
   const file = path.join(root, relative);
@@ -77,6 +108,14 @@ function load(relative, extraStubs = {}) {
     if (id === 'react-native') return rn;
     if (extraStubs[id]) return extraStubs[id];
     if (id.startsWith('.')) {
+      // An image require() is resolved by Metro into an asset descriptor, not
+      // a module. Without this the loader tries to read me-neutral.jpg as
+      // JavaScript, which is not a bug in the app.
+      if (/\.(png|jpe?g|gif|webp|svg)$/i.test(id)) {
+        const file = path.join(root, path.dirname(relative), id);
+        const [width, height] = imageSize(file);
+        return { __asset: true, uri: id, width, height };
+      }
       // Resolve sibling modules through the same loader.
       const resolved = path.join(path.dirname(relative), id);
       if (resolved.endsWith('.js')) return load(resolved, extraStubs);
@@ -205,11 +244,22 @@ const reactStub = {
   useContext: () => ({}),
 };
 
+// Art is supplied now, so the real manifest returns a photograph and the
+// drawn character is never reached. These two load it with the art switched
+// OFF, because the drawing is still what a person with no art of their own
+// gets and it still has to be right.
+const noArt = {
+  ME_ART: {}, PARTNER_ART: {}, PAIR_ART: null,
+  artFor: () => null, hasArtFor: () => false, HAS_ART: false,
+};
 const Character = load('components/Character.js', {
   react: reactStub,
   './ThemeContext': themeStub,
+  '../assets/mascot': noArt,
 }).default;
-const CharacterMod = load('components/Character.js', { react: reactStub, './ThemeContext': themeStub });
+const CharacterMod = load('components/Character.js', {
+  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt,
+});
 
 /** Every fill/stroke the figure paints with, flattened out of the tree. */
 function paints(element, out = [], depth = 0) {
@@ -231,7 +281,9 @@ const TOPS = ['tee', 'dress', 'tank', 'hoodie', 'jersey', 'shirt', 'longSleeve',
 const BOTTOMS = ['jeans', 'trousers', 'skirt', 'shorts', 'cargo', 'joggers'];
 const SHOES = ['sneakers', 'boots', 'slides', 'barefoot'];
 const ACCESSORIES = ['none', 'glasses', 'earrings', 'cap', 'beanie', 'chain', 'headphones'];
-const MOODS = Object.keys(load('components/Mascot.js', { react: reactStub, './ThemeContext': themeStub }).EXPRESSIONS);
+const MOODS = Object.keys(load('components/Mascot.js', {
+  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt,
+}).EXPRESSIONS);
 
 const bad = [];
 let combos = 0;
@@ -284,7 +336,9 @@ check(`all ${callSites.length} call sites pass height`, callSites.length > 0 && 
 check('and none still pass size', !callSites.some((t) => /\ssize=/.test(t)), callSites.join(' | '));
 
 console.log('\n=== THE MASCOT IS LIT, AND TWO OF THEM DO NOT COLLIDE ===');
-const Mascot = load('components/Mascot.js', { react: reactStub, './ThemeContext': themeStub }).default;
+const Mascot = load('components/Mascot.js', {
+  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt,
+}).default;
 
 /** Every prop object in the rendered tree. */
 function attrs(element, out = [], depth = 0) {
@@ -337,7 +391,7 @@ console.log('\n=== SUPPLIED ARTWORK IS USED AS SUPPLIED ===');
 // When there is a picture of the actual person, showing a vector
 // approximation of them instead would be strictly worse — so art wins, and
 // it is drawn with no tint, no recolouring and no clothes painted over it.
-const fakeArt = { uri: 'art://me-neutral.png' };
+const fakeArt = { uri: 'art://me-neutral.jpg', width: 315, height: 760 };
 const artStub = {
   ME_ART: { neutral: fakeArt },
   PARTNER_ART: { neutral: null },
@@ -355,9 +409,19 @@ const CharacterArt = load('components/Character.js', {
 const withArt = attrs(React.createElement(CharacterArt, { avatar: {}, mood: 'happy', who: 'me', height: 120 }));
 check('a person with art renders their image', withArt.some((p) => p.source === fakeArt), withArt.map((p) => p.source));
 check('and nothing is drawn over it', !withArt.some((p) => typeof p.fill === 'string'), withArt.filter((p) => p.fill).length);
-// Not stretched: a portrait character in a square box must letterbox, not distort.
-check('the image is contained rather than stretched',
-  withArt.some((p) => p.resizeMode === 'contain'), withArt.map((p) => p.resizeMode));
+// Nothing cropped and nothing stretched. That used to mean `contain`, which
+// letterboxed a 0.4-wide crop inside the drawn character's 0.51-wide box with
+// dead space down both sides. The box is now sized from the ARTWORK, so
+// `cover` fills it exactly and loses nothing — which is the property worth
+// asserting rather than the prop that happens to achieve it.
+const box = withArt.find((p) => p.style && !Array.isArray(p.style) === false);
+const frame = withArt.map((p) => (Array.isArray(p.style) ? p.style : [p.style]))
+  .flat().find((st) => st && st.width && st.height);
+check('the image box is the artwork\u2019s own shape, so nothing is cropped',
+  frame && Math.abs((frame.width / frame.height) - (fakeArt.width / fakeArt.height)) < 0.01,
+  frame);
+check('and it fills that box rather than letterboxing inside it',
+  withArt.some((p) => p.resizeMode === 'cover'), withArt.map((p) => p.resizeMode));
 // No tint prop anywhere, because "use it as it is" means exactly that.
 check('no tint is applied to it', !withArt.some((p) => p.tintColor), withArt.map((p) => p.tintColor));
 
@@ -377,6 +441,33 @@ check(`all ${sites.length} call sites say whose character it is`,
 // The wardrobe cannot dress a photograph, and must not claim to.
 const wardrobe = fs.readFileSync(path.join(root, 'app', 'WardrobeScreen.js'), 'utf8');
 check('the wardrobe says so when art is in use', /hasArtFor\('me'\)/.test(wardrobe));
+
+console.log('\n=== THE REAL ARTWORK IS IN THE BUILD ===');
+// The mechanism working against a stub proves nothing about the files being
+// there. This checks the actual manifest and the actual images.
+const realArt = load('assets/mascot/index.js');
+check('both people have art', realArt.hasArtFor('me') && realArt.hasArtFor('partner'));
+check('and the pair image exists for the loading screen', Boolean(realArt.PAIR_ART));
+for (const [who, file] of [['me', 'me-neutral.jpg'], ['partner', 'partner-neutral.jpg']]) {
+  const onDisk = path.join(root, 'assets', 'mascot', file);
+  check(`  ${file} is on disk`, fs.existsSync(onDisk));
+  const [w, h] = imageSize(onDisk);
+  check(`  and is a real image (${w}x${h})`, w > 100 && h > 100, [w, h]);
+  // Portrait. A landscape crop in a height-driven box is somebody's head and
+  // nothing else.
+  check('  and portrait, as a standing figure should be', h > w, [w, h]);
+  check(`  ${who} resolves to it`, realArt.artFor('neutral', who) !== null);
+}
+// Any mood falls back to that person's neutral rather than to nothing.
+for (const mood of MOODS) {
+  check(`  ${mood} falls back rather than returning nothing`,
+    realArt.artFor(mood, 'me') !== null && realArt.artFor(mood, 'partner') !== null, mood);
+}
+// A bundle is downloaded over a phone network. Three photographs should not
+// be a megabyte of it.
+const bytes = ['me-neutral.jpg', 'partner-neutral.jpg', 'pair.jpg']
+  .reduce((n, f) => n + fs.statSync(path.join(root, 'assets', 'mascot', f)).size, 0);
+check(`all three together are ${Math.round(bytes / 1024)}KB, not a megabyte`, bytes < 400 * 1024, bytes);
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
