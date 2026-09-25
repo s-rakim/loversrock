@@ -37,7 +37,7 @@ const fakeRequire = (id) => {
   return require(id);
 };
 new Function('module', 'exports', 'require', code)(module_, module_.exports, fakeRequire);
-const { normalizeStroke, PALETTE, WIDTHS, TOOLS, CANVAS_COLORS, DEFAULT_STROKE } = module_.exports;
+const { normalizeStroke, PALETTE, WIDTHS, TOOLS, CANVAS_COLORS, DEFAULT_STROKE, strokeBounds } = module_.exports;
 
 console.log('=== OLD DOODLES STILL RENDER ===');
 const legacy = [{ x: 1, y: 2 }, { x: 3, y: 4 }];
@@ -118,6 +118,39 @@ for (const screen of ['app/CanvasScreen.js', 'app/MessagesScreen.js', 'app/games
   check(`${screen} has no hand-rolled Polyline left`,
     !/<Polyline/.test(text), 'still renders its own Polyline');
 }
+
+console.log('\n=== A GALLERY THUMBNAIL SHOWS THE DRAWING, NOT ITS TOP-LEFT CORNER ===');
+// Stroke points are raw finger coordinates from whatever screen the drawing
+// was made on — a 390x700 canvas, typically. Rendered into a 170px cell with
+// no viewBox you get the top-left quarter of it and nothing else, which for a
+// drawing centred on the page is an empty tile.
+const pts = (list) => ({ points: list.map(([x, y]) => ({ x, y })), color: '#000000', width: 6, tool: 'pen' });
+
+const b = strokeBounds([pts([[100, 200], [300, 500]])]);
+check('bounds cover the drawn area', b.x <= 100 && b.y <= 200 && b.x + b.width >= 300 && b.y + b.height >= 500, b);
+// A path's coordinates are its CENTRE line, so a fat stroke ending on the
+// bounds would be sliced in half lengthways without padding.
+check('and are padded by at least the stroke width', b.x < 100 - 5 && b.y < 200 - 5, b);
+
+const fat = strokeBounds([{ points: [{ x: 0, y: 0 }], color: '#000000', width: 22, tool: 'pen' }]);
+check('a fatter stroke gets more padding', fat.width >= 44, fat);
+// Zero-extent boxes render nothing at all rather than a dot.
+check('a single point still has a non-zero box', fat.width > 0 && fat.height > 0, fat);
+
+check('nothing drawable gives no box, rather than an infinite one', strokeBounds([]) === null);
+check('and neither does a stroke with no points', strokeBounds([{ points: [] }]) === null);
+check('a NaN point is skipped rather than poisoning the box',
+  Number.isFinite(strokeBounds([pts([[10, 10], [50, 50]]), { points: [{ x: NaN, y: 0 }] }])?.width));
+
+// Several strokes, one box around all of them.
+const many = strokeBounds([pts([[0, 0]]), pts([[400, 10]]), pts([[20, 900]])]);
+check('the box covers every stroke', many.x <= 0 && many.x + many.width >= 400 && many.y + many.height >= 900, many);
+
+check('Doodle only fits when asked', /fit = false/.test(source), 'fit should default off');
+// In a message bubble a small doodle and a full-page one must not come out
+// the same size; only the gallery wants them zoomed to fill.
+const gallery = fs.readFileSync(path.join(root, 'app', 'CanvasGalleryScreen.js'), 'utf8');
+check('but the gallery does ask for it', /<Doodle[\s\S]{0,300}?\bfit\b/.test(gallery));
 
 console.log(`\nDOODLE RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

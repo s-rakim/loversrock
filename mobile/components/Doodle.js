@@ -193,20 +193,67 @@ export function StrokePath({ stroke, index, canvasColor = '#FFFDF8' }) {
 }
 
 /**
+ * The rectangle a set of strokes actually occupies.
+ *
+ * Needed because stroke points are raw finger coordinates from whatever
+ * screen the drawing was made on. Rendered as-is into a small box you get the
+ * top-left corner of the drawing and nothing else — which is exactly what a
+ * gallery thumbnail must not be.
+ *
+ * Padded by the widest stroke, because a path's coordinates are its CENTRE
+ * line: a 22px brush stroke ending at the right edge of the bounds would be
+ * sliced in half lengthways without it.
+ */
+export function strokeBounds(strokes) {
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
+  let pad = 4;
+  for (const stroke of strokes || []) {
+    pad = Math.max(pad, (stroke?.width || 6) * (stroke?.tool === 'spray' ? 2 : 1));
+    for (const p of stroke?.points || []) {
+      if (!Number.isFinite(p?.x) || !Number.isFinite(p?.y)) continue;
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+  }
+  if (!Number.isFinite(minX)) return null;   // nothing drawable
+  // A single dot has zero extent, and a zero-width viewBox renders nothing at
+  // all rather than a dot.
+  const w = Math.max(maxX - minX, 1) + pad * 2;
+  const h = Math.max(maxY - minY, 1) + pad * 2;
+  return { x: minX - pad, y: minY - pad, width: w, height: h };
+}
+
+/**
  * A finished doodle, as shown in a message bubble.
  *
  * `canvasColor` travels with the doodle when there is one, so an eraser
  * stroke keeps erasing and a drawing made on a dark canvas is not rendered
  * on a light one.
+ *
+ * `fit` scales the drawing to fill the box it is given, which is what a
+ * gallery thumbnail needs. It is OFF by default: in a message bubble the
+ * drawing should sit at the size it was drawn, and zooming each one to fill
+ * its bubble would make a small doodle and a full-page one look identical.
  */
-export default function Doodle({ strokeData, height = 180, style }) {
+export default function Doodle({ strokeData, height = 180, style, fit = false, radius = 12 }) {
   const payload = Array.isArray(strokeData) ? { strokes: strokeData } : (strokeData || {});
   const strokes = payload.strokes || [];
   const canvasColor = payload.canvasColor || '#FFFDF8';
+  const box = fit ? strokeBounds(strokes) : null;
 
   return (
-    <View style={[{ height, borderRadius: 12, overflow: 'hidden', backgroundColor: canvasColor }, style]}>
-      <Svg style={StyleSheet.absoluteFill}>
+    <View style={[{ height, borderRadius: radius, overflow: 'hidden', backgroundColor: canvasColor }, style]}>
+      <Svg
+        style={StyleSheet.absoluteFill}
+        {...(box ? {
+          viewBox: `${box.x} ${box.y} ${box.width} ${box.height}`,
+          // Fill the cell and crop, rather than letterboxing a portrait
+          // drawing into a square with bands of paper down both sides.
+          preserveAspectRatio: 'xMidYMid slice',
+        } : {})}
+      >
         {strokes.map((stroke, i) => (
           <StrokePath key={i} stroke={stroke} index={i} canvasColor={canvasColor} />
         ))}

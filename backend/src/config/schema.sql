@@ -599,3 +599,38 @@ CREATE TABLE IF NOT EXISTS user_avatars (
   outfit      JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------
+-- The canvas gallery: drawings kept, rather than sent and lost in the thread.
+-- ---------------------------------------------------------------------------
+
+-- Strokes, not pixels.
+--
+-- A drawing is stored exactly as it is drawn: a list of stroke objects, each
+-- with its points, colour, width and tool. That is what lets the other phone
+-- re-render it as real vectors at its own resolution, lets a drawing be
+-- reopened and added to months later, and keeps a whole gallery in a few
+-- kilobytes rather than a few megabytes of PNG.
+--
+-- `canvas_color` travels with it because an eraser stroke is painted IN the
+-- canvas colour — without it, a drawing made on the dark paper reopens on the
+-- light paper with every erased area drawn in as a stripe.
+CREATE TABLE IF NOT EXISTS canvas_drawings (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id      UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  created_by   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title        TEXT,
+  stroke_data  JSONB NOT NULL,
+  canvas_color TEXT NOT NULL DEFAULT '#FFFDF8',
+  -- A drawing either of you can keep adding to. The gallery shows who
+  -- touched it last, which is not necessarily who started it.
+  updated_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  pinned       BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Pinned first, then newest: the gallery's one and only sort order, so it is
+-- an index rather than a sort on every read.
+CREATE INDEX IF NOT EXISTS canvas_drawings_pair_idx
+  ON canvas_drawings (pair_id, pinned DESC, updated_at DESC);

@@ -418,6 +418,41 @@ export async function waitForSocket(timeoutMs = 8000) {
   });
 }
 
+/**
+ * Subscribe to a socket event for as long as a screen is mounted.
+ *
+ * Returns an unsubscribe function, and that is the entire point of it. The
+ * pattern everywhere else in this app is
+ *
+ *     connectSocket().then((s) => s.on('bucket:update', handler));
+ *     return () => getSocket()?.off('bucket:update');
+ *
+ * and `off(name)` with no handler removes EVERY listener for that event, not
+ * just this screen's. Two screens listening to the same event — the gallery
+ * and the canvas both want `canvas:saved` — silently unhook each other on the
+ * first unmount, and the surviving screen quietly stops updating. Passing the
+ * handler back to `off` is the fix.
+ *
+ * It also handles the case where the socket has not finished connecting when
+ * the screen mounts, which is the common case on a cold start: the handler is
+ * attached when the connection lands, unless the screen went away first.
+ */
+export function onSocketEvent(event, handler) {
+  let live = null;
+  let cancelled = false;
+
+  connectSocket().then((s) => {
+    if (cancelled) return;
+    live = s;
+    s.on(event, handler);
+  }).catch(() => {});
+
+  return () => {
+    cancelled = true;
+    live?.off(event, handler);
+  };
+}
+
 export function getSocket() {
   return socket;
 }

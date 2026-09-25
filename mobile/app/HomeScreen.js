@@ -111,10 +111,18 @@ export default function HomeScreen({ navigation }) {
           </MorphButton>
           </ShineBorder>
 
-          <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.doodleRow}>
-            <Icon name="brush-outline" chip={false} size={16} color={colors.accent} />
-            <Text style={font.body}>Send a doodle instead</Text>
-          </MorphButton>
+          <View style={styles.doodleSplit}>
+            <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.doodleRow}>
+              <Icon name="brush-outline" chip={false} size={16} color={colors.accent} />
+              <Text style={font.body}>Doodle</Text>
+            </MorphButton>
+            {/* The shelf. Worth its own way in from Home: a drawing you can
+                reopen is only useful if finding it is one tap. */}
+            <MorphButton onPress={() => navigation.navigate('CanvasGallery')} style={styles.doodleRow}>
+              <Icon name="images-outline" chip={false} size={16} color={colors.accent} />
+              <Text style={font.body}>Your drawings</Text>
+            </MorphButton>
+          </View>
         </FadeInUp>
 
         <FadeInUp delay={100}>
@@ -214,7 +222,9 @@ const makeStyles = (colors, font) =>
     borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md,
   },
   widgetPhotoOverlayText: { color: '#fff', fontSize: 12, flex: 1 },
+  doodleSplit: { flexDirection: 'row', gap: spacing.sm },
   doodleRow: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     marginTop: spacing.sm, paddingVertical: spacing.sm,
     justifyContent: 'center',

@@ -27,6 +27,7 @@ import widgetRoutes from './routes/widget.js';
 import profileRoutes from './routes/profile.js';
 import presenceRoutes from './routes/presence.js';
 import achievementsRoutes from './routes/achievements.js';
+import canvasRoutes from './routes/canvas.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -57,6 +58,8 @@ app.use('/profile', profileRoutes);
 // Moods, notes and reactions — see routes/presence.js for why they share one.
 app.use('/presence', presenceRoutes);
 app.use('/achievements', achievementsRoutes);
+// Kept drawings, as opposed to ones sent into the message thread and lost.
+app.use('/canvas', canvasRoutes);
 
 /** image/jpeg for a .jpg, and so on. */
 const EXTENSION_TYPES = {

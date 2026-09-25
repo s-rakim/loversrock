@@ -165,5 +165,27 @@ check('CallScreen: role tells each end which it is without comparing ids',
   && (await req('/calls/current', { token: B.token })).data.call.role === 'callee');
 await req(`/calls/${ringing.data.call.id}/end`, { method: 'POST', token: A.token });
 
+// The gallery grid reads exactly these keys off each row, and draws its
+// thumbnail from `preview` — which is stroke objects, not a URL. A listing
+// that carried `stroke_data` instead would still render, and would fetch a
+// few megabytes to show thirty postage stamps.
+const drawn = await req('/canvas', {
+  method: 'POST', token: A.token,
+  body: { strokeData: { strokes: [{ points: [{ x: 1, y: 2 }, { x: 8, y: 9 }], color: '#FF5C8D', width: 6, tool: 'pen' }] }, title: 'contract' },
+});
+const shelf = await req('/canvas', { token: B.token });
+const tile = shelf.data.drawings[0];
+check('CanvasGalleryScreen: id/title/canvas_color/pinned/stroke_count/updated_at present',
+  ['id', 'title', 'canvas_color', 'pinned', 'stroke_count', 'updated_at', 'created_by', 'updated_by']
+    .every((k) => k in tile), Object.keys(tile || {}));
+check('CanvasGalleryScreen: preview is stroke objects the renderer can draw',
+  Array.isArray(tile.preview) && Array.isArray(tile.preview[0]?.points)
+  && typeof tile.preview[0].points[0]?.x === 'number', tile.preview?.[0]);
+check('CanvasGalleryScreen: the listing does NOT carry full stroke_data',
+  !('stroke_data' in tile), Object.keys(tile));
+check('CanvasScreen: opening one gives strokes and the paper it was drawn on',
+  Array.isArray((await req(`/canvas/${tile.id}`, { token: A.token })).data.drawing.stroke_data.strokes));
+await req(`/canvas/${drawn.data.drawing.id}`, { method: 'DELETE', token: A.token });
+
 console.log(`\nCONTRACT RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 process.exit(fails.length ? 1 : 0);

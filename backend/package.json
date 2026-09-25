@@ -28,7 +28,8 @@
     "test:stale-calls": "node --env-file=.env test/staleCalls.mjs",
     "test:e2ee": "node --env-file=.env test/e2ee.mjs",
     "test:presence": "node test/presence.mjs",
-    "test:achievements": "node --env-file=.env test/achievements.mjs"
+    "test:achievements": "node --env-file=.env test/achievements.mjs",
+    "test:canvas": "node test/canvas.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

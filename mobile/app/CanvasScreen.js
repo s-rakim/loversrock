@@ -7,7 +7,7 @@
 //
 // The tools, the palette and the renderer all live in components/Doodle.js,
 // shared with the message bubble and Draw Duel.
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, PanResponder, Alert, ScrollView, Pressable,
 } from 'react-native';
@@ -21,18 +21,28 @@ import {
   StrokePath, PALETTE, WIDTHS, TOOLS, CANVAS_COLORS,
 } from '../components/Doodle';
 
-export default function CanvasScreen({ navigation }) {
+export default function CanvasScreen({ navigation, route }) {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [strokes, setStrokes] = useState([]);
+  // Opened from the gallery, this screen is handed an existing drawing to
+  // carry on with. Seeded into state rather than fetched here, because the
+  // gallery already has the strokes by the time it navigates.
+  const opened = route?.params || {};
+
+  const [strokes, setStrokes] = useState(opened.strokes || []);
   const [undone, setUndone] = useState([]);
   const [color, setColor] = useState('#FF5C8D');
   const [width, setWidth] = useState(6);
   const [tool, setTool] = useState('pen');
-  const [canvasColor, setCanvasColor] = useState('#FFFDF8');
+  const [canvasColor, setCanvasColor] = useState(opened.canvasColor || '#FFFDF8');
   const [panel, setPanel] = useState('color'); // color | width | tool | paper
   const [saving, setSaving] = useState(false);
+  const [drawingId, setDrawingId] = useState(opened.drawingId || null);
+  // The strokes as last written to the server, so "save" can tell whether
+  // there is anything to write and the back-guard can tell whether there is
+  // anything to lose.
+  const savedCount = useRef((opened.strokes || []).length);
 
   const currentStroke = useRef([]);
   const [, forceRender] = useState(0);
@@ -101,6 +111,34 @@ export default function CanvasScreen({ navigation }) {
     ]);
   }
 
+  // Kept, rather than sent.
+  //
+  // The two destinations are genuinely different things and both are worth
+  // having: the thread is for "look at this now", the gallery is for the one
+  // you spent twenty minutes on and want back next week.
+  async function keep() {
+    if (strokes.length === 0) {
+      Alert.alert('Nothing drawn yet', 'Draw something first.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = { strokeData: { strokes }, canvasColor };
+      const { drawing } = drawingId
+        ? await apiFetch(`/canvas/${drawingId}`, { method: 'PUT', body })
+        : await apiFetch('/canvas', { method: 'POST', body });
+      // Saving again updates the same drawing rather than making a second
+      // copy of it, which is what makes "keep adding to it" work at all.
+      setDrawingId(drawing.id);
+      savedCount.current = strokes.length;
+      navigation.navigate('CanvasGallery');
+    } catch (err) {
+      Alert.alert('Could not save it', err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function send() {
     if (strokes.length === 0) {
       Alert.alert('Nothing drawn yet', 'Draw something first.');
@@ -115,6 +153,9 @@ export default function CanvasScreen({ navigation }) {
         method: 'POST',
         body: { type: 'doodle', strokeData: { strokes, canvasColor } },
       });
+      // Sending counts as a destination, so the leave-guard must not then
+      // ask whether to discard work that has just been delivered.
+      savedCount.current = strokes.length;
       navigation.goBack();
     } catch (err) {
       Alert.alert('Could not send doodle', err.message);
@@ -122,6 +163,23 @@ export default function CanvasScreen({ navigation }) {
       setSaving(false);
     }
   }
+
+  // Leaving with unsaved strokes.
+  //
+  // This screen is reached from the gallery, and the hardware back button is
+  // right next to everything else — losing twenty minutes of drawing to a
+  // stray tap is the kind of thing that stops people using a feature at all.
+  // Only strokes drawn SINCE the last save count, so saving and then leaving
+  // is silent, as it should be.
+  useEffect(() => navigation.addListener('beforeRemove', (e) => {
+    if (strokes.length === savedCount.current) return;
+    e.preventDefault();
+    Alert.alert('Leave without keeping this?', 'The strokes you have added since the last save will be gone.', [
+      { text: 'Stay', style: 'cancel' },
+      { text: 'Keep it', onPress: keep },
+      { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+    ]);
+  }), [navigation, strokes.length, keep]);
 
   const activeTool = TOOLS.find((t) => t.id === tool);
 
@@ -262,6 +320,10 @@ export default function CanvasScreen({ navigation }) {
         <MorphButton onPress={clear} style={styles.iconButton}>
           <Ionicons name="trash-outline" size={20} color={colors.danger} />
         </MorphButton>
+        <MorphButton onPress={keep} disabled={saving} style={[styles.keepButton, saving && styles.disabled]}>
+          <Ionicons name="bookmark-outline" size={18} color={colors.accentIndigo} />
+          <Text style={styles.keepText}>{drawingId ? 'Update' : 'Keep'}</Text>
+        </MorphButton>
         <MorphButton onPress={send} disabled={saving} style={[styles.sendButton, saving && styles.disabled]}>
           <Ionicons name="send" size={18} color="#fff" />
           <Text style={styles.sendText}>{saving ? 'Sending…' : 'Send'}</Text>
@@ -331,6 +393,13 @@ const makeStyles = (colors) =>
       borderWidth: 1, borderColor: colors.border,
     },
     disabled: { opacity: 0.4 },
+    keepButton: {
+      flex: 1, flexDirection: 'row', gap: spacing.xs,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: colors.surface, borderRadius: radius.pill,
+      borderWidth: 1.5, borderColor: colors.accentIndigo,
+    },
+    keepText: { color: colors.accentIndigo, fontWeight: '700' },
     sendButton: {
       flex: 1, flexDirection: 'row', gap: spacing.xs,
       alignItems: 'center', justifyContent: 'center',

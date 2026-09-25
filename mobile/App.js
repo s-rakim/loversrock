@@ -30,6 +30,7 @@ import DateIdeasScreen from './app/DateIdeasScreen';
 import CountdownScreen from './app/CountdownScreen';
 import MessagesScreen from './app/MessagesScreen';
 import CanvasScreen from './app/CanvasScreen';
+import CanvasGalleryScreen from './app/CanvasGalleryScreen';
 import ThumbKissScreen from './app/ThumbKissScreen';
 import DistanceApartScreen from './app/DistanceApartScreen';
 import PeriodTrackerScreen from './app/PeriodTrackerScreen';
@@ -219,6 +220,10 @@ function Root() {
             <Stack.Screen name="BucketList" component={BucketListScreen} options={{ title: 'Bucket List' }} />
             <Stack.Screen name="DateIdeas" component={DateIdeasScreen} options={{ title: 'Date Ideas' }} />
             <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
+            {/* The shelf, and the canvas itself. The gallery is the entry
+                point of the two: you arrive wanting to see what is there far
+                more often than with a blank drawing already in mind. */}
+            <Stack.Screen name="CanvasGallery" component={CanvasGalleryScreen} options={{ title: 'Drawings' }} />
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
             {/* The locket, as its own section: a camera screen and the wall of
                 everything sent. headerShown false on the camera because the
