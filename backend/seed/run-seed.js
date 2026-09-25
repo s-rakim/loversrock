@@ -150,7 +150,7 @@ async function seedGamesCatalog() {
   for (const game of games) {
     await query(
       `INSERT INTO games_catalog (slug, emoji, title, subtitle, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (slug) DO UPDATE SET
          emoji = EXCLUDED.emoji, title = EXCLUDED.title, subtitle = EXCLUDED.subtitle,
          sort_order = EXCLUDED.sort_order`,

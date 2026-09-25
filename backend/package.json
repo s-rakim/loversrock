@@ -33,7 +33,8 @@
     "test:dates": "node test/dates.mjs",
     "test:seasons": "node test/seasons.mjs",
     "test:checkins": "node test/checkins.mjs",
-    "test:feed": "node test/feed.mjs"
+    "test:feed": "node test/feed.mjs",
+    "test:seed": "node test/seed.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",
