@@ -73,17 +73,26 @@ export function setActiveScreen(name) {
 // the screen you are reading it on, is pure noise — the message is already
 // there, arriving over the socket a moment earlier. So a message notification
 // is suppressed while the thread is open, and shown everywhere else.
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const type = notification?.request?.content?.data?.type;
-    const inThread = activeScreen === 'Messages' && type === 'message';
-    return {
-      shouldShowAlert: !inThread,
-      shouldPlaySound: !inThread,
-      shouldSetBadge: false,
-    };
-  },
-});
+//
+// Guarded, because this runs while the bundle is still loading. If the
+// notifications native module is not there, an unguarded throw here takes the
+// whole app down before React starts — trading "banners behave oddly" for
+// "the app does not open".
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async (notification) => {
+      const type = notification?.request?.content?.data?.type;
+      const inThread = activeScreen === 'Messages' && type === 'message';
+      return {
+        shouldShowAlert: !inThread,
+        shouldPlaySound: !inThread,
+        shouldSetBadge: false,
+      };
+    },
+  });
+} catch {
+  /* No notifications on this build; everything else still works. */
+}
 
 export async function ensureChannels() {
   if (Platform.OS !== 'android') return;

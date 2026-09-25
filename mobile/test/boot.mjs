@@ -47,8 +47,25 @@ const rn = new Proxy({}, {
     if (k === 'Platform') return { OS: 'android', select: (o) => o.android ?? o.default, Version: 34 };
     if (k === 'Animated') return new Proxy({}, { get: (_x, q) => {
       const s = String(q);
-      if (s === 'Value') return class { constructor(v){this.v=v;} setValue(){} interpolate(){return this;} addListener(){return 1;} removeListener(){} stopAnimation(){} };
-      if (s === 'ValueXY') return class { constructor(){ this.x={}; this.y={}; } setValue(){} getLayout(){return {};} };
+      const AnimatedValue = class {
+        constructor(v) { this.v = v; }
+        setValue() {} setOffset() {} flattenOffset() {} extractOffset() {}
+        interpolate() { return new AnimatedValue(0); }
+        addListener() { return 1; } removeListener() {} removeAllListeners() {}
+        stopAnimation(cb) { cb && cb(this.v); } resetAnimation() {}
+      };
+      if (s === 'Value') return AnimatedValue;
+      // x and y have to be real Animated.Values, not {}: the swipe deck does
+      // pan.x.interpolate(...) and a bare object fails on the test's own stub
+      // rather than on the app.
+      if (s === 'ValueXY') return class {
+        constructor(v) { this.x = new AnimatedValue(v?.x ?? 0); this.y = new AnimatedValue(v?.y ?? 0); }
+        setValue() {} setOffset() {} flattenOffset() {} extractOffset() {}
+        getLayout() { return { left: this.x, top: this.y }; }
+        getTranslateTransform() { return [{ translateX: this.x }, { translateY: this.y }]; }
+        addListener() { return 1; } removeListener() {} removeAllListeners() {}
+        stopAnimation() {} resetAnimation() {}
+      };
       if (['timing','spring','decay','parallel','sequence','stagger','loop','delay','event'].includes(s)) return () => ({ start(cb){ cb && cb({finished:true}); }, stop(){}, reset(){} });
       if (s === 'add' || s === 'subtract' || s === 'multiply' || s === 'divide' || s === 'modulo') return () => ({ interpolate: () => ({}) });
       if (s === 'createAnimatedComponent') return (c) => c;
@@ -146,7 +163,12 @@ function ghost(name) {
       if (k === '__esModule') return true;
       if (k === 'displayName' || k === 'name') return name;
       if (p === Symbol.toPrimitive || k === 'toString') return () => name;
-      if (p === Symbol.iterator) return undefined;
+      // Array-destructured hooks are everywhere in this codebase
+      // (`const [permission, request] = useCameraPermissions()`), so a
+      // stand-in has to be iterable or the test fails on itself.
+      if (p === Symbol.iterator) {
+        return function* iterate() { for (let i = 0; i < 4; i += 1) yield ghost(`${name}[${i}]`); };
+      }
       if (k === 'prototype') return t.prototype;
       if (k === 'then') return undefined;   // must not look like a promise
       return ghost(`${name}.${k}`);
@@ -172,11 +194,40 @@ function ghost(name) {
 // What each context is currently providing, as the walk descends.
 const provided = new Map();
 
+// Every screen the walk has executed, so the test can say how much of the
+// app it actually covered rather than just "no exception".
+const screens = [];
+
+const navStub = {
+  navigate() {}, push() {}, goBack() {}, replace() {}, popToTop() {},
+  setOptions() {}, setParams() {}, dispatch() {}, reset() {},
+  addListener: () => () => {},
+  removeListener() {},
+  isFocused: () => true,
+  canGoBack: () => true,
+  getParent: () => navStub,
+  getState: () => ({ index: 0, routes: [] }),
+};
+
 function render(el, depth = 0) {
   if (el === null || el === undefined || typeof el !== 'object') return;
   if (Array.isArray(el)) { el.forEach((e) => render(e, depth)); return; }
   if (depth > 60) return;
   const { type, props } = el;
+
+  // <Stack.Screen component={LoginScreen} /> hands the screen over as a
+  // PROP, so a walk that only follows children never executes a single
+  // screen in the app — which is most of it. This has to come BEFORE the
+  // function branch below, because Stack.Screen is itself a stand-in
+  // function and that branch would swallow the element whole.
+  if (typeof props?.component === 'function') {
+    screens.push(props.name || props.component.displayName || props.component.name || 'anon');
+    render(React.createElement(props.component, {
+      navigation: navStub,
+      route: { key: `${props.name}-1`, name: props.name || 'Screen', params: {} },
+    }), depth + 1);
+    return;
+  }
 
   if (typeof type === 'function') {
     const out = type.prototype?.isReactComponent ? new type(props).render() : type(props);
@@ -205,12 +256,14 @@ let failures = 0;
 for (const [label, value] of [['as it first paints', false], ['once its gates have resolved', true]]) {
   flip = value;
   cache.clear();
+  screens.length = 0;
   try {
     render(React.createElement(load('App.js').default, {}));
-    console.log(`  PASS  the app boots ${label}`);
+    console.log(`  PASS  the app boots ${label} (${screens.length} screens rendered)`);
   } catch (e) {
     failures += 1;
     console.log(`  FAIL  the app boots ${label} :: ${e.name}: ${e.message}`);
+    console.log(`        after rendering ${screens.length}: ${screens.slice(-6).join(' → ')}`);
   }
 }
 console.log(`\nBOOT RESULT — PASSED: ${2 - failures}  FAILED: ${failures}`);

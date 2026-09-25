@@ -20,10 +20,28 @@ import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
 import { Platform, AppState, PermissionsAndroid, Alert } from 'react-native';
-import {
-  RTCPeerConnection, RTCSessionDescription, RTCIceCandidate,
-  mediaDevices, registerGlobals,
-} from 'react-native-webrtc';
+
+/**
+ * WebRTC, required rather than imported, for exactly the reason stated below
+ * for InCallManager — and more urgently, because this one used to run at
+ * module scope.
+ *
+ * `registerGlobals()` was called unguarded as the module loaded, which meant
+ * a build where the native module did not initialise took the whole app down
+ * on launch, before a single pixel: not "calls do not work", but "the app
+ * does not open". Calling is one feature of many; it does not get to decide
+ * whether the other twenty do.
+ */
+let WebRTC = null;
+try {
+  // eslint-disable-next-line global-require
+  WebRTC = require('react-native-webrtc');
+} catch {
+  WebRTC = null;
+}
+const {
+  RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices,
+} = WebRTC || {};
 import { apiFetch, connectSocket, getSocket, waitForSocket } from '../../services/api';
 
 /**
@@ -60,8 +78,15 @@ const audio = {
 export const hasAudioRouting = () => InCallManager !== null;
 
 // react-native-webrtc needs its globals installed once, before any peer
-// connection is built.
-registerGlobals();
+// connection is built — but never at the cost of the app starting at all.
+try {
+  WebRTC?.registerGlobals?.();
+} catch {
+  WebRTC = null;
+}
+
+/** Whether this build can place a call at all. */
+export const hasCalling = () => WebRTC !== null;
 
 const CallContext = createContext(null);
 
@@ -156,6 +181,10 @@ export function CallProvider({ children }) {
 
   /** Mic, and camera only for a video call — never ask for more than needed. */
   const getMedia = useCallback(async (kind) => {
+    if (!WebRTC) {
+      Alert.alert('Calling unavailable', 'This build does not have calling support.');
+      throw new Error('webrtc-missing');
+    }
     const stream = await mediaDevices.getUserMedia({
       audio: true,
       video: kind === 'video'

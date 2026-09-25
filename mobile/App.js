@@ -18,6 +18,7 @@ import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification, syncPushToken } from './services/notifications';
 import LumaBar, { TAB_ROUTES } from './components/LumaBar';
 import { CallProvider, useCall } from './components/calls/CallContext';
+import CrashScreen from './components/CrashScreen';
 import { fadeOnFocus } from './components/Motion';
 
 import LoginScreen from './app/LoginScreen';
@@ -299,18 +300,23 @@ function Root() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      {/* Outermost of the app's own providers: everything below it, including
-          the theme's own labels, can be translated. */}
-      <LanguageProvider>
-        <ThemeProvider>
-          <GlassProvider>
-            <CallProvider>
-              <Root />
-            </CallProvider>
-          </GlassProvider>
-        </ThemeProvider>
-      </LanguageProvider>
-    </SafeAreaProvider>
+    // Outside everything, including SafeAreaProvider: a boundary is only
+    // useful if it survives whatever it is catching, and a provider that
+    // throws while mounting would take an inner boundary with it.
+    <CrashScreen>
+      <SafeAreaProvider>
+        {/* Outermost of the app's own providers: everything below it,
+            including the theme's own labels, can be translated. */}
+        <LanguageProvider>
+          <ThemeProvider>
+            <GlassProvider>
+              <CallProvider>
+                <Root />
+              </CallProvider>
+            </GlassProvider>
+          </ThemeProvider>
+        </LanguageProvider>
+      </SafeAreaProvider>
+    </CrashScreen>
   );
 }

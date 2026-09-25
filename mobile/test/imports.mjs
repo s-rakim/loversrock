@@ -302,5 +302,77 @@ if (undefined_.length === 0) {
   for (const u of undefined_) fail(u);
 }
 
+console.log('\n=== AND NOTHING CALLS INTO A NATIVE MODULE AT IMPORT TIME UNGUARDED ===');
+
+// CallContext.js had, at module scope:
+//
+//     import { ..., registerGlobals } from 'react-native-webrtc';
+//     registerGlobals();
+//
+// A statement like that runs while the bundle is still loading — before
+// React, before any error boundary, before the first pixel. If the native
+// side is not there, or throws, the app does not start. Not "calls are
+// broken": the app does not open, which is indistinguishable from a bad
+// build and tells you nothing about which feature caused it.
+//
+// The same file already knew this. InCallManager directly above it was a
+// guarded require(), with a comment saying it was guarded so a missing
+// native module "degrades to no speaker control instead of a white screen on
+// launch". The rule just was not applied to its neighbour.
+//
+// So: a top-level call whose callee came from a package import has to sit in
+// a try/catch. Registering a handler or a PRNG is fine; it is the unguarded
+// CALL that is the problem, so guarded ones pass.
+
+// Packages that only touch JS and cannot take the app down on their own.
+const PURE = new Set(['tweetnacl', 'tweetnacl-util', 'socket.io-client']);
+
+const unguarded = [];
+let topLevelCalls = 0;
+
+for (const file of files) {
+  let tree;
+  try {
+    tree = parser.parse(fs.readFileSync(file, 'utf8'), {
+      sourceType: 'unambiguous',
+      plugins: ['jsx', 'classProperties', 'objectRestSpread', 'optionalChaining', 'nullishCoalescingOperator'],
+    });
+  } catch { continue; }
+
+  // Which local names came from which package.
+  const fromPackage = new Map();
+  for (const node of tree.program.body) {
+    if (node.type !== 'ImportDeclaration') continue;
+    const source = node.source.value;
+    if (source.startsWith('.') || PURE.has(source)) continue;
+    for (const spec of node.specifiers) fromPackage.set(spec.local.name, source);
+  }
+  if (fromPackage.size === 0) continue;
+
+  for (const node of tree.program.body) {
+    if (node.type !== 'ExpressionStatement') continue;
+    const call = node.expression.type === 'AwaitExpression' ? node.expression.argument : node.expression;
+    if (call.type !== 'CallExpression') continue;
+
+    // The root of `a.b.c()` is `a`.
+    let callee = call.callee;
+    while (callee.type === 'MemberExpression') callee = callee.object;
+    if (callee.type !== 'Identifier') continue;
+    if (!fromPackage.has(callee.name)) continue;
+
+    topLevelCalls += 1;
+    unguarded.push(
+      `${path.relative(root, file)}:${node.loc?.start.line} calls ${callee.name}(...) `
+      + `from '${fromPackage.get(callee.name)}' at module scope, outside a try/catch`,
+    );
+  }
+}
+
+if (unguarded.length === 0) {
+  pass('no package call runs unguarded while the bundle loads');
+} else {
+  for (const u of unguarded) fail(u);
+}
+
 console.log(`\nIMPORT RESULT — PASSED: ${passed}  FAILED: ${failed}`);
 process.exit(failed ? 1 : 0);

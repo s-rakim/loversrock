@@ -63,10 +63,17 @@ function stopClock() {
 }
 
 // A moving light nobody is looking at is pure battery.
-AppState.addEventListener('change', (state) => {
-  if (state === 'active') startClock();
-  else stopClock();
-});
+//
+// Guarded for the same reason as every other module-scope call in this app:
+// a decorative border is not worth the app failing to launch over.
+try {
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') startClock();
+    else stopClock();
+  });
+} catch {
+  /* The light just keeps running; it is a shine on a border. */
+}
 
 export const SHINE_COLORS = ['#A07CFE', '#FE8FB5', '#FFBE7B'];
 
