@@ -35,5 +35,13 @@
 
   { "slug": "popular-most-asked", "category": "Popular Community Questions", "emoji": "trophy-outline", "title": "Most Asked Questions", "isLocked": false, "sortOrder": 1 },
   { "slug": "popular-newlywed-game", "category": "Popular Community Questions", "emoji": "heart-outline", "title": "The Newlywed Game", "isLocked": false, "sortOrder": 2 },
-  { "slug": "popular-late-night", "category": "Popular Community Questions", "emoji": "moon-outline", "title": "Late Night Talks", "isLocked": false, "sortOrder": 3 }
+  { "slug": "popular-late-night", "category": "Popular Community Questions", "emoji": "moon-outline", "title": "Late Night Talks", "isLocked": false, "sortOrder": 3 },
+
+  { "slug": "seasonal-valentines", "category": "Seasonal", "emoji": "heart-circle-outline", "title": "Valentine's", "isLocked": false, "sortOrder": 1, "seasonStart": "02-01", "seasonEnd": "02-20" },
+  { "slug": "seasonal-christmas", "category": "Seasonal", "emoji": "gift-outline", "title": "Christmas", "isLocked": false, "sortOrder": 2, "seasonStart": "12-01", "seasonEnd": "12-27" },
+  { "slug": "seasonal-new-year", "category": "Seasonal", "emoji": "sparkles-outline", "title": "New Year, Us", "isLocked": false, "sortOrder": 3, "seasonStart": "12-26", "seasonEnd": "01-07" },
+  { "slug": "seasonal-summer", "category": "Seasonal", "emoji": "sunny-outline", "title": "Summer Plans", "isLocked": false, "sortOrder": 4, "seasonStart": "05-15", "seasonEnd": "08-31" },
+  { "slug": "seasonal-autumn", "category": "Seasonal", "emoji": "leaf-outline", "title": "Cosy Season", "isLocked": false, "sortOrder": 5, "seasonStart": "09-15", "seasonEnd": "11-15" },
+  { "slug": "seasonal-halloween", "category": "Seasonal", "emoji": "moon-outline", "title": "Spooky Season", "isLocked": false, "sortOrder": 6, "seasonStart": "10-15", "seasonEnd": "11-02" },
+  { "slug": "seasonal-anniversary", "category": "Seasonal", "emoji": "calendar-outline", "title": "Your Anniversary Month", "isLocked": false, "sortOrder": 7, "seasonAnchor": "anniversary" }
 ]

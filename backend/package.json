@@ -30,7 +30,8 @@
     "test:presence": "node test/presence.mjs",
     "test:achievements": "node --env-file=.env test/achievements.mjs",
     "test:canvas": "node test/canvas.mjs",
-    "test:dates": "node test/dates.mjs"
+    "test:dates": "node test/dates.mjs",
+    "test:seasons": "node test/seasons.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

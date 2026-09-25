@@ -72,12 +72,18 @@ async function seedQuestionDecks() {
   const decks = loadJson('question_decks.json');
   for (const deck of decks) {
     await query(
-      `INSERT INTO question_decks (slug, category, emoji, title, is_locked, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO question_decks (slug, category, emoji, title, is_locked, sort_order,
+                                   season_start, season_end, season_anchor)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (slug) DO UPDATE SET
          category = EXCLUDED.category, emoji = EXCLUDED.emoji, title = EXCLUDED.title,
-         is_locked = EXCLUDED.is_locked, sort_order = EXCLUDED.sort_order`,
-      [deck.slug, deck.category, deck.emoji, deck.title, deck.isLocked, deck.sortOrder]
+         is_locked = EXCLUDED.is_locked, sort_order = EXCLUDED.sort_order,
+         -- Re-seeding must be able to CLEAR a season as well as set one, so
+         -- these take the new value even when it is null.
+         season_start = EXCLUDED.season_start, season_end = EXCLUDED.season_end,
+         season_anchor = EXCLUDED.season_anchor`,
+      [deck.slug, deck.category, deck.emoji, deck.title, deck.isLocked, deck.sortOrder,
+        deck.seasonStart || null, deck.seasonEnd || null, deck.seasonAnchor || null]
     );
   }
   console.log(`[seed] question_decks: ${decks.length} decks`);

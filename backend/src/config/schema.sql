@@ -658,3 +658,22 @@ CREATE TABLE IF NOT EXISTS nudges (
 
 -- Only ever read as "the most recent one from them", so that is the index.
 CREATE INDEX IF NOT EXISTS nudges_pair_idx ON nudges (pair_id, from_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Seasonal decks: ones that appear when they are relevant and retire after.
+-- ---------------------------------------------------------------------------
+
+-- The window is stored as two MM-DD strings rather than dates, because a deck
+-- recurs every year — a real date would need re-seeding each January.
+--
+-- A window may WRAP the year end (New Year runs 12-26 → 01-07), which is why
+-- the comparison lives in models/seasons.js rather than in SQL: "between" is
+-- wrong for half of these, and wrong in a way that silently shows nothing.
+ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS season_start TEXT;
+ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS season_end TEXT;
+
+-- Some seasons are not the same date for everybody. `anniversary` means the
+-- month the two of you started, which is a different month per couple and
+-- cannot be a fixed window at all.
+ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS season_anchor TEXT
+  CHECK (season_anchor IS NULL OR season_anchor IN ('anniversary'));

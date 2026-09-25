@@ -77,5 +77,77 @@
     "What's your partner's go-to karaoke song?",
     "What's the first thing your partner does when they get home?",
     "What's your partner's biggest pet peeve?"
+  ],
+  "seasonal-valentines": [
+    "What is the least romantic thing I do that you secretly like?",
+    "If we ignored the date entirely and did something ordinary together, what would you want it to be?",
+    "What was the best Valentine's you ever had, and was I in it?",
+    "Is there something you want more of from me that you have never asked for?",
+    "What is a small thing I did this year that you have not forgotten?",
+    "If you had to describe us to a stranger in one sentence, what would you say?",
+    "What do you find most attractive about me that has nothing to do with how I look?",
+    "What would make today feel like it mattered, rather than like a date on a calendar?"
+  ],
+  "seasonal-christmas": [
+    "What is the one Christmas tradition from your family you want us to keep?",
+    "And is there one you would quietly like to drop?",
+    "What is the best present you have ever been given?",
+    "What do you actually want this year — honestly, not the polite answer?",
+    "What does a good Christmas Day look like to you, hour by hour?",
+    "Whose family, which year, and how do we decide that without a row?",
+    "What is the worst Christmas you have had, and what made it bad?",
+    "If we could spend it anywhere, where would you want to be?"
+  ],
+  "seasonal-new-year": [
+    "What is the thing from this year you are most glad happened?",
+    "And the thing you would take back?",
+    "What did I get right this year that I should keep doing?",
+    "What is one thing you want us to do more of next year?",
+    "What is something you want for yourself, separate from us?",
+    "Is there anything we have been putting off that next year should be the year for?",
+    "What would make next year a good one, in one sentence?",
+    "What do you want to be different about us in twelve months?"
+  ],
+  "seasonal-summer": [
+    "Where do you actually want to go this summer, budget aside?",
+    "Beach, city or mountains — and why that one?",
+    "What is the best summer you have ever had?",
+    "What is one thing you want to do this summer that we have never done?",
+    "Are you a plan-everything or figure-it-out-there person, really?",
+    "What is your ideal lazy Sunday in July?",
+    "What song sounds like summer to you?",
+    "What would you want a photo of us from this summer to look like?"
+  ],
+  "seasonal-autumn": [
+    "What is your idea of a perfect night in when it is dark by five?",
+    "What do you want to cook or eat more of this season?",
+    "Is there a film or a show you want us to watch together properly, not half-watching?",
+    "What is the best thing about the year getting colder?",
+    "What is one small thing that makes the house feel like home to you?",
+    "What do you want more of from me when the evenings get long?",
+    "Where would you want to go for a walk on a cold bright morning?",
+    "What is a small comfort you have never told me you love?"
+  ],
+  "seasonal-halloween": [
+    "What genuinely scares you — and I mean genuinely?",
+    "What is the best costume you have ever worn?",
+    "If we did a couples' costume, what would you pick?",
+    "Scary film or comfort film, and are you honest about which?",
+    "What is the strangest thing that has ever happened to you?",
+    "Do you believe in any of it, even slightly?",
+    "What is the scariest thing about us, if you had to name one?",
+    "What would our haunted house be haunted by?"
+  ],
+  "seasonal-anniversary": [
+    "What do you remember about the first time you saw me?",
+    "When did you know?",
+    "What is the best day we have had together — the actual best one?",
+    "What did you think this would be, when it started?",
+    "What have I got wrong that you never made a fuss about?",
+    "What is something we do now that we did not do at the start?",
+    "What is the hardest thing we have got through, and what got us through it?",
+    "What do you want the next year of us to look like?",
+    "If you had to keep one memory of us and lose the rest, which one?",
+    "What would you say to us at the very beginning, if you could?"
   ]
 }

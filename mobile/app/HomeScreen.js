@@ -27,6 +27,7 @@ export default function HomeScreen({ navigation }) {
   const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [streak, setStreak] = useState(0);
   const [decksByCategory, setDecksByCategory] = useState({});
+  const [seasonalSoon, setSeasonalSoon] = useState([]);
   const [games, setGames] = useState([]);
   const [widgetPhoto, setWidgetPhoto] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -40,7 +41,10 @@ export default function HomeScreen({ navigation }) {
       apiFetch('/profile'),
     ]);
     if (prompt.status === 'fulfilled') setStreak(prompt.value.streakCount || 0);
-    if (decks.status === 'fulfilled') setDecksByCategory(decks.value.decksByCategory || {});
+    if (decks.status === 'fulfilled') {
+      setDecksByCategory(decks.value.decksByCategory || {});
+      setSeasonalSoon(decks.value.seasonalSoon || []);
+    }
     if (gamesRes.status === 'fulfilled') setGames(gamesRes.value.games || []);
     if (widget.status === 'fulfilled') setWidgetPhoto(widget.value.widgetPhoto);
     if (profileRes.status === 'fulfilled') setProfile(profileRes.value);
@@ -152,6 +156,30 @@ export default function HomeScreen({ navigation }) {
           </View>
         </FadeInUp>
 
+        {/* Decks that are nearly in season. Announced rather than hidden,
+            because "Christmas questions, back in 9 days" is something to look
+            forward to and a silently absent deck is nothing at all. */}
+        {seasonalSoon.length > 0 && (
+          <FadeInUp delay={150}>
+            <Text style={styles.sectionTitle}>Coming up</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: spacing.lg }}>
+              {seasonalSoon.map((deck) => (
+                <MorphButton
+                  key={deck.id}
+                  onPress={() => navigation.navigate('DeckDetail', { slug: deck.slug, title: deck.title })}
+                  style={[styles.deckCard, styles.soonCard]}
+                >
+                  <Icon name={deck.emoji} chip chipColor={colors.surfaceAlt} size={20} />
+                  <Text style={[font.body, { marginTop: spacing.sm }]}>{deck.title}</Text>
+                  <Text style={[font.muted, { fontSize: 11 }]}>
+                    in {deck.daysUntilSeason} day{deck.daysUntilSeason === 1 ? '' : 's'}
+                  </Text>
+                </MorphButton>
+              ))}
+            </ScrollView>
+          </FadeInUp>
+        )}
+
         {Object.entries(decksByCategory).map(([category, decks], i) => (
           <FadeInUp key={category} delay={160 + i * 40}>
             <Text style={styles.sectionTitle}>{category}</Text>
@@ -166,6 +194,9 @@ export default function HomeScreen({ navigation }) {
                   >
                     <Icon name={deck.emoji} chip chipColor="rgba(255,255,255,0.6)" size={20} />
                     <Text style={[font.body, { marginTop: spacing.sm }]}>{deck.title}</Text>
+                    {deck.seasonal && (
+                      <Text style={[font.muted, { fontSize: 10, fontWeight: '700' }]}>IN SEASON</Text>
+                    )}
                   </MorphButton>
                 );
               })}
@@ -248,6 +279,12 @@ const makeStyles = (colors, font) =>
   deckCard: {
     width: 130, borderRadius: radius.lg, padding: spacing.md,
     marginRight: spacing.sm, minHeight: 120, justifyContent: 'space-between',
+  },
+  // Muted rather than gradient, so a deck that is not open yet does not
+  // compete with the ones you can actually use today.
+  soonCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
   },
   gameCard: {
     width: 110, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,

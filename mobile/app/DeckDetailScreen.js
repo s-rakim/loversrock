@@ -12,12 +12,13 @@ export default function DeckDetailScreen({ route, navigation }) {
   const { slug, title } = route.params;
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
+  const [deck, setDeck] = useState(null);
   const [drafts, setDrafts] = useState({});
 
   useEffect(() => {
     navigation.setOptions({ title });
     apiFetch(`/decks/${slug}/questions`)
-      .then((data) => setQuestions(data.questions))
+      .then((data) => { setQuestions(data.questions); setDeck(data.deck); })
       .catch((err) => Alert.alert('Could not load deck', err.message))
       .finally(() => setLoading(false));
   }, [slug]);
@@ -47,6 +48,16 @@ export default function DeckDetailScreen({ route, navigation }) {
     <View style={styles.container}>
       <StickerField variant="minimal" />
       <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+        {/* Out of season is not locked. There is no paywall here and a
+            seasonal deck is not a soft one — an old link still opens, it just
+            says the timing is off. */}
+        {deck?.seasonal && deck.inSeason === false && (
+          <View style={styles.outOfSeason}>
+            <Text style={[font.muted, { fontSize: 12 }]}>
+              This one is really for its time of year — but it is all here if you want it now.
+            </Text>
+          </View>
+        )}
         {questions.map((q, i) => (
           <FadeInUp key={q.id} delay={i * 40}>
             <View style={styles.card}>
@@ -92,6 +103,11 @@ const makeStyles = (colors) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   centered: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  outOfSeason: {
+    backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
+    padding: spacing.md, marginBottom: spacing.md,
+    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
+  },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
     marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border,
