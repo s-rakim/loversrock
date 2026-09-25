@@ -17,10 +17,11 @@
 // not yours), so the character is doing two jobs at once: it looks like them
 // and it tells you how they are.
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Easing } from 'react-native';
+import { Animated, Easing, Image, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Ellipse, G, Rect, Defs, RadialGradient, LinearGradient, Stop } from 'react-native-svg';
 import { useTheme } from './ThemeContext';
 import { EXPRESSIONS } from './Mascot';
+import { artFor, hasArtFor } from '../assets/mascot';
 
 export const SKINS = {
   porcelain: '#F3D7C4', light: '#E8BE9C', medium: '#C98C63',
@@ -390,9 +391,12 @@ function Accessory({ id, colour }) {
 /**
  * @param avatar {skin, hair, hairColor, build, outfit}
  * @param mood   the expression to wear — normally the owner's current mood.
+ * @param who    'me' | 'partner'. Decides WHICH artwork this is, and it has
+ *               to be explicit: both characters take the same props and
+ *               nothing in an avatar row says whose it is.
  */
 export default function Character({
-  avatar, mood,
+  avatar, mood, who = 'partner',
   // HEIGHT, not width. A person is taller than wide, and sizing by width made
   // every call site guess at the aspect ratio — which is how the figure ended
   // up filling about sixty per cent of its own box.
@@ -401,6 +405,13 @@ export default function Character({
 }) {
   const { reduceMotion } = useTheme();
   const a = avatar || {};
+
+  // Real artwork wins, always, and is used exactly as supplied — no tinting,
+  // no clothes drawn over it, no recolouring. The drawn character below is a
+  // stand-in for having none, not a style choice: if there is a picture of
+  // the actual person, showing a vector approximation of them instead would
+  // be strictly worse.
+  const art = artFor(mood, who);
   const skin = SKINS[a.skin] || SKINS.medium;
   const hairColour = HAIR_COLORS[a.hairColor] || HAIR_COLORS.black;
   const outfit = a.outfit || {};
@@ -443,6 +454,19 @@ export default function Character({
   // shadow, so `height` is the height you actually get on screen.
   const VB = { x: 16, y: 6, w: 68, h: 134 };
   const width = height * (VB.w / VB.h);
+
+  if (art) {
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={[{ width, height, transform: [{ translateY }] }, style]}
+      >
+        {/* `contain`, so a character is never stretched to fill a box whose
+            aspect ratio does not match the artwork's. */}
+        <Image source={art} style={StyleSheet.absoluteFill} resizeMode="contain" />
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View

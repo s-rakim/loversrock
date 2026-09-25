@@ -3,9 +3,23 @@ package com.loversrock.app.widgets
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+
+/**
+ * org.json has three different ways of saying "absent" — the key is missing,
+ * the value is JSON null, or optString hands back an empty string — and every
+ * one of them has to become a Kotlin null or the widget prints the word
+ * "null" on somebody's home screen.
+ */
+private fun JSONObject.optStringOrNull(key: String): String? =
+    if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
 
 /**
  * Talks to GET /widget/summary using the long-lived widget token the app
@@ -21,6 +35,7 @@ object WidgetRepository {
     private const val KEY_TOKEN = "widgetToken"
     private const val KEY_CACHE = "cachedSummary"
     private const val KEY_CACHED_AT = "cachedAt"
+    private const val KEY_DRAWING = "cachedDrawing"
 
     private const val CONNECT_TIMEOUT_MS = 8000
     private const val READ_TIMEOUT_MS = 8000
@@ -35,8 +50,35 @@ object WidgetRepository {
         val hasPhoto: Boolean,
         val partnerCyclePhase: String?,
         val partnerNextPeriodDate: String?,
+        // Ambient presence, for the widgets that exist so nothing has to be
+        // opened at all.
+        val daysTogether: Int?,
+        val togetherSince: String?,
+        val partnerMood: String?,
+        val partnerMoodNote: String?,
+        val todaysQuestion: String?,
+        val nextDateTitle: String?,
+        val nextDateDays: Int?,
+        // A sealed note is ANNOUNCED on the home screen, never printed there.
+        val sealedNoteWaiting: Boolean,
+        val latestNote: String?,
+        val unseenKisses: Int,
+        val lastKissFromPartnerAt: String?,
+        val lastKissSentAt: String?,
+        val latestDrawingAt: String?,
+        val latestDrawingTitle: String?,
         val stale: Boolean
     )
+
+    /** One stroke of a drawing, as the canvas widget needs to paint it. */
+    data class Stroke(
+        val points: FloatArray,   // x0, y0, x1, y1, ... — flat, to avoid boxing
+        val color: Int,
+        val width: Float,
+        val tool: String
+    )
+
+    data class Drawing(val title: String?, val canvasColor: Int, val strokes: List<Stroke>)
 
     fun credentials(context: Context): Pair<String, String>? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -107,9 +149,190 @@ object WidgetRepository {
         }
     }
 
+    /**
+     * Sends a kiss. The one write a widget can perform.
+     *
+     * Returns true only when the server actually recorded one; a throttled
+     * press (the pocket case) comes back false so the widget can say nothing
+     * rather than claim it sent something it did not.
+     */
+    fun sendKiss(context: Context): Boolean {
+        val (apiUrl, token) = credentials(context) ?: return false
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL("$apiUrl/widget/kiss").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                setRequestProperty("X-Widget-Token", token)
+                setRequestProperty("Content-Type", "application/json")
+                doOutput = true
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+            }
+            connection.outputStream.use { it.write("{\"kind\":\"kiss\"}".toByteArray()) }
+            if (connection.responseCode !in 200..201) return false
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            JSONObject(body).optBoolean("sent", false)
+        } catch (e: Exception) {
+            false
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    /** The newest drawing, already thinned by the server to a tile's worth. */
+    fun fetchDrawing(context: Context): Drawing? {
+        val (apiUrl, token) = credentials(context) ?: return null
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL("$apiUrl/widget/drawing").openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                setRequestProperty("X-Widget-Token", token)
+                setRequestProperty("Accept", "application/json")
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+            }
+            if (connection.responseCode != 200) return null
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(KEY_DRAWING, body).apply()
+            parseDrawing(body)
+        } catch (e: Exception) {
+            null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    fun cachedDrawing(context: Context): Drawing? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_DRAWING, null)?.let { parseDrawing(it) }
+
+    private fun parseColor(hex: String?, fallback: Int): Int = try {
+        if (hex.isNullOrBlank()) fallback else Color.parseColor(hex)
+    } catch (e: Exception) {
+        fallback
+    }
+
+    private fun parseDrawing(raw: String): Drawing? = try {
+        val root = JSONObject(raw).optJSONObject("drawing")
+        if (root == null) null else {
+            val strokesJson: JSONArray = root.optJSONArray("strokes") ?: JSONArray()
+            val strokes = ArrayList<Stroke>(strokesJson.length())
+            for (i in 0 until strokesJson.length()) {
+                val st = strokesJson.optJSONObject(i) ?: continue
+                val pts = st.optJSONArray("points") ?: continue
+                val flat = FloatArray(pts.length() * 2)
+                for (j in 0 until pts.length()) {
+                    val p = pts.optJSONObject(j) ?: continue
+                    flat[j * 2] = p.optDouble("x", 0.0).toFloat()
+                    flat[j * 2 + 1] = p.optDouble("y", 0.0).toFloat()
+                }
+                strokes.add(
+                    Stroke(
+                        points = flat,
+                        color = parseColor(st.optStringOrNull("color"), Color.BLACK),
+                        width = st.optDouble("width", 6.0).toFloat(),
+                        tool = st.optStringOrNull("tool") ?: "pen"
+                    )
+                )
+            }
+            Drawing(
+                title = root.optStringOrNull("title"),
+                canvasColor = parseColor(root.optStringOrNull("canvasColor"), Color.WHITE),
+                strokes = strokes
+            )
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * Paints a drawing into a bitmap the widget can show.
+     *
+     * RemoteViews has no vector anything, so the strokes have to become
+     * pixels somewhere, and doing it here rather than server-side means no
+     * image storage and a drawing that re-renders crisply at whatever size
+     * the person resizes the widget to.
+     *
+     * The drawing is scaled to fit rather than cropped: a widget tile is the
+     * one place where showing the middle of somebody's drawing and cutting
+     * off the rest would be worse than empty margins.
+     */
+    fun renderDrawing(drawing: Drawing, widthPx: Int, heightPx: Int): Bitmap? {
+        if (widthPx <= 0 || heightPx <= 0) return null
+
+        var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
+        var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
+        var widest = 1f
+        for (stroke in drawing.strokes) {
+            widest = maxOf(widest, stroke.width)
+            var i = 0
+            while (i < stroke.points.size) {
+                val x = stroke.points[i]; val y = stroke.points[i + 1]
+                if (x < minX) minX = x
+                if (y < minY) minY = y
+                if (x > maxX) maxX = x
+                if (y > maxY) maxY = y
+                i += 2
+            }
+        }
+        val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(drawing.canvasColor)
+        if (minX > maxX) return bitmap   // nothing drawable, but the paper is right
+
+        // A path's coordinates are its centre line, so the box has to grow by
+        // the widest brush or a stroke on the edge is sliced lengthways.
+        val pad = widest
+        val boxW = maxOf(maxX - minX, 1f) + pad * 2
+        val boxH = maxOf(maxY - minY, 1f) + pad * 2
+        val scale = minOf(widthPx / boxW, heightPx / boxH)
+
+        canvas.save()
+        canvas.translate(
+            (widthPx - boxW * scale) / 2f - (minX - pad) * scale,
+            (heightPx - boxH * scale) / 2f - (minY - pad) * scale
+        )
+        canvas.scale(scale, scale)
+
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        for (stroke in drawing.strokes) {
+            if (stroke.points.size < 2) continue
+            // An eraser paints IN the canvas colour rather than removing
+            // pixels — same as the app, and the only way that works when the
+            // strokes are replayed in order onto opaque paper.
+            paint.color = if (stroke.tool == "eraser") drawing.canvasColor else stroke.color
+            paint.alpha = if (stroke.tool == "highlighter") 110 else 255
+            paint.strokeWidth = stroke.width
+            val path = Path()
+            path.moveTo(stroke.points[0], stroke.points[1])
+            var i = 2
+            while (i < stroke.points.size) {
+                path.lineTo(stroke.points[i], stroke.points[i + 1])
+                i += 2
+            }
+            // A one-point stroke is a dot, and a Path with no line in it
+            // draws nothing at all.
+            if (stroke.points.size == 2) {
+                canvas.drawPoint(stroke.points[0], stroke.points[1], Paint(paint).apply {
+                    strokeCap = Paint.Cap.ROUND
+                })
+            } else {
+                canvas.drawPath(path, paint)
+            }
+        }
+        canvas.restore()
+        return bitmap
+    }
+
     private fun parse(raw: String, stale: Boolean): Summary? = try {
         val json = JSONObject(raw)
         val countdown = json.optJSONObject("nextCountdown")
+        val nextDate = json.optJSONObject("nextDate")
         Summary(
             paired = json.optBoolean("paired", false),
             streakCount = json.optInt("streakCount", 0),
@@ -120,6 +343,20 @@ object WidgetRepository {
             hasPhoto = !json.isNull("latestPhotoUrl"),
             partnerCyclePhase = if (json.isNull("partnerCyclePhase")) null else json.optString("partnerCyclePhase"),
             partnerNextPeriodDate = if (json.isNull("partnerNextPeriodDate")) null else json.optString("partnerNextPeriodDate"),
+            daysTogether = if (json.isNull("daysTogether")) null else json.optInt("daysTogether"),
+            togetherSince = json.optStringOrNull("togetherSince"),
+            partnerMood = json.optStringOrNull("partnerMood"),
+            partnerMoodNote = json.optStringOrNull("partnerMoodNote"),
+            todaysQuestion = json.optStringOrNull("todaysQuestion"),
+            nextDateTitle = nextDate?.optStringOrNull("title"),
+            nextDateDays = if (nextDate == null || nextDate.isNull("daysUntil")) null else nextDate.optInt("daysUntil"),
+            sealedNoteWaiting = json.optBoolean("sealedNoteWaiting", false),
+            latestNote = json.optStringOrNull("latestNote"),
+            unseenKisses = json.optInt("unseenKisses", 0),
+            lastKissFromPartnerAt = json.optStringOrNull("lastKissFromPartnerAt"),
+            lastKissSentAt = json.optStringOrNull("lastKissSentAt"),
+            latestDrawingAt = json.optStringOrNull("latestDrawingAt"),
+            latestDrawingTitle = json.optStringOrNull("latestDrawingTitle"),
             stale = stale
         )
     } catch (e: Exception) {

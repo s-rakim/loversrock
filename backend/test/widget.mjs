@@ -125,6 +125,92 @@ console.log('\n=== AMBIENT PRESENCE REACHES THE WIDGET ===');
   check('nor anywhere in the payload', !JSON.stringify(sealedView.data).includes('drawer'));
 }
 
+console.log('\n=== THE SIX REMAINING WIDGETS HAVE SOMETHING TO SHOW ===');
+// Each of these is a widget layout that had nowhere to read from before.
+// A fresh token, because the revocation section above deliberately killed WT.
+const W2 = (await req('/widget/token', { method: 'POST', token: A.token })).data.widgetToken;
+
+// Daily question.
+const withQ = await req('/widget/summary', { widgetToken: W2 });
+check('daily-question widget: the question itself is in the summary',
+  typeof withQ.data.todaysQuestion === 'string' && withQ.data.todaysQuestion.length > 0, withQ.data.todaysQuestion);
+check('and whether it still needs answering', typeof withQ.data.promptAnsweredToday === 'boolean');
+
+// Next date. Ideas are seeded globally and copied into the pair when saved,
+// so this is the real path a person takes rather than an invented one.
+const browse = await req('/date-ideas', { token: A.token });
+const seeded = browse.data.ideas[0];
+const mine = await req(`/date-ideas/${seeded.id}/save`, { method: 'POST', token: A.token });
+const when = new Date(Date.now() + 3 * 86400000).toISOString();
+const sched = await req(`/date-ideas/${mine.data.idea.id}/schedule`, { method: 'PATCH', token: A.token, body: { scheduledFor: when, status: 'scheduled' } });
+check('a date can be scheduled', sched.status === 200, sched.data);
+const dated = await req('/widget/summary', { widgetToken: W2 });
+check('next-date widget: title and countdown', dated.data.nextDate?.title === seeded.title
+  && dated.data.nextDate.daysUntil >= 2 && dated.data.nextDate.daysUntil <= 3, dated.data.nextDate);
+
+// Anniversary. Already in the payload, asserted here because the widget reads it.
+await req('/profile/together-since', { method: 'PUT', token: A.token, body: { togetherSince: '2020-02-14' } })
+  .catch(() => null);
+const anni = await req('/widget/summary', { widgetToken: W2 });
+check('anniversary widget: days together is a number or an honest null',
+  anni.data.daysTogether === null || typeof anni.data.daysTogether === 'number', anni.data.daysTogether);
+
+console.log('\n=== QUICK KISS: THE ONLY WRITE A WIDGET TOKEN CAN DO ===');
+const kissed = await req('/widget/kiss', { method: 'POST', widgetToken: W2 });
+check('a kiss sends', kissed.status === 201 && kissed.data.sent === true, kissed.data);
+// A button on a home screen WILL be pressed by a pocket. A second one in the
+// same breath is a no-op rather than an error the widget has to render.
+const again = await req('/widget/kiss', { method: 'POST', widgetToken: W2 });
+check('a second one straight away is throttled, not an error',
+  again.status === 200 && again.data.sent === false && again.data.throttled === true, again.data);
+
+const BWT = (await req('/widget/token', { method: 'POST', token: B.token })).data.widgetToken;
+const theirView = await req('/widget/summary', { widgetToken: BWT });
+check('their widget sees a kiss waiting', theirView.data.unseenKisses === 1, theirView.data.unseenKisses);
+check('and when it arrived', Boolean(theirView.data.lastKissFromPartnerAt));
+const myView = await req('/widget/summary', { widgetToken: W2 });
+check('mine shows when I last sent one', Boolean(myView.data.lastKissSentAt));
+check('and no unseen kisses of my own', myView.data.unseenKisses === 0, myView.data.unseenKisses);
+
+await req('/widget/kiss/seen', { method: 'POST', widgetToken: BWT });
+check('opening the app clears their badge',
+  (await req('/widget/summary', { widgetToken: BWT })).data.unseenKisses === 0);
+
+// The whole justification for allowing a write at all: this token lives in
+// SharedPreferences, not the keychain, so what it can do must stay harmless.
+check('the kiss route still needs a real widget token', (await req('/widget/kiss', { method: 'POST' })).status === 401);
+check('a bogus one cannot send', (await req('/widget/kiss', { method: 'POST', widgetToken: 'a'.repeat(64) })).status === 401);
+check('and the token still cannot post a message', (await req('/messages', { method: 'POST', widgetToken: W2, body: { type: 'text', content: 'hi' } })).status === 401);
+
+console.log('\n=== CANVAS WIDGET ===');
+const none = await req('/widget/drawing', { widgetToken: W2 });
+check('no drawing yet is null, not a 404', none.status === 200 && none.data.drawing === null, none.data);
+
+// A realistic drawing: slow strokes with hundreds of near-identical points.
+const dense = Array.from({ length: 6 }, (_, k) => ({
+  points: Array.from({ length: 900 }, (_, i) => ({ x: k * 20 + i * 0.05, y: i * 0.4 })),
+  color: '#FF5C8D', width: 6, tool: 'pen',
+}));
+await req('/canvas', { method: 'POST', token: A.token, body: { strokeData: { strokes: dense }, title: 'for the widget', canvasColor: '#FFFDF8' } });
+
+const drawing = await req('/widget/drawing', { widgetToken: W2 });
+check('the newest drawing comes back', drawing.data.drawing?.title === 'for the widget', drawing.data.drawing);
+check('with the paper it was drawn on', drawing.data.drawing.canvasColor === '#FFFDF8');
+const points = drawing.data.drawing.strokes.reduce((n, st) => n + st.points.length, 0);
+check(`thinned to something a tile can draw (${points} points, from 5400)`, points <= 2400 && points > 0, points);
+// Geometric thinning, not every-Nth: the shape has to survive.
+check('every stroke survived, just with fewer points', drawing.data.drawing.strokes.length === 6, drawing.data.drawing.strokes.length);
+check('and the last point of a stroke is kept, so lines end where the finger did',
+  drawing.data.drawing.strokes[0].points.at(-1).y === Math.round(899 * 0.4), drawing.data.drawing.strokes[0].points.at(-1));
+check('coordinates are whole numbers at tile size', drawing.data.drawing.strokes[0].points.every((p) => Number.isInteger(p.x) && Number.isInteger(p.y)));
+
+const summaryAfter = await req('/widget/summary', { widgetToken: W2 });
+check('the summary says there IS a drawing', Boolean(summaryAfter.data.latestDrawingAt), summaryAfter.data.latestDrawingAt);
+// The reason it is a separate endpoint at all.
+check('but does NOT carry the strokes, which every other widget would pay for',
+  !JSON.stringify(summaryAfter.data).includes('"points"'));
+check('the other couple cannot fetch it', (await req('/widget/drawing', { widgetToken: 'b'.repeat(64) })).status === 401);
+
 console.log(`\nWIDGET API RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) console.log('FAILURES:', fails);
 process.exit(fails.length ? 1 : 0);

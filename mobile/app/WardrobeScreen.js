@@ -18,6 +18,7 @@ import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton } from '../components/Motion';
 import Character, { SKINS, HAIR_COLORS, GARMENT_COLORS } from '../components/Character';
+import { hasArtFor } from '../assets/mascot';
 import usePartnerMood from '../components/usePartnerMood';
 
 const SLOTS = [
@@ -98,9 +99,14 @@ export default function WardrobeScreen() {
       <View style={styles.stage}>
         {/* The real renderer, wearing your current mood — so you can see
             exactly what they see. */}
-        <Character avatar={avatar} mood={mine?.mood} height={230} />
+        <Character avatar={avatar} mood={mine?.mood} who="me" height={230} />
+        {/* Artwork is used as supplied. Drawing a hoodie over a picture of a
+            real person would look exactly as bad as it sounds, so when there
+            IS art the wardrobe stops claiming it applies. */}
         <Text style={[font.muted, styles.stageNote]}>
-          This is what they see on their phone.
+          {hasArtFor('me')
+            ? 'Your artwork is what they see. The wardrobe dresses the drawn character.'
+            : 'This is what they see on their phone.'}
         </Text>
       </View>
 

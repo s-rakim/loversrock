@@ -332,5 +332,51 @@ check('two characters share no gradient ids either',
 const mascotSource = fs.readFileSync(path.join(root, 'components', 'Mascot.js'), 'utf8');
 check('nothing in the mascot is drawn at opacity 0', !/opacity=\{0\}/.test(mascotSource));
 
+console.log('\n=== SUPPLIED ARTWORK IS USED AS SUPPLIED ===');
+// The drawn character is a stand-in for having no art, not a style choice.
+// When there is a picture of the actual person, showing a vector
+// approximation of them instead would be strictly worse — so art wins, and
+// it is drawn with no tint, no recolouring and no clothes painted over it.
+const fakeArt = { uri: 'art://me-neutral.png' };
+const artStub = {
+  ME_ART: { neutral: fakeArt },
+  PARTNER_ART: { neutral: null },
+  PAIR_ART: null,
+  artFor: (mood, who) => (who === 'me' ? fakeArt : null),
+  hasArtFor: (who) => who === 'me',
+  HAS_ART: true,
+};
+const CharacterArt = load('components/Character.js', {
+  react: reactStub,
+  './ThemeContext': themeStub,
+  '../assets/mascot': artStub,
+}).default;
+
+const withArt = attrs(React.createElement(CharacterArt, { avatar: {}, mood: 'happy', who: 'me', height: 120 }));
+check('a person with art renders their image', withArt.some((p) => p.source === fakeArt), withArt.map((p) => p.source));
+check('and nothing is drawn over it', !withArt.some((p) => typeof p.fill === 'string'), withArt.filter((p) => p.fill).length);
+// Not stretched: a portrait character in a square box must letterbox, not distort.
+check('the image is contained rather than stretched',
+  withArt.some((p) => p.resizeMode === 'contain'), withArt.map((p) => p.resizeMode));
+// No tint prop anywhere, because "use it as it is" means exactly that.
+check('no tint is applied to it', !withArt.some((p) => p.tintColor), withArt.map((p) => p.tintColor));
+
+const withoutArt = attrs(React.createElement(CharacterArt, { avatar: {}, mood: 'happy', who: 'partner', height: 120 }));
+check('a person with NO art still falls back to the drawing',
+  !withoutArt.some((p) => p.source) && withoutArt.some((p) => typeof p.fill === 'string'));
+
+// The two characters take identical props, so nothing but `who` can say
+// whose artwork a given one is.
+const charSrc = fs.readFileSync(path.join(root, 'components', 'Character.js'), 'utf8');
+check('Character takes an explicit `who`', /who = 'partner'/.test(charSrc));
+const sites = [...walk(path.join(root, 'app')), ...walk(path.join(root, 'components'))]
+  .flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/<Character\s[^>]*\/>/g)].map((m) => m[0]));
+check(`all ${sites.length} call sites say whose character it is`,
+  sites.every((t) => /who="(me|partner)"/.test(t)), sites.join(' | '));
+
+// The wardrobe cannot dress a photograph, and must not claim to.
+const wardrobe = fs.readFileSync(path.join(root, 'app', 'WardrobeScreen.js'), 'utf8');
+check('the wardrobe says so when art is in use', /hasArtFor\('me'\)/.test(wardrobe));
+
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

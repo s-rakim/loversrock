@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Image } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -12,6 +12,7 @@ import { GlassProvider } from './components/GlassContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import LavaLamp from './components/LavaLamp';
 import Mascot from './components/Mascot';
+import { PAIR_ART } from './assets/mascot';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification } from './services/notifications';
 import GlassTabBar from './components/GlassTabBar';
@@ -198,8 +199,14 @@ function Root() {
         <LavaLamp />
         {/* The mascot holds the loading moment rather than a bare spinner.
             Neutral here on purpose — the partner's mood is not known until
-            after sign-in, and guessing one would be a lie for half a second. */}
-        <Mascot size={140} />
+            after sign-in, and guessing one would be a lie for half a second.
+
+            The pair artwork, if there is any, is shown as supplied: the two
+            of you leaning on each other is a single picture, and there is no
+            arrangement of two cut-outs that reproduces it. */}
+        {PAIR_ART
+          ? <Image source={PAIR_ART} style={{ width: 240, height: 240 }} resizeMode="contain" />
+          : <Mascot size={140} />}
         <ActivityIndicator color={colors.accentPink} size="large" style={{ marginTop: 24 }} />
       </View>
     );

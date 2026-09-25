@@ -634,3 +634,27 @@ CREATE TABLE IF NOT EXISTS canvas_drawings (
 -- an index rather than a sort on every read.
 CREATE INDEX IF NOT EXISTS canvas_drawings_pair_idx
   ON canvas_drawings (pair_id, pinned DESC, updated_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Nudges: the quick-kiss widget, and anything else that is a tap and a feeling.
+-- ---------------------------------------------------------------------------
+
+-- Deliberately not the thumb-kiss socket event.
+--
+-- Thumb kiss is synchronous: both of you have to be holding the same screen at
+-- the same moment, which is lovely and happens rarely. A widget kiss is the
+-- opposite — one tap from a home screen, delivered whether or not they are
+-- looking. So it is a stored row rather than a relayed packet: it survives
+-- their phone being in a pocket, and the widget on the other side can say
+-- "kissed you, 4m ago" hours later.
+CREATE TABLE IF NOT EXISTS nudges (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id    UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  from_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind       TEXT NOT NULL DEFAULT 'kiss' CHECK (kind IN ('kiss', 'hug', 'thinking', 'miss')),
+  seen_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Only ever read as "the most recent one from them", so that is the index.
+CREATE INDEX IF NOT EXISTS nudges_pair_idx ON nudges (pair_id, from_id, created_at DESC);

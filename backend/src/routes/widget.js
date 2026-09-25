@@ -4,10 +4,28 @@ import { query } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getObjectStream } from '../config/storage.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
+import { getUserDeviceTokens } from '../models/pairs.js';
+import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 
 const router = asyncRouter();
 
 const hashToken = (raw) => createHash('sha256').update(raw).digest('hex');
+
+// What a widget can afford to draw.
+//
+// Android RemoteViews cross a Binder transaction with a hard ~1MB ceiling and
+// an iOS widget gets a few hundred milliseconds of background execution. A
+// drawing of 120,000 points is neither of those things, so the widget copy is
+// thinned to something a 2x2 tile can show — which at that size is all the
+// detail that survives anyway.
+const WIDGET_DRAWING = { strokes: 120, points: 2400, minStep: 3 };
+
+const LABELS = {
+  kiss: { title: 'A kiss 💋', body: 'Sent from their home screen.' },
+  hug: { title: 'A hug', body: 'They are thinking of you.' },
+  thinking: { title: 'Thinking of you', body: 'Straight from their home screen.' },
+  miss: { title: 'They miss you', body: 'Tap to say something back.' },
+};
 
 // Deliberately NOT requireAuth: this is the widget's own read-only credential,
 // usable on this endpoint alone. It can never reach messages, memories, or
@@ -110,6 +128,22 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     sealedNoteWaiting: false,
     latestNote: null,
     latestNoteAt: null,
+    // The daily-question widget shows the question itself. Answering happens
+    // in the app — a home screen is no place to type a paragraph — but a
+    // question you can read without unlocking anything is one you think about
+    // during the day instead of at 11pm.
+    todaysQuestion: null,
+    // The next-date widget.
+    nextDate: null,
+    // The quick-kiss widget, both halves of it: whether one is waiting for
+    // you, and when you last sent one, so the button can say so.
+    lastKissFromPartnerAt: null,
+    unseenKisses: 0,
+    lastKissSentAt: null,
+    // The canvas widget only needs to know there IS one, and when. The
+    // strokes are a separate fetch — see GET /widget/drawing.
+    latestDrawingAt: null,
+    latestDrawingTitle: null,
     updatedAt: new Date().toISOString(),
   };
 
@@ -117,7 +151,10 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
 
   const partnerId = pair.user_a_id === req.userId ? pair.user_b_id : pair.user_a_id;
 
-  const [promptRes, countdownRes, photoRes, locationRes, partnerPeriodRes, moodRes, noteRes] = await Promise.all([
+  const [
+    promptRes, countdownRes, photoRes, locationRes, partnerPeriodRes, moodRes, noteRes,
+    questionRes, dateRes, kissInRes, kissOutRes, drawingRes,
+  ] = await Promise.all([
     query(
       `SELECT 1 FROM prompt_responses pr
        JOIN daily_prompts dp ON dp.id = pr.prompt_id
@@ -147,7 +184,49 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
         ORDER BY created_at DESC LIMIT 1`,
       [pair.id, partnerId]
     ),
+    query('SELECT content FROM daily_prompts WHERE scheduled_date = CURRENT_DATE LIMIT 1'),
+    query(
+      `SELECT title, scheduled_for FROM date_ideas
+        WHERE pair_id = $1 AND status = 'scheduled' AND scheduled_for > now()
+        ORDER BY scheduled_for ASC LIMIT 1`,
+      [pair.id]
+    ),
+    // Theirs to me: the newest, and how many I have not looked at.
+    query(
+      `SELECT max(created_at) AS at, count(*) FILTER (WHERE seen_at IS NULL) AS unseen
+         FROM nudges WHERE pair_id = $1 AND from_id = $2 AND kind = 'kiss'`,
+      [pair.id, partnerId]
+    ),
+    query(
+      `SELECT max(created_at) AS at FROM nudges
+        WHERE pair_id = $1 AND from_id = $2 AND kind = 'kiss'`,
+      [pair.id, req.userId]
+    ),
+    query(
+      'SELECT title, updated_at FROM canvas_drawings WHERE pair_id = $1 ORDER BY updated_at DESC LIMIT 1',
+      [pair.id]
+    ),
   ]);
+
+  summary.todaysQuestion = questionRes.rows[0]?.content || null;
+
+  if (dateRes.rows[0]) {
+    const at = new Date(dateRes.rows[0].scheduled_for);
+    summary.nextDate = {
+      title: dateRes.rows[0].title,
+      scheduledFor: at.toISOString(),
+      daysUntil: Math.max(0, Math.ceil((at.getTime() - Date.now()) / 86400000)),
+    };
+  }
+
+  summary.lastKissFromPartnerAt = kissInRes.rows[0]?.at || null;
+  summary.unseenKisses = Number(kissInRes.rows[0]?.unseen || 0);
+  summary.lastKissSentAt = kissOutRes.rows[0]?.at || null;
+
+  if (drawingRes.rows[0]) {
+    summary.latestDrawingAt = drawingRes.rows[0].updated_at;
+    summary.latestDrawingTitle = drawingRes.rows[0].title;
+  }
 
   summary.togetherSince = pair.together_since || null;
   summary.daysTogether = pair.together_since
@@ -215,6 +294,147 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
   }
 
   res.json(summary);
+});
+
+/**
+ * The latest drawing, downsampled enough to cross a widget's budget.
+ *
+ * Kept OFF /summary on purpose. Every widget on the home screen hits that
+ * endpoint on every refresh; only the canvas widget wants strokes, and a real
+ * drawing is tens of thousands of points. Making everyone pay for it would
+ * slow down the five widgets that do not care.
+ *
+ * Downsampling is geometric rather than by count: a stroke drawn slowly has
+ * hundreds of points a fraction of a pixel apart, and dropping every Nth one
+ * of those loses nothing, while a fast flick has few points that all matter.
+ * So points are kept when they are far enough from the last kept one, which
+ * preserves the shape of both.
+ */
+router.get('/drawing', requireWidgetToken, async (req, res) => {
+  const { rows: pairRows } = await query(
+    `SELECT id FROM pairs WHERE (user_a_id = $1 OR user_b_id = $1) AND unlinked_at IS NULL AND user_b_id IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+    [req.userId]
+  );
+  if (!pairRows[0]) return res.json({ drawing: null });
+
+  const { rows } = await query(
+    `SELECT id, title, canvas_color, stroke_data, updated_at FROM canvas_drawings
+      WHERE pair_id = $1 ORDER BY pinned DESC, updated_at DESC LIMIT 1`,
+    [pairRows[0].id]
+  );
+  if (!rows[0]) return res.json({ drawing: null });
+
+  const strokes = (rows[0].stroke_data?.strokes || []).slice(0, WIDGET_DRAWING.strokes);
+  let budget = WIDGET_DRAWING.points;
+
+  const thinned = [];
+  for (const stroke of strokes) {
+    if (budget <= 0) break;
+    const kept = [];
+    let lastX = null;
+    let lastY = null;
+    for (const p of stroke.points || []) {
+      const far = lastX === null
+        || Math.abs(p.x - lastX) + Math.abs(p.y - lastY) >= WIDGET_DRAWING.minStep;
+      if (far) {
+        kept.push({ x: Math.round(p.x), y: Math.round(p.y) });
+        lastX = p.x;
+        lastY = p.y;
+      }
+    }
+    // The last point of a stroke is where the finger stopped, so keeping it
+    // is the difference between a line that ends and one that stops short.
+    const last = stroke.points?.[stroke.points.length - 1];
+    if (last && kept.length && (kept[kept.length - 1].x !== Math.round(last.x)
+      || kept[kept.length - 1].y !== Math.round(last.y))) {
+      kept.push({ x: Math.round(last.x), y: Math.round(last.y) });
+    }
+    if (kept.length === 0) continue;
+    const take = kept.slice(0, budget);
+    budget -= take.length;
+    thinned.push({ points: take, color: stroke.color, width: stroke.width, tool: stroke.tool });
+  }
+
+  res.json({
+    drawing: {
+      id: rows[0].id,
+      title: rows[0].title,
+      canvasColor: rows[0].canvas_color,
+      updatedAt: rows[0].updated_at,
+      strokes: thinned,
+    },
+  });
+});
+
+/**
+ * A kiss, sent from a home screen.
+ *
+ * This is the only WRITE the widget token can perform, and it was worth
+ * thinking about before adding. The token lives in plain SharedPreferences /
+ * an app group container so a widget process can read it, which is a weaker
+ * place than the keychain the real session lives in. So the rule is that
+ * anything the widget token can do must be something you would not mind a
+ * thief of that phone doing: it can read a summary, and it can tell your
+ * partner you are thinking of them. It cannot read a message, post one, see a
+ * sealed note, or touch anything else.
+ *
+ * Rate-limited because a button on a home screen will be pressed by a pocket.
+ */
+router.post('/kiss', requireWidgetToken, async (req, res) => {
+  const { rows: pairRows } = await query(
+    `SELECT * FROM pairs WHERE (user_a_id = $1 OR user_b_id = $1) AND unlinked_at IS NULL AND user_b_id IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+    [req.userId]
+  );
+  const pair = pairRows[0];
+  if (!pair) return res.status(409).json({ error: 'Not paired' });
+
+  const kind = ['kiss', 'hug', 'thinking', 'miss'].includes(req.body?.kind) ? req.body.kind : 'kiss';
+
+  // One every thirty seconds. Not an error — a pocket press should be a
+  // no-op, not a red banner the next time the widget refreshes.
+  const { rows: recent } = await query(
+    `SELECT created_at FROM nudges
+      WHERE pair_id = $1 AND from_id = $2 AND created_at > now() - interval '30 seconds'
+      ORDER BY created_at DESC LIMIT 1`,
+    [pair.id, req.userId]
+  );
+  if (recent[0]) return res.json({ sent: false, throttled: true, at: recent[0].created_at });
+
+  const { rows } = await query(
+    'INSERT INTO nudges (pair_id, from_id, kind) VALUES ($1, $2, $3) RETURNING id, kind, created_at',
+    [pair.id, req.userId, kind]
+  );
+
+  const partnerId = pair.user_a_id === req.userId ? pair.user_b_id : pair.user_a_id;
+  req.app.get('io')?.to(`pair:${pair.id}`).emit('nudge:received', { nudge: rows[0], from: req.userId });
+
+  const tokens = await getUserDeviceTokens(partnerId);
+  await sendNotification(
+    tokens,
+    { title: LABELS[kind].title, body: LABELS[kind].body },
+    deepLink('home'),
+    { channel: CHANNELS.partner }
+  ).catch((err) => console.error('[widget] kiss push failed:', err.message));
+
+  res.status(201).json({ sent: true, nudge: rows[0] });
+});
+
+// Marks their kisses as seen, so the widget's little badge clears. Called by
+// the app rather than the widget — opening the app is what "seen" means.
+router.post('/kiss/seen', requireWidgetToken, async (req, res) => {
+  const { rows: pairRows } = await query(
+    `SELECT * FROM pairs WHERE (user_a_id = $1 OR user_b_id = $1) AND unlinked_at IS NULL AND user_b_id IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+    [req.userId]
+  );
+  if (!pairRows[0]) return res.status(409).json({ error: 'Not paired' });
+  const { rowCount } = await query(
+    'UPDATE nudges SET seen_at = now() WHERE pair_id = $1 AND from_id <> $2 AND seen_at IS NULL',
+    [pairRows[0].id, req.userId]
+  );
+  res.json({ seen: rowCount });
 });
 
 // Widgets can't send an Authorization header through the image loader on
