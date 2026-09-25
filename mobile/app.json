@@ -23,6 +23,7 @@
     },
     "plugins": [
       "./plugins/withCleartextTraffic",
+      "./plugins/withGradleProjectName",
       "./plugins/withAndroidWidgets",
       "./plugins/withIosWidgets",
       [
