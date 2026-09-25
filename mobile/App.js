@@ -262,10 +262,6 @@ function Root() {
                 point of the two: you arrive wanting to see what is there far
                 more often than with a blank drawing already in mind. */}
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
-            {/* The locket, as its own section: a camera screen and the wall of
-                everything sent. headerShown false on the camera because the
-                camera IS the screen — a title bar over it is just a bar. */}
-            <Stack.Screen name="PhotoHistory" component={PhotoHistoryScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Chat Wallpaper' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />

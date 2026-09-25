@@ -11,6 +11,7 @@
     "test:theme": "node test/theme.mjs",
     "test:parse": "node test/parse-check.mjs .",
     "test:imports": "node test/imports.mjs",
+    "test:boot": "node test/boot.mjs",
     "test:catalog": "node test/cycleCatalog.mjs",
     "test:doodle": "node test/doodle.mjs",
     "test:render": "node test/render.mjs",

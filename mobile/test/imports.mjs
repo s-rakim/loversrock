@@ -24,6 +24,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const parser = require('@babel/parser');
+const traverse = require('@babel/traverse').default;
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -216,6 +217,89 @@ if (wrongName.length === 0) {
   pass('every named import is exported by its target');
 } else {
   for (const w of wrongName) fail(w);
+}
+
+console.log('\n=== AND NO FILE USES A NAME IT NEVER DEFINED ===');
+
+// The white screen. App.js had
+//
+//     <Stack.Screen name="PhotoHistory" component={PhotoHistoryScreen} ... />
+//
+// and no import for PhotoHistoryScreen — the import went when the photo wall
+// was folded into PhotoSectionScreen, the route it fed did not. Every other
+// check was happy: the file parses, every import resolves, and the nav test
+// reads route names out of App.js, so "PhotoHistory" counted as a registered
+// destination even though the thing registering it was undefined.
+//
+// At runtime it is a ReferenceError thrown while rendering the root, which
+// React answers by unmounting the entire tree. No crash dialog, no message:
+// a white screen, which is the least informative failure the app has.
+//
+// So: resolve every identifier against its own scope. A name with no binding
+// and no entry in the globals below is a name that does not exist.
+
+const GLOBALS = new Set([
+  // Standard library.
+  'Array', 'ArrayBuffer', 'BigInt', 'Boolean', 'DataView', 'Date', 'Error', 'EvalError',
+  'Float32Array', 'Float64Array', 'Function', 'Infinity', 'Int8Array', 'Int16Array',
+  'Int32Array', 'Intl', 'JSON', 'Map', 'Math', 'NaN', 'Number', 'Object', 'Promise',
+  'Proxy', 'RangeError', 'ReferenceError', 'Reflect', 'RegExp', 'Set', 'String', 'Symbol',
+  'SyntaxError', 'TypeError', 'URIError', 'Uint8Array', 'Uint8ClampedArray', 'Uint16Array',
+  'Uint32Array', 'WeakMap', 'WeakSet', 'decodeURI', 'decodeURIComponent', 'encodeURI',
+  'encodeURIComponent', 'escape', 'globalThis', 'isFinite', 'isNaN', 'parseFloat',
+  'parseInt', 'structuredClone', 'undefined', 'unescape',
+  // The module wrapper.
+  'exports', 'module', 'require', 'process', 'global', '__dirname', '__filename',
+  // React Native's runtime: the timers, the fetch stack, the web-ish shims
+  // Hermes provides, and the flag every RN codebase branches on.
+  '__DEV__', 'AbortController', 'AbortSignal', 'Blob', 'File', 'FileReader', 'FormData',
+  'Headers', 'Request', 'Response', 'TextDecoder', 'TextEncoder', 'URL', 'URLSearchParams',
+  'WebSocket', 'XMLHttpRequest', 'atob', 'btoa', 'cancelAnimationFrame', 'cancelIdleCallback',
+  'clearImmediate', 'clearInterval', 'clearTimeout', 'console', 'fetch', 'navigator',
+  'performance', 'queueMicrotask', 'requestAnimationFrame', 'requestIdleCallback',
+  'setImmediate', 'setInterval', 'setTimeout', 'alert', 'window', 'document', 'crypto',
+  'HermesInternal',
+]);
+
+const undefined_ = [];
+let identifiers = 0;
+
+for (const file of files) {
+  const ast = astOf(file);
+  if (!ast) continue;
+
+  // A fresh parse: traverse mutates paths, and astOf caches.
+  let tree;
+  try {
+    tree = parser.parse(fs.readFileSync(file, 'utf8'), {
+      sourceType: 'unambiguous',
+      plugins: ['jsx', 'classProperties', 'objectRestSpread', 'optionalChaining', 'nullishCoalescingOperator'],
+    });
+  } catch { continue; }
+
+  const seen = new Set();
+  traverse(tree, {
+    ReferencedIdentifier(p) {
+      const { name } = p.node;
+      // JSX member expressions (<Stack.Screen>) reference only the object,
+      // and an object property shorthand is not a reference to a binding.
+      if (p.parentPath.isJSXMemberExpression() && p.parentPath.node.property === p.node) return;
+      if (p.parentPath.isJSXAttribute()) return;
+      identifiers += 1;
+      if (GLOBALS.has(name)) return;
+      if (p.scope.hasBinding(name, true)) return;
+      const key = `${file}:${name}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      undefined_.push(`${path.relative(root, file)} uses ${name}, which is never imported or declared (line ${p.node.loc?.start.line})`);
+    },
+  });
+}
+
+if (undefined_.length === 0) {
+  pass(`all ${identifiers} identifiers resolve to a binding or a known global`);
+} else {
+  for (const u of undefined_) fail(u);
 }
 
 console.log(`\nIMPORT RESULT — PASSED: ${passed}  FAILED: ${failed}`);

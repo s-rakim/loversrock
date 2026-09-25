@@ -151,7 +151,7 @@ export default function PhotoWidgetScreen({ navigation }) {
           </Text>
         </View>
 
-        <Pressable onPress={() => navigation.navigate('PhotoHistory')} style={styles.roundSmall}>
+        <Pressable onPress={() => navigation.navigate('Wall')} style={styles.roundSmall}>
           <Ionicons name="images" size={18} color="#fff" />
         </Pressable>
       </View>
@@ -232,7 +232,7 @@ export default function PhotoWidgetScreen({ navigation }) {
         )}
       </View>
 
-      <Pressable onPress={() => navigation.navigate('PhotoHistory')} style={styles.historyRow}>
+      <Pressable onPress={() => navigation.navigate('Wall')} style={styles.historyRow}>
         <Text style={styles.historyText}>History</Text>
         <Ionicons name="chevron-down" size={18} color={colors.textPrimary} />
       </Pressable>
