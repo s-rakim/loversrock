@@ -496,3 +496,7 @@ CREATE INDEX IF NOT EXISTS idx_chess_games_pair ON chess_games(pair_id, updated_
 -- how you found us, ...). Free-form JSON: the app owns the question set.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding     JSONB;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarded_at   TIMESTAMPTZ;
+
+-- The couple's live characters: each person's wardrobe (skin, hair, top,
+-- bottom, shoes, accessories) as drawn by mobile/components/avatar.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar JSONB;

@@ -6,6 +6,10 @@ import { colors, font, spacing, radius, gradientForCategory } from '../theme';
 import { FadeInUp, MorphButton, PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
+import { CoupleMascots } from '../components/Mascot';
+import MoodPicker from '../components/MoodPicker';
+import { useCouple } from '../components/CoupleContext';
+import { useI18n } from '../i18n';
 
 const QUICK_LINKS = [
   ['BucketList', 'Bucket List', 'checkbox-outline'],
@@ -15,11 +19,33 @@ const QUICK_LINKS = [
   ['PeriodTracker', 'Cycle Tracker', 'water-outline'],
 ];
 
+// Candle / Lovers X additions, labelled through i18n.
+const MORE_LINKS = [
+  ['Connect', 'home.link.connect', 'chatbubbles-outline'],
+  ['DailySnap', 'home.link.snap', 'camera-outline'],
+  ['SharedCanvas', 'home.link.canvas', 'color-palette-outline'],
+  ['CanvasGallery', 'home.link.gallery', 'albums-outline'],
+  ['DateDiscover', 'home.link.dateDiscover', 'heart-circle-outline'],
+  ['DatePlans', 'home.link.datePlans', 'calendar-outline'],
+  ['CheckIn', 'home.link.checkin', 'pulse-outline'],
+  ['Challenge', 'home.link.challenge', 'dice-outline'],
+  ['Notes', 'home.link.notes', 'document-text-outline'],
+  ['SecretMessage', 'home.link.secret', 'mail-unread-outline'],
+  ['Timeline', 'home.link.timeline', 'calendar-number-outline'],
+  ['Achievements', 'home.link.achievements', 'trophy-outline'],
+  ['Sparks', 'home.link.sparks', 'sparkles-outline'],
+  ['Wardrobe', 'home.link.wardrobe', 'shirt-outline'],
+];
+
 export default function HomeScreen({ navigation }) {
   const [streak, setStreak] = useState(0);
   const [decksByCategory, setDecksByCategory] = useState({});
   const [games, setGames] = useState([]);
   const [widgetPhoto, setWidgetPhoto] = useState(null);
+  const { t } = useI18n();
+  const { me, partner, pair, sparks, myCharacter, partnerCharacter, refresh } = useCouple();
+  const [moodOpen, setMoodOpen] = useState(false);
+  const [today, setToday] = useState({});
 
   const load = useCallback(async () => {
     const [prompt, decks, gamesRes, widget] = await Promise.allSettled([
@@ -36,6 +62,28 @@ export default function HomeScreen({ navigation }) {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Dashboard extras: what's waiting today, so there's always something to do.
+  const loadToday = useCallback(async () => {
+    const fresh = await refresh();
+    if (fresh?.me && !fresh.me.onboardedAt) {
+      navigation.navigate('Onboarding');
+      return;
+    }
+    const [challenge, nextDate, secrets, checkin] = await Promise.allSettled([
+      apiFetch('/challenges/today'),
+      apiFetch('/dates/next'),
+      apiFetch('/secrets'),
+      apiFetch('/checkins/current'),
+    ]);
+    setToday({
+      challenge: challenge.status === 'fulfilled' ? challenge.value : null,
+      nextDate: nextDate.status === 'fulfilled' ? nextDate.value.plan : null,
+      unopenedSecrets: secrets.status === 'fulfilled' ? secrets.value.unopened : 0,
+      checkin: checkin.status === 'fulfilled' ? checkin.value : null,
+    });
+  }, [refresh, navigation]);
+  useFocusEffect(useCallback(() => { loadToday(); }, [loadToday]));
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <StickerField variant="home" />
@@ -43,11 +91,88 @@ export default function HomeScreen({ navigation }) {
         <FadeInUp>
           <View style={styles.headerRow}>
             <Text style={font.wordmark}>loversrock.</Text>
-            <View style={styles.streakPill}>
-              <Icon name="flame" size={16} color={colors.gold} />
-              <Text style={styles.streakText}>{streak}</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+              <MorphButton onPress={() => navigation.navigate('Sparks')} style={styles.streakPill}>
+                <Icon name="sparkles" size={16} color={colors.gold} />
+                <Text style={styles.streakText}>{sparks}</Text>
+              </MorphButton>
+              <View style={styles.streakPill}>
+                <Icon name="flame" size={16} color={colors.gold} />
+                <Text style={styles.streakText}>{streak}</Text>
+              </View>
             </View>
           </View>
+        </FadeInUp>
+
+        {/* The couple: each character wears its own person's current mood. */}
+        <FadeInUp delay={30}>
+          <View style={styles.coupleCard}>
+            <CoupleMascots
+              me={myCharacter || { emotion: 'happy' }}
+              partner={partnerCharacter || { emotion: 'happy', avatar: { preset: 'her' } }}
+              context="home"
+              onPressPartner={() => navigation.navigate('Profile', { who: 'partner' })}
+              onLongPressMe={() => setMoodOpen(true)}
+            />
+            <Text style={[font.muted, { textAlign: 'center', marginTop: spacing.xs }]}>
+              {partner?.mood
+                ? t('home.partnerFeeling', { name: partner.name, mood: `${partner.mood.emoji}${partner.mood.text ? ` ${partner.mood.text}` : ''}` })
+                : partner ? t('home.partnerNoMood', { name: partner.name }) : ''}
+              {pair ? `  ·  ${t('home.daysTogether', { n: pair.daysTogether })}` : ''}
+            </Text>
+            <View style={styles.coupleActions}>
+              <MorphButton onPress={() => setMoodOpen(true)} style={styles.coupleButton}>
+                <Text style={{ fontSize: 16 }}>{me?.mood?.emoji || '🙂'}</Text>
+                <Text style={styles.coupleButtonText}>{t('mood.set')}</Text>
+              </MorphButton>
+              <MorphButton onPress={() => navigation.navigate('Wardrobe')} style={styles.coupleButton}>
+                <Icon name="shirt-outline" size={15} chip={false} />
+                <Text style={styles.coupleButtonText}>{t('wardrobe.title')}</Text>
+              </MorphButton>
+              <MorphButton onPress={() => apiFetch('/nudges', { method: 'POST', body: { kind: 'kiss' } }).catch(() => {})} style={styles.coupleButton}>
+                <Text style={{ fontSize: 15 }}>😘</Text>
+                <Text style={styles.coupleButtonText}>{t('home.sendKiss')}</Text>
+              </MorphButton>
+            </View>
+          </View>
+        </FadeInUp>
+
+        <FadeInUp delay={45}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.md }}>
+            {widgetPhoto && (
+              <MorphButton onPress={() => navigation.navigate('DailySnap')} style={[styles.todayCard, { padding: 0, overflow: 'hidden' }]}>
+                <Image source={{ uri: mediaUrl(widgetPhoto.imageUrl || widgetPhoto.image_url) }} style={{ width: '100%', height: 90 }} />
+                <Text style={[styles.todayTitle, { padding: spacing.sm }]} numberOfLines={1}>{widgetPhoto.caption || t('home.today.snap')}</Text>
+              </MorphButton>
+            )}
+            {today.unopenedSecrets > 0 && (
+              <MorphButton onPress={() => navigation.navigate('SecretMessage')} style={[styles.todayCard, { backgroundColor: '#FFE1E7' }]}>
+                <Icon name="mail-unread" chip chipColor="rgba(255,255,255,0.7)" />
+                <Text style={styles.todayTitle}>{t('home.today.secret')}</Text>
+              </MorphButton>
+            )}
+            {today.challenge && (
+              <MorphButton onPress={() => navigation.navigate('Challenge')} style={[styles.todayCard, { backgroundColor: '#FFF0D6' }]}>
+                <Icon name={today.challenge.challenge.icon} chip chipColor="rgba(255,255,255,0.7)" />
+                <Text style={styles.todayLabel}>{today.challenge.completed ? t('home.today.challengeDone') : t('home.today.challenge')}</Text>
+                <Text style={styles.todayTitle} numberOfLines={2}>{today.challenge.challenge.title}</Text>
+              </MorphButton>
+            )}
+            <MorphButton onPress={() => navigation.navigate(today.nextDate ? 'DatePlans' : 'DateDiscover')} style={[styles.todayCard, { backgroundColor: '#E3F2FD' }]}>
+              <Icon name="calendar" chip chipColor="rgba(255,255,255,0.7)" />
+              <Text style={styles.todayLabel}>{today.nextDate ? t('home.today.nextDate') : t('home.today.findDate')}</Text>
+              <Text style={styles.todayTitle} numberOfLines={2}>
+                {today.nextDate ? `${today.nextDate.title} · ${new Date(today.nextDate.scheduled_for).toLocaleDateString([], { day: 'numeric', month: 'short' })}` : t('home.today.swipe')}
+              </Text>
+            </MorphButton>
+            {today.checkin && !today.checkin.myAnswers && (
+              <MorphButton onPress={() => navigation.navigate('CheckIn')} style={[styles.todayCard, { backgroundColor: '#DDF5EA' }]}>
+                <Icon name="pulse" chip chipColor="rgba(255,255,255,0.7)" />
+                <Text style={styles.todayLabel}>{t('home.today.checkin')}</Text>
+                <Text style={styles.todayTitle} numberOfLines={2}>{today.checkin.partnerDone ? t('home.today.checkinPartner', { name: partner?.name || '' }) : t('home.today.checkinBody')}</Text>
+              </MorphButton>
+            )}
+          </ScrollView>
         </FadeInUp>
 
         <FadeInUp delay={60}>
@@ -89,6 +214,12 @@ export default function HomeScreen({ navigation }) {
               <MorphButton key={route} onPress={() => navigation.navigate(route)} style={styles.quickLink}>
                 <Icon name={icon} size={16} />
                 <Text style={font.body}>{label}</Text>
+              </MorphButton>
+            ))}
+            {MORE_LINKS.map(([route, key, icon]) => (
+              <MorphButton key={route} onPress={() => navigation.navigate(route)} style={styles.quickLink}>
+                <Icon name={icon} size={16} />
+                <Text style={font.body}>{t(key)}</Text>
               </MorphButton>
             ))}
           </View>
@@ -133,6 +264,7 @@ export default function HomeScreen({ navigation }) {
           </ScrollView>
         </FadeInUp>
       </ScrollView>
+      <MoodPicker visible={moodOpen} onClose={() => setMoodOpen(false)} />
     </View>
   );
 }
@@ -180,4 +312,20 @@ const styles = StyleSheet.create({
   },
   lockedTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs },
   lockedTagText: { fontSize: 11, color: colors.text, fontWeight: '600' },
+  coupleCard: {
+    backgroundColor: colors.surface, borderRadius: radius.xl, paddingTop: spacing.md, paddingBottom: spacing.md,
+    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,
+  },
+  coupleActions: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  coupleButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accentSoft,
+    borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+  },
+  coupleButtonText: { color: colors.accent, fontWeight: '700', fontSize: 13 },
+  todayCard: {
+    width: 150, minHeight: 130, borderRadius: radius.lg, padding: spacing.md, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.border, justifyContent: 'flex-start',
+  },
+  todayLabel: { ...font.muted, fontSize: 11, marginTop: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
+  todayTitle: { fontWeight: '700', color: colors.text, marginTop: 2 },
 });

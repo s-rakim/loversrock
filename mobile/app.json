@@ -34,7 +34,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "loversrock needs access to your photos to add them to your shared Memories."
+          "photosPermission": "loversrock needs access to your photos to add them to your shared Memories.",
+          "cameraPermission": "loversrock uses the camera for Daily Snaps you send to your partner."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#E8607A"
         }
       ]
     ]

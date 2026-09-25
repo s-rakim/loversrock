@@ -24,6 +24,7 @@ function publicProfile(u) {
     birthday: u.birthday,
     loveLanguage: u.love_language,
     favorites: u.favorites || {},
+    avatar: u.avatar || null,
     mood: u.mood_emoji ? { emoji: u.mood_emoji, text: u.mood_text, updatedAt: u.mood_updated_at } : null,
   };
 }
@@ -81,7 +82,12 @@ router.get('/me', async (req, res) => {
 });
 
 router.patch('/', async (req, res) => {
-  const { name, bio, birthday, loveLanguage, favorites, language } = req.body || {};
+  const { name, bio, birthday, loveLanguage, favorites, language, avatar } = req.body || {};
+  if (avatar !== undefined && avatar !== null) {
+    if (typeof avatar !== 'object' || Array.isArray(avatar) || JSON.stringify(avatar).length > 4000) {
+      return res.status(400).json({ error: 'avatar must be a small object' });
+    }
+  }
   if (language !== undefined && !SUPPORTED_LANGUAGES.includes(language)) {
     return res.status(400).json({ error: `language must be one of ${SUPPORTED_LANGUAGES.join(', ')}` });
   }
@@ -97,7 +103,8 @@ router.patch('/', async (req, res) => {
        birthday = CASE WHEN $4::boolean THEN $5::date ELSE birthday END,
        love_language = CASE WHEN $6::boolean THEN $7 ELSE love_language END,
        favorites = CASE WHEN $8::boolean THEN $9::jsonb ELSE favorites END,
-       language = COALESCE($10, language)
+       language = COALESCE($10, language),
+       avatar = CASE WHEN $12::boolean THEN $13::jsonb ELSE avatar END
      WHERE id = $11 RETURNING *`,
     [
       name?.trim() ?? null,
@@ -107,8 +114,13 @@ router.patch('/', async (req, res) => {
       favorites !== undefined, favorites ? JSON.stringify(favorites) : null,
       language ?? null,
       req.userId,
+      avatar !== undefined, avatar ? JSON.stringify(avatar) : null,
     ]
   );
+  if (avatar !== undefined) {
+    const pair = await getActivePairForUser(req.userId);
+    if (pair) req.app.get('io').to(`pair:${pair.id}`).emit('avatar:update', { userId: req.userId, avatar: rows[0].avatar });
+  }
   res.json({ me: { ...publicProfile(rows[0]), email: rows[0].email, language: rows[0].language } });
 });
 

@@ -5,9 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from './Icon';
 import { useGlass } from './GlassContext';
 import { colors, radius, spacing, font } from '../theme';
+import { useI18n } from '../i18n';
 
 const TAB_META = {
   Home: { icon: 'home-outline', iconActive: 'home', label: 'Home' },
+  Feed: { icon: 'newspaper-outline', iconActive: 'newspaper', label: 'Feed' },
   Games: { icon: 'game-controller-outline', iconActive: 'game-controller', label: 'Arcade' },
   Messages: { icon: 'chatbubble-outline', iconActive: 'chatbubble', label: 'Messages' },
   Memories: { icon: 'images-outline', iconActive: 'images', label: 'Memories' },
@@ -20,6 +22,7 @@ const TAB_META = {
 export default function GlassTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
   const { intensity } = useGlass();
+  const { t } = useI18n();
 
   return (
     <View style={[styles.wrapper, { bottom: Math.max(insets.bottom, spacing.md) }]} pointerEvents="box-none">
@@ -46,7 +49,7 @@ export default function GlassTabBar({ state, navigation }) {
                   chipSize={36}
                   chipColor={focused ? colors.accent : 'transparent'}
                 />
-                <Text style={[styles.label, focused && styles.labelActive]}>{meta.label}</Text>
+                <Text style={[styles.label, focused && styles.labelActive]}>{t(`tab.${route.name}`, undefined) === `tab.${route.name}` ? meta.label : t(`tab.${route.name}`)}</Text>
               </Pressable>
             );
           })}

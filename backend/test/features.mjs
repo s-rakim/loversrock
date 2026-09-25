@@ -75,6 +75,13 @@ const pairPatch = await req('/profile/pair', { method: 'PATCH', token: A.token, 
 check('pair anniversary/together-since/date setting saved', pairPatch.data.pair.anniversaryDate === '2023-02-14' && pairPatch.data.pair.daysTogether > 900, pairPatch.data);
 check('bad dateSetting rejected', (await req('/profile/pair', { method: 'PATCH', token: A.token, body: { dateSetting: 'moon' } })).status === 400);
 
+const outfit = { preset: 'her', top: { style: 'dress', color: '#E8607A' }, accessories: ['hoops', 'flower'] };
+check('wardrobe saved', (await req('/profile', { method: 'PATCH', token: B.token, body: { avatar: outfit } })).data.me.avatar.top.style === 'dress');
+await wait(200);
+check('partner receives avatar:update live', eventsA.some(([e, p]) => e === 'avatar:update' && p.avatar.top.color === '#E8607A'));
+check("partner sees the outfit on /me", (await req('/profile/me', { token: A.token })).data.partner.avatar.accessories.includes('flower'));
+check('oversized avatar rejected', (await req('/profile', { method: 'PATCH', token: B.token, body: { avatar: { junk: 'x'.repeat(5000) } } })).status === 400);
+
 section('NOTIFICATION PREFERENCES');
 const np = await req('/profile/notifications', { token: A.token });
 check('all categories default on', Object.values(np.data.prefs).every(Boolean) && np.data.categories.includes('mood'));
