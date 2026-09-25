@@ -6,6 +6,7 @@ import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton, PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
 import ShineBorder from '../components/ShineBorder';
+import MoodBar from '../components/MoodBar';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
@@ -61,6 +62,12 @@ export default function HomeScreen({ navigation }) {
               you &amp; <Text style={styles.greetingName}>{profile.partner.displayName}</Text>
             </Text>
           )}
+        </FadeInUp>
+
+        <FadeInUp delay={50}>
+          {/* Top of Home, because it is the one thing here that is about
+              THEM rather than about something to do. */}
+          <MoodBar partnerName={profile?.partner?.displayName} />
         </FadeInUp>
 
         <FadeInUp delay={60}>

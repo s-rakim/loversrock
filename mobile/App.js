@@ -11,6 +11,7 @@ import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import LavaLamp from './components/LavaLamp';
+import Mascot from './components/Mascot';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification } from './services/notifications';
 import GlassTabBar from './components/GlassTabBar';
@@ -193,7 +194,11 @@ function Root() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <LavaLamp />
-        <ActivityIndicator color={colors.accentPink} size="large" />
+        {/* The mascot holds the loading moment rather than a bare spinner.
+            Neutral here on purpose — the partner's mood is not known until
+            after sign-in, and guessing one would be a lie for half a second. */}
+        <Mascot size={140} />
+        <ActivityIndicator color={colors.accentPink} size="large" style={{ marginTop: 24 }} />
       </View>
     );
   }

@@ -75,12 +75,26 @@ router.post('/today/respond', async (req, res) => {
       const yesterday = new Date(new Date(`${today}T00:00:00Z`).getTime() - 86400000)
         .toISOString()
         .slice(0, 10);
-      newStreak = lastActiveDate === yesterday ? req.pair.streak_count + 1 : 1;
-      await query('UPDATE pairs SET streak_count = $1, last_active_date = $2 WHERE id = $3', [
-        newStreak,
-        today,
-        req.pair.id,
-      ]);
+      const continued = lastActiveDate === yesterday;
+      newStreak = continued ? req.pair.streak_count + 1 : 1;
+
+      // A streak that just broke is REMEMBERED rather than simply zeroed, so
+      // it can be offered back (see routes/achievements.js). Without this the
+      // number is gone the instant it lapses and there is nothing to repair.
+      // Only worth keeping if it was actually a streak — losing a one-day
+      // "streak" is not a loss.
+      const broke = !continued && req.pair.streak_count > 1;
+
+      await query(
+        `UPDATE pairs
+            SET streak_count = $1,
+                last_active_date = $2,
+                longest_streak = GREATEST(longest_streak, $1),
+                broken_streak = CASE WHEN $4::boolean THEN $5 ELSE broken_streak END,
+                broken_streak_at = CASE WHEN $4::boolean THEN $2::date ELSE broken_streak_at END
+          WHERE id = $3`,
+        [newStreak, today, req.pair.id, broke, broke ? req.pair.streak_count : null]
+      );
     }
 
     // Idempotent "both answered" push: notified_at is only set once we've

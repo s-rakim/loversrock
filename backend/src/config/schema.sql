@@ -523,3 +523,59 @@ CREATE TABLE IF NOT EXISTS reactions (
 );
 
 CREATE INDEX IF NOT EXISTS reactions_target_idx ON reactions (target_kind, target_id);
+
+-- ---------------------------------------------------------------------------
+-- Achievements and streak repair.
+-- ---------------------------------------------------------------------------
+
+-- Earned badges, one row per pair per achievement.
+--
+-- The catalogue itself lives in code (models/achievements.js) rather than a
+-- table: it is a fixed list that ships with the app, and putting it in the
+-- database would mean a migration every time one is added and a seed that
+-- can drift from the rules that award them.
+CREATE TABLE IF NOT EXISTS pair_achievements (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  slug        TEXT NOT NULL,
+  earned_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pair_id, slug)
+);
+
+-- Streak repair.
+--
+-- `longest_streak` is kept separately because a repaired streak should not be
+-- able to invent a record that never happened, and because losing a streak
+-- should not erase the memory of how far you got.
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS longest_streak INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS streak_repairs_used INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS last_repair_at TIMESTAMPTZ;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS broken_streak INTEGER;
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS broken_streak_at DATE;
+
+-- ---------------------------------------------------------------------------
+-- Date matching and scheduling.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ;
+ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'idea'
+  CHECK (status IN ('idea', 'scheduled', 'done', 'skipped'));
+ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+-- One vote per person per idea.
+--
+-- A MATCH is both of you voting yes, and neither sees the other's vote until
+-- they have cast their own — same rule as the daily prompt, for the same
+-- reason: knowing what they picked changes what you pick, and then the match
+-- means nothing.
+CREATE TABLE IF NOT EXISTS date_idea_votes (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id      UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  date_idea_id UUID NOT NULL REFERENCES date_ideas(id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  liked        BOOLEAN NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (date_idea_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS date_idea_votes_pair_idx ON date_idea_votes (pair_id, date_idea_id);
