@@ -21,6 +21,7 @@ import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import ConnectionCard from '../components/ConnectionCard';
 import ColorPicker from '../components/ColorPicker';
+import { useLanguage } from '../components/LanguageContext';
 import {
   useTheme, THEME_PREFERENCES, ACCENTS, ACCENT_NAMES, BACKGROUND_SPEEDS, TEXT_SCALES,
   BLOB_PALETTES, BLOB_PALETTE_NAMES,
@@ -35,6 +36,9 @@ export default function SettingsScreen() {
   } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { intensity, setIntensity } = useGlass();
+  const {
+    preference: languagePreference, setPreference: setLanguagePreference, languages,
+  } = useLanguage();
   const navigation = useNavigation();
   const [lockScreenOn, setLockScreenOn] = useState(false);
 
@@ -254,6 +258,33 @@ export default function SettingsScreen() {
               <Icon name="image-outline" chip={false} size={16} color={colors.accent} />
               <Text style={{ color: colors.accent, fontWeight: '600' }}>Choose</Text>
             </MorphButton>
+          </View>
+        </View>
+      </FadeInUp>
+
+      <FadeInUp delay={46}>
+        <View style={styles.card}>
+          <Text style={font.h2}>Language</Text>
+          <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.md }]}>
+            Follows your phone unless you pick one. Your partner's phone has
+            its own setting — you do not have to agree.
+          </Text>
+          <View style={styles.segmentRow}>
+            {[{ code: 'system', native: 'Auto' }, ...languages].map((option) => {
+              const active = languagePreference === option.code;
+              return (
+                <View key={option.code} style={{ flex: 1 }}>
+                  <MorphButton
+                    onPress={() => setLanguagePreference(option.code)}
+                    style={[styles.segment, active && styles.segmentActive]}
+                  >
+                    <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+                      {option.native}
+                    </Text>
+                  </MorphButton>
+                </View>
+              );
+            })}
           </View>
         </View>
       </FadeInUp>

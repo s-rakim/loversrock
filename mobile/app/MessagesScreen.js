@@ -28,6 +28,7 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
+import { setActiveScreen } from '../services/notifications';
 import Doodle from '../components/Doodle';
 import Wallpaper from '../components/Wallpaper';
 import { getKeyPair, encryptFor, decryptFrom, isEncrypted } from '../services/crypto';
@@ -126,6 +127,13 @@ export default function MessagesScreen({ navigation }) {
   );
 
   useFocusEffect(load);
+
+  // Tells the notification handler the thread is open, so a push for the
+  // message you are already looking at does not draw a banner over it.
+  useFocusEffect(useCallback(() => {
+    setActiveScreen('Messages');
+    return () => setActiveScreen(null);
+  }, []));
 
   // Decryption happens here rather than in render: it is async, and a render
   // path that returns a promise shows nothing at all.

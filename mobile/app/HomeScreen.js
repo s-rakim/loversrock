@@ -106,7 +106,7 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           <ShineBorder variant="shine" radius={radius.card} phase={0.25} style={{ marginTop: spacing.md }}>
-          <MorphButton onPress={() => navigation.navigate('Locket')} style={styles.widgetWideInner}>
+          <MorphButton onPress={() => navigation.navigate('Photos')} style={styles.widgetWideInner}>
             {widgetPhoto ? (
               <>
                 <Image source={{ uri: mediaUrl(widgetPhoto.imageUrl || widgetPhoto.image_url) }} style={styles.widgetPhoto} />
@@ -133,7 +133,7 @@ export default function HomeScreen({ navigation }) {
             </MorphButton>
             {/* The shelf. Worth its own way in from Home: a drawing you can
                 reopen is only useful if finding it is one tap. */}
-            <MorphButton onPress={() => navigation.navigate('Doodle')} style={styles.doodleRow}>
+            <MorphButton onPress={() => navigation.navigate('Play')} style={styles.doodleRow}>
               <Icon name="images-outline" chip={false} size={16} color={colors.accent} />
               <Text style={font.body}>Your drawings</Text>
             </MorphButton>
@@ -216,7 +216,7 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Arcade</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: spacing.lg }}>
             {games.map((game) => (
-              <MorphButton key={game.id} onPress={() => navigation.navigate('Games')} style={styles.gameCard}>
+              <MorphButton key={game.id} onPress={() => navigation.navigate('Play')} style={styles.gameCard}>
                 <Icon name={game.emoji} chip chipSize={36} />
                 <Text style={[font.body, { marginTop: spacing.xs }]}>{game.title}</Text>
               </MorphButton>

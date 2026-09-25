@@ -18,25 +18,55 @@ const bar = read('components', 'LumaBar.js');
 console.log('=== THE TAB BAR AND THE NAVIGATOR AGREE ===');
 const barTabs = [...bar.matchAll(/^ {2}(\w+): \{ icon:/gm)].map((m) => m[1]);
 const navTabs = [...app.matchAll(/<Tab\.Screen name="(\w+)"/g)].map((m) => m[1]);
-check(`the bar knows ${barTabs.length} tabs`, barTabs.length === 7, barTabs);
+check(`the bar knows ${barTabs.length} tabs`, barTabs.length === 6, barTabs);
 check('and the navigator has the same ones, in the same order',
   JSON.stringify(barTabs) === JSON.stringify(navTabs), { barTabs, navTabs });
 // A tab with no entry in TAB_META falls back to a grey circle and the route
 // name, which looks like a bug because it is one.
 for (const t of navTabs) check(`  ${t} has an icon and a label`, bar.includes(`  ${t}: { icon:`));
 
-console.log('\n=== THE SEVEN THE APP IS FOR ===');
+console.log('\n=== THE SIX BUTTONS, AND WHAT IS BEHIND THEM ===');
 for (const [name, why] of [
+  ['Photos', 'photos, memories and messages'],
+  ['Play', 'doodle and games'],
   ['Home', 'home'],
-  ['Locket', 'the photo widget'],
-  ['Doodle', 'the doodle widget'],
-  ['Games', 'games'],
-  ['Messages', 'messaging'],
   ['Cycle', 'period tracking'],
+  ['Quiz', 'the daily quiz'],
   ['Settings', 'settings'],
 ]) {
   check(`${why} is a tab`, navTabs.includes(name), navTabs);
 }
+
+// Two of the six are SECTIONS — a tab holding several screens behind one
+// button. What is inside them is the actual requirement, so it is asserted
+// rather than left to the tab name.
+const sections = {
+  'app/PhotoSectionScreen.js': {
+    screens: ['Camera', 'Wall', 'Messages'],
+    components: ['PhotoWidgetScreen', 'PhotoHistoryScreen', 'MessagesScreen'],
+  },
+  'app/PlaySectionScreen.js': {
+    screens: ['Drawings', 'Arcade'],
+    components: ['CanvasGalleryScreen', 'GamesScreen'],
+  },
+};
+for (const [file, want] of Object.entries(sections)) {
+  const src = read(...file.split('/'));
+  const inner = [...src.matchAll(/<Stack\.Screen name="(\w+)"/g)].map((m) => m[1]);
+  check(`${file} holds ${want.screens.join(', ')}`,
+    JSON.stringify(inner) === JSON.stringify(want.screens), inner);
+  for (const c of want.components) check(`  and really renders ${c}`, src.includes(c));
+  // Every screen in the section must be reachable from its own pill, or one
+  // of them is in the build and unreachable.
+  const pill = [...src.matchAll(/key: '(\w+)'/g)].map((m) => m[1]);
+  check('  every screen is on the section pill',
+    JSON.stringify([...pill].sort()) === JSON.stringify([...want.screens].sort()), { pill, inner });
+}
+
+// Home in the middle: with six buttons the thumb reaches the centre.
+check('the tabs open on Home rather than the first one',
+  /initialRouteName="Home"/.test(app), 'Tab.Navigator should pin Home');
+check('and Home is in the middle of the bar', barTabs.indexOf('Home') === 2, barTabs);
 
 console.log('\n=== NOTHING IS BOTH A TAB AND A STACK SCREEN ===');
 // Two navigable copies of the camera means two entries on the back stack and
@@ -95,6 +125,43 @@ check('and nothing still imports it', !files.some((f) => fs.readFileSync(f, 'utf
 // must survive the bar being replaced.
 check('the glass intensity setting still drives the new bar', /useGlass\(\)/.test(bar));
 check('and reduce-motion still stops the slide', /reduceMotion/.test(bar));
+
+console.log('\n=== PUSH IS ACTUALLY TURNED ON ===');
+// Every failure here is the same silent one: notifications simply stop
+// arriving, with no error on either side.
+const notif = read('services', 'notifications.js');
+
+// Registration used to happen only on the pairing screen. A phone that
+// reinstalled — or the partner who ACCEPTED the invite rather than sending it
+// — could end up with a token the server had never heard of.
+check('the push token is re-registered on every cold start',
+  /syncPushToken\(\)/.test(app) && /export async function syncPushToken/.test(notif));
+check('and doing so never prompts, so the ask stays where there is context',
+  /status !== 'granted'\) return \{ registered: false, reason: 'not-granted' \}/.test(notif));
+check('the first ask still happens at pairing', read('app', 'PairingScreen.js').includes('registerForPush'));
+
+// Android shows nothing at all for a message aimed at a channel that does not
+// exist, and the channel — not the message — decides importance.
+for (const [id, importance] of [['calls', 'MAX'], ['partner', 'HIGH'], ['games', 'HIGH'], ['reminders', 'DEFAULT']]) {
+  check(`the ${id} channel exists at ${importance} importance`,
+    new RegExp(`${id}: \\{[\\s\\S]{0,200}?AndroidImportance\\.${importance}`).test(notif), id);
+}
+check('channels are created before the first notification can arrive', /ensureChannels\(\)/.test(app));
+
+// A banner for the message you are currently reading, on the screen you are
+// reading it on, is noise — it arrived over the socket a moment earlier.
+check('a message banner is suppressed while the thread is open',
+  /activeScreen === 'Messages' && type === 'message'/.test(notif));
+check('and the thread says when it is open',
+  /setActiveScreen\('Messages'\)/.test(read('app', 'MessagesScreen.js')));
+check('and says when it is not, or every later message is swallowed',
+  /setActiveScreen\(null\)/.test(read('app', 'MessagesScreen.js')));
+
+// A tap has to land somewhere that exists — asserted against the real route
+// table above.
+check('a message notification opens the photo section, where the thread lives',
+  /message: 'Photos'/.test(notif));
+check('a call notification opens the call', /call: 'Call'/.test(notif));
 
 console.log(`\nNAV RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

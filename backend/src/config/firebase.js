@@ -63,7 +63,7 @@ function getApp() {
   return app;
 }
 
-export async function sendToTokens(tokens, { notification, data, channel, priority } = {}) {
+export async function sendToTokens(tokens, { notification, data, channel, priority, collapseKey } = {}) {
   const firebaseApp = getApp();
   if (!firebaseApp || tokens.length === 0) return { successCount: 0, failureCount: 0, pruned: 0 };
 
@@ -83,8 +83,25 @@ export async function sendToTokens(tokens, { notification, data, channel, priori
     ...(stringData ? { data: stringData } : {}),
     android: {
       priority: priority || (channel === CHANNELS.calls ? 'high' : 'normal'),
+      // Ten messages in a row should be one line in the tray that updates,
+      // not ten. On Android that is a collapse key; on iOS the equivalent is
+      // apns-collapse-id, which is a different header entirely — so both are
+      // set from the one value rather than the caller knowing about either.
+      ...(collapseKey ? { collapseKey } : {}),
       ...(channel ? { notification: { channelId: channel } } : {}),
     },
+    ...(collapseKey
+      ? {
+        apns: {
+          headers: {
+            'apns-collapse-id': collapseKey.slice(0, 64),
+            // A collapsed alert still has to wake the phone, or the update
+            // silently replaces a notification nobody ever saw.
+            'apns-priority': priority === 'high' ? '10' : '5',
+          },
+        },
+      }
+      : {}),
   };
 
   const result = await admin.messaging(firebaseApp).sendEachForMulticast(message);

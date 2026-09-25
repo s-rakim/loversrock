@@ -16,7 +16,8 @@
     "test:messages": "node test/messages.mjs",
     "test:crypto": "node test/crypto.mjs",
     "test:widgets": "node test/widgets.mjs",
-    "test:nav": "node test/nav.mjs"
+    "test:nav": "node test/nav.mjs",
+    "test:i18n": "node test/i18n.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^9.0.0",

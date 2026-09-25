@@ -131,7 +131,7 @@ export default function CanvasScreen({ navigation, route }) {
       // copy of it, which is what makes "keep adding to it" work at all.
       setDrawingId(drawing.id);
       savedCount.current = strokes.length;
-      navigation.navigate('Doodle');
+      navigation.navigate('Play');
     } catch (err) {
       Alert.alert('Could not save it', err.message);
     } finally {

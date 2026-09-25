@@ -20,9 +20,11 @@ export default {
   },
   tabs: {
     home: 'Home',
-    messages: 'Messages',
-    memories: 'Memories',
-    games: 'Games',
+    locket: 'Locket',
+    doodle: 'Doodle',
+    games: 'Arcade',
+    messages: 'Chat',
+    cycle: 'Cycle',
     settings: 'Settings',
   },
   home: {

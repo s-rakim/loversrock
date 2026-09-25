@@ -10,11 +10,12 @@ import { getAccessToken, loadApiUrl } from './services/api';
 import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
+import { LanguageProvider } from './components/LanguageContext';
 import LavaLamp from './components/LavaLamp';
 import Mascot from './components/Mascot';
 import { PAIR_ART } from './assets/mascot';
 import * as Notifications from 'expo-notifications';
-import { ensureChannels, routeForNotification } from './services/notifications';
+import { ensureChannels, routeForNotification, syncPushToken } from './services/notifications';
 import LumaBar, { TAB_ROUTES } from './components/LumaBar';
 import { CallProvider, useCall } from './components/calls/CallContext';
 import { fadeOnFocus } from './components/Motion';
@@ -25,26 +26,22 @@ import HomeScreen from './app/HomeScreen';
 import DailyPromptScreen from './app/DailyPromptScreen';
 import QuizScreen from './app/QuizScreen';
 import DeckDetailScreen from './app/DeckDetailScreen';
-import MemoriesScreen from './app/MemoriesScreen';
 import BucketListScreen from './app/BucketListScreen';
 import DateIdeasScreen from './app/DateIdeasScreen';
 import SwipeDeckScreen from './app/SwipeDeckScreen';
 import CheckinScreen from './app/CheckinScreen';
 import FeedScreen from './app/FeedScreen';
 import CountdownScreen from './app/CountdownScreen';
-import MessagesScreen from './app/MessagesScreen';
 import CanvasScreen from './app/CanvasScreen';
-import CanvasGalleryScreen from './app/CanvasGalleryScreen';
+import PhotoSectionScreen from './app/PhotoSectionScreen';
+import PlaySectionScreen from './app/PlaySectionScreen';
 import ThumbKissScreen from './app/ThumbKissScreen';
 import DistanceApartScreen from './app/DistanceApartScreen';
 import PeriodTrackerScreen from './app/PeriodTrackerScreen';
-import GamesScreen from './app/GamesScreen';
 import SettingsScreen from './app/SettingsScreen';
 import CallScreen from './app/CallScreen';
 import DiagnosticsScreen from './app/DiagnosticsScreen';
 import WardrobeScreen from './app/WardrobeScreen';
-import PhotoWidgetScreen from './app/PhotoWidgetScreen';
-import PhotoHistoryScreen from './app/PhotoHistoryScreen';
 import WallpaperScreen from './app/WallpaperScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
 import TicTacToeScreen from './app/games/TicTacToeScreen';
@@ -109,18 +106,19 @@ function MainTabs() {
     // switch glides; upgrading the navigator for its built-in animation would
     // be a much larger change than the effect is worth.
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={{ headerShown: false }}
       sceneContainerStyle={{ backgroundColor: 'transparent' }}
       tabBar={(props) => <LumaBar {...props} />}
     >
+      {/* Home sits in the MIDDLE rather than first: with six buttons the
+          thumb reaches the centre, and the two sections either side of it are
+          the ones opened most. */}
+      <Tab.Screen name="Photos" component={fadeOnFocus(PhotoSectionScreen)} />
+      <Tab.Screen name="Play" component={fadeOnFocus(PlaySectionScreen)} />
       <Tab.Screen name="Home" component={fadeOnFocus(HomeScreen)} />
-      {/* The two widget screens get tabs of their own: they are what this app
-          is FOR, and both were a tap down inside Home. */}
-      <Tab.Screen name="Locket" component={fadeOnFocus(PhotoWidgetScreen)} />
-      <Tab.Screen name="Doodle" component={fadeOnFocus(CanvasGalleryScreen)} />
-      <Tab.Screen name="Games" component={fadeOnFocus(GamesScreen)} />
-      <Tab.Screen name="Messages" component={fadeOnFocus(MessagesScreen)} />
       <Tab.Screen name="Cycle" component={fadeOnFocus(PeriodTrackerScreen)} />
+      <Tab.Screen name="Quiz" component={fadeOnFocus(QuizScreen)} />
       <Tab.Screen name="Settings" component={fadeOnFocus(SettingsScreen)} />
     </Tab.Navigator>
   );
@@ -159,6 +157,10 @@ function Root() {
   // first one is *sent* — Android drops anything aimed at a missing channel.
   useEffect(() => {
     ensureChannels();
+    // And re-register this device's push token on every cold start. The FCM
+    // token changes on reinstall and occasionally on its own, and a stale one
+    // means calls and messages silently stop arriving.
+    syncPushToken();
   }, []);
 
   // Two paths into the app: tapped while running, and tapped from cold. The
@@ -228,11 +230,6 @@ function Root() {
             <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
             <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
             <Stack.Screen name="DailyPrompt" component={DailyPromptScreen} options={{ title: "Today's Prompt" }} />
-            {/* Quiz and Memories lost their tabs to the two widget screens.
-                Both keep a card at the top of Home, which is where the quiz
-                was always actually opened from. */}
-            <Stack.Screen name="Quiz" component={QuizScreen} options={{ title: 'Daily Quiz' }} />
-            <Stack.Screen name="Memories" component={MemoriesScreen} options={{ title: 'Memories' }} />
             <Stack.Screen name="DeckDetail" component={DeckDetailScreen} options={{ title: 'Deck' }} />
             <Stack.Screen name="BucketList" component={BucketListScreen} options={{ title: 'Bucket List' }} />
             <Stack.Screen name="DateIdeas" component={DateIdeasScreen} options={{ title: 'Date Ideas' }} />
@@ -290,13 +287,17 @@ function Root() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <GlassProvider>
-          <CallProvider>
-            <Root />
-          </CallProvider>
-        </GlassProvider>
-      </ThemeProvider>
+      {/* Outermost of the app's own providers: everything below it, including
+          the theme's own labels, can be translated. */}
+      <LanguageProvider>
+        <ThemeProvider>
+          <GlassProvider>
+            <CallProvider>
+              <Root />
+            </CallProvider>
+          </GlassProvider>
+        </ThemeProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

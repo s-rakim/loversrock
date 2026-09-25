@@ -55,14 +55,34 @@ export const DEFAULT_REMINDERS = {
   waterEveryHours: 3,
 };
 
+/**
+ * Which screen is on top, for the foreground handler.
+ *
+ * Module-level rather than context, because setNotificationHandler is
+ * registered once at import time and cannot read React state.
+ */
+let activeScreen = null;
+export function setActiveScreen(name) {
+  activeScreen = name;
+}
+
 // Foreground behaviour: show the banner rather than swallowing it. A quiz or a
 // game turn arriving while the app is open is still worth surfacing.
+//
+// With one exception. A banner for the message you are currently reading, on
+// the screen you are reading it on, is pure noise — the message is already
+// there, arriving over the socket a moment earlier. So a message notification
+// is suppressed while the thread is open, and shown everywhere else.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    const type = notification?.request?.content?.data?.type;
+    const inThread = activeScreen === 'Messages' && type === 'message';
+    return {
+      shouldShowAlert: !inThread,
+      shouldPlaySound: !inThread,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 export async function ensureChannels() {
@@ -90,6 +110,29 @@ export async function hasAskedPermission() {
  * Safe to call more than once; returns why it stopped rather than throwing,
  * because a declined permission is a normal outcome, not an error.
  */
+/**
+ * Re-registers this device's push token, silently.
+ *
+ * Called on every cold start, and it matters more than it sounds: the FCM
+ * token changes on reinstall, on a data clear, and occasionally on its own.
+ * Registration used to happen only on the pairing screen, so a phone that
+ * reinstalled — or the partner who ACCEPTED the invite rather than sending it
+ * — could end up with a token the server had never heard of, and the symptom
+ * is simply that calls and messages stop arriving with no error anywhere.
+ *
+ * It never prompts: if permission has not been granted, this does nothing and
+ * the ask stays where a person has context for it.
+ */
+export async function syncPushToken() {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return { registered: false, reason: 'not-granted' };
+    return await registerForPush();
+  } catch (err) {
+    return { registered: false, reason: err.message };
+  }
+}
+
 export async function registerForPush() {
   await AsyncStorage.setItem(PERMISSION_ASKED_KEY, 'yes');
   await ensureChannels();
@@ -132,16 +175,16 @@ export const SCREEN_FOR_TYPE = {
   prompt: 'DailyPrompt',
   quiz: 'Quiz',
   partner_update: 'Home',
-  game_invite: 'Games',
-  game_turn: 'Games',
+  game_invite: 'Play',
+  game_turn: 'Play',
   // One entry, not two: this object had `call` twice, so the first was dead
   // and the second silently won. It happened to be the right one, which is
   // why nothing ever looked wrong.
   call: 'Call',
   period_reminder: 'Cycle',
   water: 'Cycle',
-  memory: 'Memories',
-  message: 'Messages',
+  memory: 'Photos',
+  message: 'Photos',
 };
 
 export function routeForNotification(response) {

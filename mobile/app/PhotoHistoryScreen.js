@@ -10,7 +10,7 @@
 // forever, on both phones, without storing a position anywhere.
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Image, Pressable, ActivityIndicator, useWindowDimensions,
+  View, Text, StyleSheet, ScrollView, Image, Pressable, ActivityIndicator, useWindowDimensions, Modal,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -160,16 +160,39 @@ export default function PhotoHistoryScreen({ navigation }) {
   const [total, setTotal] = useState(0);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [focused, setFocused] = useState(null);
 
+  // ONE wall, two sources.
+  //
+  // Lockets and memories were two screens with the same job — a photo the two
+  // of you shared — differing only in whether it also went to a home screen.
+  // Nobody thinks of their photos in those two piles, so they are one wall
+  // now, merged by date. `kind` is kept on each tile because the two are
+  // deleted through different endpoints and one of them can be re-sent to the
+  // widget; the reader never has to care.
   useFocusEffect(
     useCallback(() => {
-      apiFetch('/widget-photos')
-        .then((d) => {
-          setPhotos(d.widgetPhotos || []);
-          setTotal(d.total || 0);
-          setStreak(d.streak || 0);
+      Promise.allSettled([apiFetch('/widget-photos'), apiFetch('/memories')])
+        .then(([lockets, memories]) => {
+          const a = lockets.status === 'fulfilled' ? lockets.value : {};
+          const b = memories.status === 'fulfilled' ? memories.value : {};
+
+          const merged = [
+            ...(a.widgetPhotos || []).map((p) => ({ ...p, kind: 'locket' })),
+            ...(b.memories || []).map((m) => ({
+              ...m,
+              kind: 'memory',
+              // Memories carry the date the photo was TAKEN, which is the one
+              // that belongs on a wall grouped by month — a holiday photo
+              // uploaded in November belongs in August.
+              created_at: m.taken_at || m.created_at,
+            })),
+          ].sort((x, y) => new Date(y.created_at) - new Date(x.created_at));
+
+          setPhotos(merged);
+          setTotal(a.total || 0);
+          setStreak(a.streak || 0);
         })
-        .catch(() => {})
         .finally(() => setLoading(false));
     }, [])
   );
@@ -188,7 +211,7 @@ export default function PhotoHistoryScreen({ navigation }) {
     >
       <View style={styles.header}>
         <Text style={font.h1}>Memories</Text>
-        <Pressable onPress={() => navigation.navigate('Locket')} style={styles.cameraButton}>
+        <Pressable onPress={() => navigation.navigate('Camera')} style={styles.cameraButton}>
           <Ionicons name="camera" size={20} color={colors.accent} />
         </Pressable>
       </View>
@@ -197,13 +220,13 @@ export default function PhotoHistoryScreen({ navigation }) {
         <View style={styles.card}>
           <View style={styles.emptyInner}>
             <Ionicons name="camera-outline" size={40} color={colors.textMuted} />
-            <Text style={[font.body, { marginTop: spacing.sm }]}>No lockets yet.</Text>
+            <Text style={[font.body, { marginTop: spacing.sm }]}>No photos yet.</Text>
             <Text style={[font.muted, { marginTop: 2, textAlign: 'center' }]}>
               The first photo either of you sends shows up here — and on the
               other one&apos;s home screen.
             </Text>
             <Pressable
-              onPress={() => navigation.navigate('Locket')}
+              onPress={() => navigation.navigate('Camera')}
               style={styles.emptyButton}
             >
               <Text style={styles.emptyButtonText}>Send the first one</Text>
@@ -219,15 +242,39 @@ export default function PhotoHistoryScreen({ navigation }) {
                 photos={month.photos}
                 width={wallWidth}
                 colors={colors}
-                onPress={(photo) => navigation.navigate('Memories', { focus: photo.image_url })}
+                onPress={(photo) => setFocused(photo)}
                 // Only the newest month offers the shortcut back to the camera.
                 showAdd={i === 0}
-                onAdd={() => navigation.navigate('Locket')}
+                onAdd={() => navigation.navigate('Camera')}
               />
             </View>
           </FadeInUp>
         ))
       )}
+
+      {/* Tapping a tile opens it here rather than pushing a screen: a photo
+          wall where every tap is a navigation makes going through twenty of
+          them twenty taps back. */}
+      <Modal visible={Boolean(focused)} transparent animationType="fade" onRequestClose={() => setFocused(null)}>
+        <Pressable style={styles.viewer} onPress={() => setFocused(null)}>
+          {focused && (
+            <>
+              <Image
+                source={{ uri: mediaUrl(focused.image_url) }}
+                style={styles.viewerImage}
+                resizeMode="contain"
+              />
+              {focused.caption ? (
+                <Text style={styles.viewerCaption}>{focused.caption}</Text>
+              ) : null}
+              <Text style={styles.viewerMeta}>
+                {focused.kind === 'memory' ? 'Memory' : 'Locket'} ·{' '}
+                {new Date(focused.created_at).toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}
+              </Text>
+            </>
+          )}
+        </Pressable>
+      </Modal>
 
       <View style={styles.statsBar}>
         <View style={styles.stat}>
@@ -273,7 +320,14 @@ const makeStyles = (colors) =>
     },
     emptyButtonText: { color: '#fff', fontWeight: '700' },
 
-    statsBar: {
+    viewer: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center', justifyContent: 'center', padding: spacing.lg, gap: spacing.sm,
+  },
+  viewerImage: { width: '100%', height: '70%' },
+  viewerCaption: { color: '#fff', fontSize: 16, textAlign: 'center' },
+  viewerMeta: { color: 'rgba(255,255,255,0.55)', fontSize: 12 },
+  statsBar: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: spacing.lg, alignSelf: 'center',
       backgroundColor: colors.surface, borderRadius: radius.pill,

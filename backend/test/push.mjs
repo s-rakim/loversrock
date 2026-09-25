@@ -67,6 +67,39 @@ check('transient failures do not prune', /DEAD_TOKEN_CODES\.has/.test(source));
 check('data values are coerced to strings', /JSON\.stringify\(value\)/.test(source));
 check('call pushes are sent high priority', /channel === CHANNELS\.calls \? 'high'/.test(source));
 
+// A collapse key is two different headers on the two platforms, and setting
+// only the Android one is the classic half-fix: the burst collapses on one
+// phone and stacks ten deep on the other.
+check('a collapse key sets the Android one', /collapseKey \? \{ collapseKey \}/.test(source));
+check('and the iOS one, which is a different header entirely',
+  /apns-collapse-id/.test(source), 'apns headers missing');
+// A collapsed alert still has to wake the phone, or the update silently
+// replaces a notification nobody ever saw.
+check('a collapsed high-priority alert still wakes the phone', /'apns-priority': priority === 'high' \? '10'/.test(source));
+
+console.log('\n=== MESSAGES PUSH, AND NEVER CARRY THE MESSAGE ===');
+const messages = readFileSync(new URL('../src/routes/messages.js', import.meta.url), 'utf8');
+check('sending a message fires a push', /sendNotification\(/.test(messages));
+check('at high priority, because a normal one can sit in a doze queue for minutes',
+  /priority: 'high'/.test(messages));
+check('and collapsed per pair, so ten in a row is one line in the tray',
+  /collapseKey: `msg:\$\{req\.pair\.id\}`/.test(messages));
+// This is not a policy the server could change its mind about: with
+// encryption running it holds ciphertext and could not put the text in the
+// notification if it wanted to.
+check('the message body is NEVER in the push',
+  !/body: (content|message\.content|req\.body\.content)/.test(messages)
+  && /Sent you a message/.test(messages), 'a push must not carry message content');
+check('the title is who they are to the RECIPIENT, not the sender\u2019s own name',
+  /set_by_id = \$3/.test(messages), 'nickname lookup should be keyed on the recipient');
+check('and never empty, which renders as the package name on Android',
+  /\|\| 'Your partner'/.test(messages));
+
+const calls = readFileSync(new URL('../src/routes/calls.js', import.meta.url), 'utf8');
+check('a call push uses the one channel at MAX importance', /CHANNELS\.calls/.test(calls));
+check('and a failed push never fails the call', /\[calls\] push failed/.test(calls));
+check('a failed message push never fails the send', /\[messages\] push failed/.test(messages));
+
 await query('DELETE FROM users WHERE id = $1', [user.id]);
 check('cleanup removed the test user',
   (await query('SELECT 1 FROM users WHERE id = $1', [user.id])).rows.length === 0);

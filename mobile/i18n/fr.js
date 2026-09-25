@@ -23,9 +23,11 @@ export default {
   },
   tabs: {
     home: 'Accueil',
-    messages: 'Messages',
-    memories: 'Souvenirs',
-    games: 'Jeux',
+    locket: 'Médaillon',
+    doodle: 'Dessin',
+    games: 'Arcade',
+    messages: 'Chat',
+    cycle: 'Cycle',
     settings: 'Réglages',
   },
   home: {

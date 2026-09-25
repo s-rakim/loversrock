@@ -55,6 +55,26 @@ function load(relative, extraStubs = {}) {
       const resolved = path.join(path.dirname(relative), id);
       return load(resolved.endsWith('.js') ? resolved : `${resolved}.js`, extraStubs);
     }
+    // expo-notifications is read at MODULE LOAD time — the notification
+    // handler is registered on import and the channel table indexes into
+    // AndroidImportance — so a bare proxy is not enough: the import throws
+    // before any test runs.
+    if (id === 'expo-notifications') {
+      return {
+        AndroidImportance: { DEFAULT: 3, HIGH: 4, MAX: 5, LOW: 2, MIN: 1 },
+        setNotificationHandler() {},
+        setNotificationChannelAsync: async () => {},
+        getPermissionsAsync: async () => ({ status: 'undetermined' }),
+        requestPermissionsAsync: async () => ({ status: 'undetermined' }),
+        getDevicePushTokenAsync: async () => ({ data: 'test-token' }),
+        addNotificationResponseReceivedListener: () => ({ remove() {} }),
+        getLastNotificationResponseAsync: async () => null,
+        scheduleNotificationAsync: async () => 'id',
+        cancelAllScheduledNotificationsAsync: async () => {},
+        getAllScheduledNotificationsAsync: async () => [],
+        SchedulableTriggerInputTypes: { DAILY: 'daily', TIME_INTERVAL: 'timeInterval' },
+      };
+    }
     return new Proxy(() => null, {
       get: (_t, prop) => (prop === '__esModule' ? false : host(String(prop))),
       apply: () => null,

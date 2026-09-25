@@ -38,13 +38,16 @@ import { useGlass } from './GlassContext';
 import { radius, spacing } from '../theme';
 import { useTheme } from './ThemeContext';
 
+// Six buttons, two of which are sections rather than single screens: Photos
+// holds the camera, the wall and the thread; Play holds the drawings and the
+// arcade. Things that are one activity belong behind one button, and six is
+// the point where a floating pill still reads as a pill.
 const TAB_META = {
+  Photos: { icon: 'camera-outline', iconActive: 'camera', label: 'Photos' },
+  Play: { icon: 'color-wand-outline', iconActive: 'color-wand', label: 'Play' },
   Home: { icon: 'home-outline', iconActive: 'home', label: 'Home' },
-  Locket: { icon: 'camera-outline', iconActive: 'camera', label: 'Locket' },
-  Doodle: { icon: 'brush-outline', iconActive: 'brush', label: 'Doodle' },
-  Games: { icon: 'game-controller-outline', iconActive: 'game-controller', label: 'Arcade' },
-  Messages: { icon: 'chatbubble-outline', iconActive: 'chatbubble', label: 'Chat' },
   Cycle: { icon: 'water-outline', iconActive: 'water', label: 'Cycle' },
+  Quiz: { icon: 'help-circle-outline', iconActive: 'help-circle', label: 'Quiz' },
   Settings: { icon: 'settings-outline', iconActive: 'settings', label: 'Settings' },
 };
 

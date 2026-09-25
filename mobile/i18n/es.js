@@ -23,9 +23,11 @@ export default {
   },
   tabs: {
     home: 'Inicio',
-    messages: 'Mensajes',
-    memories: 'Recuerdos',
-    games: 'Juegos',
+    locket: 'Relicario',
+    doodle: 'Dibujo',
+    games: 'Arcade',
+    messages: 'Chat',
+    cycle: 'Ciclo',
     settings: 'Ajustes',
   },
   home: {
