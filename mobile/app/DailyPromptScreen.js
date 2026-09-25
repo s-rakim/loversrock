@@ -20,6 +20,9 @@ export default function DailyPromptScreen() {
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [celebrateTrigger, setCelebrateTrigger] = useState(0);
+  const [followUp, setFollowUp] = useState(null);
+  const [followDraft, setFollowDraft] = useState('');
+  const [followSending, setFollowSending] = useState(false);
 
   useEffect(() => {
     apiFetch('/daily-prompt/today')
@@ -29,6 +32,7 @@ export default function DailyPromptScreen() {
         setPartnerAnswer(data.partnerAnswer);
         setBothAnswered(data.bothAnswered);
         setStreak(data.streakCount);
+        setFollowUp(data.followUp || null);
       })
       .catch((err) => Alert.alert('Could not load prompt', err.message))
       .finally(() => setLoading(false));
@@ -43,11 +47,36 @@ export default function DailyPromptScreen() {
       setPartnerAnswer(data.partnerAnswer);
       setBothAnswered(data.bothAnswered);
       setStreak(data.streakCount);
-      if (data.bothAnswered) setCelebrateTrigger((n) => n + 1);
+      if (data.bothAnswered) {
+        setCelebrateTrigger((n) => n + 1);
+        // The follow-up only exists once you have both answered, and it is
+        // built server-side from THEIR answer — so it has to be fetched
+        // rather than derived from what just came back.
+        apiFetch('/daily-prompt/today')
+          .then((fresh) => setFollowUp(fresh.followUp || null))
+          .catch(() => {});
+      }
     } catch (err) {
       Alert.alert('Could not submit', err.message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function submitFollowUp() {
+    const text = followDraft.trim();
+    if (!text || !followUp) return;
+    setFollowSending(true);
+    try {
+      const data = await apiFetch(`/daily-prompt/follow-up/${followUp.id}/respond`, {
+        method: 'POST', body: { answer: text },
+      });
+      setFollowUp((f) => ({ ...f, ...data }));
+      setFollowDraft('');
+    } catch (err) {
+      Alert.alert('Could not send that', err.message);
+    } finally {
+      setFollowSending(false);
     }
   }
 
@@ -105,10 +134,62 @@ export default function DailyPromptScreen() {
           </View>
 
           {bothAnswered ? (
-            <View style={styles.answerCard}>
-              <Text style={font.muted}>Their answer</Text>
-              <Text style={font.body}>{partnerAnswer}</Text>
-            </View>
+            <>
+              <View style={styles.answerCard}>
+                <Text style={font.muted}>Their answer</Text>
+                <Text style={font.body}>{partnerAnswer}</Text>
+              </View>
+
+              {/* The follow-up. Built from what THEY said, which is why it
+                  cannot appear until both of you have answered — the question
+                  would otherwise leak their answer. */}
+              {followUp && (
+                <View style={styles.followCard}>
+                  <Text style={styles.followLabel}>GOING DEEPER</Text>
+                  <Text style={[font.h3, { marginTop: 2 }]}>{followUp.question}</Text>
+
+                  {followUp.myAnswer === null ? (
+                    <>
+                      <TextInput
+                        placeholder="Your answer…"
+                        placeholderTextColor={colors.textMuted}
+                        value={followDraft}
+                        onChangeText={setFollowDraft}
+                        multiline
+                        style={styles.input}
+                      />
+                      <MorphButton
+                        onPress={submitFollowUp}
+                        disabled={followSending || !followDraft.trim()}
+                        style={[styles.primaryButton, (followSending || !followDraft.trim()) && { opacity: 0.6 }]}
+                      >
+                        <Text style={styles.primaryButtonText}>
+                          {followSending ? 'Sending…' : 'Answer'}
+                        </Text>
+                      </MorphButton>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.answerCard}>
+                        <Text style={font.muted}>You</Text>
+                        <Text style={font.body}>{followUp.myAnswer}</Text>
+                      </View>
+                      {followUp.bothAnswered ? (
+                        <View style={styles.answerCard}>
+                          <Text style={font.muted}>Them</Text>
+                          <Text style={font.body}>{followUp.partnerAnswer}</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.waitingCard}>
+                          <Icon name="hourglass-outline" size={16} color={colors.textMuted} />
+                          <Text style={font.muted}>Waiting on them for this one.</Text>
+                        </View>
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
+            </>
           ) : (
             <View style={styles.waitingCard}>
               <Icon name="hourglass-outline" size={16} color={colors.textMuted} />
@@ -138,6 +219,14 @@ const makeStyles = (colors, font) =>
   },
   primaryButton: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center' },
   primaryButtonText: { color: '#fff', fontWeight: '700' },
+  followCard: {
+    marginTop: spacing.md, padding: spacing.md,
+    backgroundColor: colors.accentSoft, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.accent,
+  },
+  followLabel: {
+    fontSize: 10, fontWeight: '800', letterSpacing: 1.2, color: colors.accent,
+  },
   answerCard: {
     backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md,
     marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,

@@ -677,3 +677,132 @@ ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS season_end TEXT;
 -- cannot be a fixed window at all.
 ALTER TABLE question_decks ADD COLUMN IF NOT EXISTS season_anchor TEXT
   CHECK (season_anchor IS NULL OR season_anchor IN ('anniversary'));
+
+-- ---------------------------------------------------------------------------
+-- Follow-ups: questions that pick up on what you actually said.
+-- ---------------------------------------------------------------------------
+
+-- No LLM, and that is a constraint rather than a compromise.
+--
+-- These follow-ups are templates keyed to the category of the question that
+-- produced them, with a `{answer}` placeholder that is filled with what your
+-- PARTNER wrote. The adaptivity is real — the question you get depends on what
+-- was said — without a paid API in the loop or a model quietly rewriting one
+-- of your answers back at you.
+--
+-- Templates are global, like daily_prompts. Which one a pair gets, and what it
+-- is filled with, is per-pair and lives in prompt_follow_up_picks.
+CREATE TABLE IF NOT EXISTS prompt_follow_ups (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  category    TEXT NOT NULL,
+  template    TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (category, template)
+);
+
+CREATE INDEX IF NOT EXISTS prompt_follow_ups_category_idx ON prompt_follow_ups (category);
+
+-- One follow-up per pair per prompt, chosen once and then fixed.
+--
+-- Fixed matters: a follow-up that re-rolled on every read would change under
+-- you between opening the screen and answering, and the answer would end up
+-- attached to a question you never saw.
+CREATE TABLE IF NOT EXISTS prompt_follow_up_picks (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id       UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  prompt_id     UUID NOT NULL REFERENCES daily_prompts(id) ON DELETE CASCADE,
+  follow_up_id  UUID NOT NULL REFERENCES prompt_follow_ups(id) ON DELETE CASCADE,
+  -- The TEMPLATE, not a rendered question.
+  --
+  -- The two of you share one follow-up, but the quote inside it is different
+  -- for each of you: a follow-up quotes your PARTNER. Storing the rendered
+  -- text meant whoever opened the screen first decided whose words both of
+  -- you were asked about — so Ben was asked about Ben.
+  template_text TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pair_id, prompt_id)
+);
+
+CREATE TABLE IF NOT EXISTS prompt_follow_up_answers (
+  id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pick_id  UUID NOT NULL REFERENCES prompt_follow_up_picks(id) ON DELETE CASCADE,
+  user_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  answer   TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pick_id, user_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Monthly check-in.
+-- ---------------------------------------------------------------------------
+
+-- Once a month, the two of you answer the same short set of questions, and
+-- neither sees the other's answers until both are done.
+--
+-- The scores are the point of keeping them rather than making it a
+-- conversation prompt: "we were at 6 in March and 9 in June" is a thing you
+-- can only know if somebody wrote it down at the time.
+CREATE TABLE IF NOT EXISTS checkins (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id    UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  -- The first of the month it belongs to, so "one per month" is a unique
+  -- index rather than something the application has to remember to check.
+  month      DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pair_id, month)
+);
+
+CREATE TABLE IF NOT EXISTS checkin_answers (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  checkin_id  UUID NOT NULL REFERENCES checkins(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- The question's stable key, not its text: the wording can be improved
+  -- later without orphaning two years of answers.
+  question_key TEXT NOT NULL,
+  score       INTEGER CHECK (score IS NULL OR (score BETWEEN 1 AND 10)),
+  answer      TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (checkin_id, user_id, question_key)
+);
+
+CREATE TABLE IF NOT EXISTS checkin_completions (
+  checkin_id   UUID NOT NULL REFERENCES checkins(id) ON DELETE CASCADE,
+  user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  completed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (checkin_id, user_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Random challenge.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS challenges (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug        TEXT NOT NULL UNIQUE,
+  title       TEXT NOT NULL,
+  detail      TEXT,
+  -- How long it is meant to take, which decides whether drawing a new one
+  -- tomorrow is reasonable.
+  scope       TEXT NOT NULL DEFAULT 'today' CHECK (scope IN ('now', 'today', 'week')),
+  category    TEXT NOT NULL DEFAULT 'together'
+);
+
+-- One live challenge per pair. A second draw while one is open would turn the
+-- feature into a slot machine you pull until you get an easy one.
+CREATE TABLE IF NOT EXISTS pair_challenges (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id      UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  challenge_id UUID NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
+  status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'done', 'skipped')),
+  drawn_by     UUID REFERENCES users(id) ON DELETE SET NULL,
+  drawn_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at    TIMESTAMPTZ
+);
+
+-- At most one open challenge per pair, enforced by the database rather than by
+-- everyone remembering to check.
+CREATE UNIQUE INDEX IF NOT EXISTS pair_challenges_one_open
+  ON pair_challenges (pair_id) WHERE status = 'open';
+
+CREATE INDEX IF NOT EXISTS pair_challenges_history_idx
+  ON pair_challenges (pair_id, drawn_at DESC);

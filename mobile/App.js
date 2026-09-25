@@ -29,6 +29,7 @@ import MemoriesScreen from './app/MemoriesScreen';
 import BucketListScreen from './app/BucketListScreen';
 import DateIdeasScreen from './app/DateIdeasScreen';
 import SwipeDeckScreen from './app/SwipeDeckScreen';
+import CheckinScreen from './app/CheckinScreen';
 import CountdownScreen from './app/CountdownScreen';
 import MessagesScreen from './app/MessagesScreen';
 import CanvasScreen from './app/CanvasScreen';
@@ -230,6 +231,7 @@ function Root() {
             {/* The deck is how ideas actually get chosen; the list is where
                 the ones you both said yes to end up. */}
             <Stack.Screen name="SwipeDeck" component={SwipeDeckScreen} options={{ title: 'Swipe' }} />
+            <Stack.Screen name="Checkin" component={CheckinScreen} options={{ title: 'Monthly Check-In' }} />
             <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
             {/* The shelf, and the canvas itself. The gallery is the entry
                 point of the two: you arrive wanting to see what is there far

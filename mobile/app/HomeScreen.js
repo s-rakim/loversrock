@@ -10,6 +10,7 @@ import MoodBar from '../components/MoodBar';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
+import ChallengeCard from '../components/ChallengeCard';
 
 const QUICK_LINKS = [
   ['BucketList', 'Bucket List', 'checkbox-outline'],
@@ -20,6 +21,7 @@ const QUICK_LINKS = [
   ['Countdown', 'Countdowns', 'hourglass-outline'],
   ['DistanceApart', 'Distance Apart', 'navigate-outline'],
   ['PeriodTracker', 'Cycle Tracker', 'water-outline'],
+  ['Checkin', 'Monthly Check-In', 'clipboard-outline'],
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -75,6 +77,11 @@ export default function HomeScreen({ navigation }) {
           {/* Top of Home, because it is the one thing here that is about
               THEM rather than about something to do. */}
           <MoodBar partnerName={profile?.partner?.displayName} />
+        </FadeInUp>
+
+        <FadeInUp delay={55}>
+          {/* One thing to actually do, right under how they are feeling. */}
+          <ChallengeCard />
         </FadeInUp>
 
         <FadeInUp delay={60}>

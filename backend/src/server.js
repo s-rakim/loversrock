@@ -28,6 +28,7 @@ import profileRoutes from './routes/profile.js';
 import presenceRoutes from './routes/presence.js';
 import achievementsRoutes from './routes/achievements.js';
 import canvasRoutes from './routes/canvas.js';
+import checkinRoutes from './routes/checkins.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,6 +61,9 @@ app.use('/presence', presenceRoutes);
 app.use('/achievements', achievementsRoutes);
 // Kept drawings, as opposed to ones sent into the message thread and lost.
 app.use('/canvas', canvasRoutes);
+// The monthly check-in and the random challenge — see routes/checkins.js
+// for why they share one.
+app.use('/checkins', checkinRoutes);
 
 /** image/jpeg for a .jpg, and so on. */
 const EXTENSION_TYPES = {

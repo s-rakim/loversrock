@@ -187,5 +187,21 @@ check('CanvasScreen: opening one gives strokes and the paper it was drawn on',
   Array.isArray((await req(`/canvas/${tile.id}`, { token: A.token })).data.drawing.stroke_data.strokes));
 await req(`/canvas/${drawn.data.drawing.id}`, { method: 'DELETE', token: A.token });
 
+// CheckinScreen reads these keys off /checkins/current. The reveal rule is
+// the contract here as much as the shape: `theirs` empty is what the screen
+// draws as "waiting on them", so an accidental leak would be invisible.
+const chk = await req('/checkins/current', { token: A.token });
+check('CheckinScreen: checkin/questions/mine/theirs/iAmDone/bothDone present',
+  ['checkin', 'questions', 'mine', 'theirs', 'iAmDone', 'theyAreDone', 'bothDone', 'myAverage', 'theirAverage']
+    .every((k) => k in chk.data), Object.keys(chk.data || {}));
+check('CheckinScreen: each question has key/kind/prompt',
+  chk.data.questions.every((q) => q.key && q.kind && q.prompt), chk.data.questions?.[0]);
+check('CheckinScreen: score questions carry their scale labels',
+  chk.data.questions.filter((q) => q.kind === 'score').every((q) => q.low && q.high), chk.data.questions?.[0]);
+
+const chal = await req('/checkins/challenge', { token: A.token });
+check('ChallengeCard: challenge/history/completed present',
+  ['challenge', 'history', 'completed'].every((k) => k in chal.data), Object.keys(chal.data || {}));
+
 console.log(`\nCONTRACT RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 process.exit(fails.length ? 1 : 0);

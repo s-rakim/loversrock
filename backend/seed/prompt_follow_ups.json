@@ -1,0 +1,44 @@
+{
+  "connection": [
+    "You said “{answer}”. What made that land the way it did?",
+    "“{answer}” — is that something you would want more of, or was it right as it was?",
+    "When you wrote “{answer}”, what did you nearly write instead?",
+    "Has there been a time I did the opposite of “{answer}”, and did you say so?"
+  ],
+  "gratitude": [
+    "You said “{answer}”. Have I ever actually been told that?",
+    "“{answer}” — when did you first notice it?",
+    "Is there a version of “{answer}” you would like more of?",
+    "What is the smallest thing on the same shelf as “{answer}” that you have never mentioned?"
+  ],
+  "reflection": [
+    "You said “{answer}”. What would you say about it a year from now?",
+    "“{answer}” — was that always true, or is it new?",
+    "What would have had to be different for “{answer}” to go another way?",
+    "Is there a part of “{answer}” you left out?"
+  ],
+  "future": [
+    "You said “{answer}”. What is the first real step towards it?",
+    "“{answer}” — what would stop it from happening?",
+    "If “{answer}” happened next month instead of some day, what would you need?",
+    "Who else is in the picture when you imagine “{answer}”?"
+  ],
+  "playful": [
+    "You said “{answer}”. Be honest — how much of that was for my benefit?",
+    "“{answer}” — what is the least flattering true version of that?",
+    "What would the me of five years ago have said to “{answer}”?",
+    "Rank “{answer}” against the other options and defend it."
+  ],
+  "either_or": [
+    "You picked “{answer}”. What made the other one not it?",
+    "“{answer}” — was it close, or not close at all?",
+    "What would change your answer from “{answer}” to the other one?",
+    "Have you always been a “{answer}” person?"
+  ],
+  "default": [
+    "You said “{answer}”. Tell me the bit you did not put in the box.",
+    "“{answer}” — what is behind that?",
+    "What would you want me to understand about “{answer}”?",
+    "Is there a question I should have asked instead?"
+  ]
+}

@@ -113,6 +113,38 @@ async function seedQuestionDecks() {
   console.log(`[seed] deck_questions: ${questionCount} new questions`);
 }
 
+async function seedFollowUps() {
+  const byCategory = loadJson('prompt_follow_ups.json');
+  let count = 0;
+  for (const [category, templates] of Object.entries(byCategory)) {
+    for (let i = 0; i < templates.length; i += 1) {
+      await query(
+        `INSERT INTO prompt_follow_ups (category, template, sort_order)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (category, template) DO UPDATE SET sort_order = EXCLUDED.sort_order`,
+        [category, templates[i], i + 1]
+      );
+      count += 1;
+    }
+  }
+  console.log(`[seed] prompt_follow_ups: ${count} templates`);
+}
+
+async function seedChallenges() {
+  const challenges = loadJson('challenges.json');
+  for (const c of challenges) {
+    await query(
+      `INSERT INTO challenges (slug, title, detail, scope, category)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (slug) DO UPDATE SET
+         title = EXCLUDED.title, detail = EXCLUDED.detail,
+         scope = EXCLUDED.scope, category = EXCLUDED.category`,
+      [c.slug, c.title, c.detail, c.scope, c.category]
+    );
+  }
+  console.log(`[seed] challenges: ${challenges.length} challenges`);
+}
+
 async function seedGamesCatalog() {
   const games = loadJson('games_catalog.json');
   for (const game of games) {
@@ -133,6 +165,8 @@ async function run() {
   await seedQuizQuestions();
   await seedDateIdeas();
   await seedQuestionDecks();
+  await seedFollowUps();
+  await seedChallenges();
   await seedGamesCatalog();
   await pool.end();
   console.log('[seed] done');

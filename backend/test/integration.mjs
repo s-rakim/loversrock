@@ -264,8 +264,11 @@ section('QUESTION DECKS');
 const decks = await req('/decks', { token: A.token });
 const cats = Object.keys(decks.data.decksByCategory || {});
 const deckCount = Object.values(decks.data.decksByCategory || {}).flat().length;
-check('decks grouped by category', decks.status === 200 && cats.length === 11, cats.length);
-check('27 decks seeded', deckCount === 27, deckCount);
+check('decks grouped by category', decks.status === 200 && cats.length >= 11, cats.length);
+// Not an exact count any more: seasonal decks come and go with the calendar,
+// so a hardcoded number here would fail on a date rather than on a bug. The
+// seasonal behaviour itself is asserted properly in test/seasons.mjs.
+check('the evergreen decks are all there', deckCount >= 27, deckCount);
 // There is no paywall. This is a server two people run for themselves, and
 // shipping 17 of the 27 decks behind a "Premium" badge meant the owner was
 // locked out of his own content. Asserted so it cannot creep back.
