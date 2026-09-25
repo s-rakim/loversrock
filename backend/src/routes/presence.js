@@ -9,6 +9,7 @@ import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
+import { normalizeAvatar, catalogue } from '../models/wardrobe.js';
 
 const router = asyncRouter();
 router.use(requireAuth, requirePair);
@@ -190,6 +191,54 @@ router.put('/reactions', async (req, res) => {
 
   emit(req, 'reaction:changed', { targetKind, targetId, userId: req.userId, emoji: rows[0].emoji });
   res.json({ reaction: rows[0] });
+});
+
+// ------------------------------------------------------------- characters
+//
+// One character each. You dress yours; they see it. The reverse is the point
+// of the whole thing — the little person at the top of their Home is you,
+// wearing what you put on and the mood you set.
+
+router.get('/wardrobe', async (_req, res) => {
+  // The catalogue comes from the server so both phones agree on what exists.
+  // A client that only knew its own list would render an unknown garment as
+  // nothing, and the failure mode of "nothing" is a naked character.
+  res.json(catalogue());
+});
+
+router.get('/avatars', async (req, res) => {
+  const { rows } = await query(
+    'SELECT * FROM user_avatars WHERE user_id = ANY($1::uuid[])',
+    [[req.userId, req.partnerId]]
+  );
+  const find = (id) => {
+    const row = rows.find((r) => r.user_id === id);
+    // Someone who has never opened the wardrobe still has a character; they
+    // just have the default one.
+    return normalizeAvatar(row ? { ...row, hairColor: row.hair_color, outfit: row.outfit } : {});
+  };
+  res.json({ mine: find(req.userId), theirs: find(req.partnerId) });
+});
+
+router.put('/avatars', async (req, res) => {
+  // Only ever your own row: the id comes from the token, never the body, so
+  // nobody can dress their partner against their will.
+  const avatar = normalizeAvatar(req.body || {});
+
+  const { rows } = await query(
+    `INSERT INTO user_avatars (user_id, skin, hair, hair_color, build, outfit, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, now())
+     ON CONFLICT (user_id) DO UPDATE
+       SET skin = EXCLUDED.skin, hair = EXCLUDED.hair, hair_color = EXCLUDED.hair_color,
+           build = EXCLUDED.build, outfit = EXCLUDED.outfit, updated_at = now()
+     RETURNING *`,
+    [req.userId, avatar.skin, avatar.hair, avatar.hairColor, avatar.build, JSON.stringify(avatar.outfit)]
+  );
+
+  // So their phone re-dresses the character without being reopened.
+  emit(req, 'avatar:changed', { userId: req.userId });
+
+  res.json({ avatar: normalizeAvatar({ ...rows[0], hairColor: rows[0].hair_color, outfit: rows[0].outfit }) });
 });
 
 export default router;

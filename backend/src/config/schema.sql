@@ -579,3 +579,23 @@ CREATE TABLE IF NOT EXISTS date_idea_votes (
 );
 
 CREATE INDEX IF NOT EXISTS date_idea_votes_pair_idx ON date_idea_votes (pair_id, date_idea_id);
+
+-- ---------------------------------------------------------------------------
+-- Characters: one per person, dressed by their owner, seen by their partner.
+-- ---------------------------------------------------------------------------
+
+-- Appearance is columns; the outfit is jsonb.
+--
+-- The split is deliberate. Skin, hair and build are a fixed, small set that
+-- the renderer must always have a value for, so they get columns and defaults.
+-- The wardrobe is a bag of slots that will grow — a hat today, a scarf next
+-- month — and adding a column per garment would mean a migration per garment.
+CREATE TABLE IF NOT EXISTS user_avatars (
+  user_id     UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  skin        TEXT NOT NULL DEFAULT 'medium',
+  hair        TEXT NOT NULL DEFAULT 'short',
+  hair_color  TEXT NOT NULL DEFAULT 'black',
+  build       TEXT NOT NULL DEFAULT 'average',
+  outfit      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

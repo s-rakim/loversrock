@@ -136,6 +136,71 @@ check('no notes', (await req('/presence/notes', { token: C.token })).status === 
 check('and cannot react to this pair’s messages',
   (await req('/presence/reactions', { method: 'PUT', token: C.token, body: { targetKind: 'message', targetId: msg.data.message.id, emoji: '❤️' } })).status === 403);
 
+
+console.log('\n=== CHARACTERS AND THE WARDROBE ===');
+{
+  const cat = await req('/presence/wardrobe', { token: A.token });
+  check('the catalogue is served from the server', cat.status === 200, cat.status);
+  // It has to come from here, not only the client: a phone on an older build
+  // would otherwise render a garment it has never heard of, and the sensible
+  // fallback for "unknown garment" is nothing at all.
+  check('with garments for every slot',
+    ['top', 'bottom', 'shoes', 'accessory'].every((k) => Object.keys(cat.data.WARDROBE[k] || {}).length > 0),
+    Object.keys(cat.data.WARDROBE || {}));
+  check('and the palettes to dress them in',
+    Object.keys(cat.data.GARMENT_COLORS).length > 8 && Object.keys(cat.data.SKINS).length > 3);
+
+  const fresh = await req('/presence/avatars', { token: A.token });
+  check('everyone has a character before touching anything',
+    Boolean(fresh.data.mine?.outfit?.top?.id), fresh.data.mine);
+  check('including the partner', Boolean(fresh.data.theirs?.outfit?.bottom?.id), fresh.data.theirs);
+
+  const dressed = await req('/presence/avatars', {
+    method: 'PUT', token: A.token,
+    body: {
+      skin: 'deep', hair: 'locs', hairColor: 'black', build: 'average',
+      outfit: {
+        top: { id: 'jersey', color: 'navy', accent: 'red' },
+        bottom: { id: 'cargo', color: 'olive' },
+        shoes: { id: 'slides', color: 'teal' },
+        accessory: { id: 'chain' },
+      },
+    },
+  });
+  check('a character can be dressed', dressed.status === 200, dressed.data);
+  check('and it keeps what was chosen',
+    dressed.data.avatar.hair === 'locs' && dressed.data.avatar.outfit.top.id === 'jersey',
+    dressed.data.avatar);
+  check('including the trim on a garment that takes one',
+    dressed.data.avatar.outfit.top.accent === 'red', dressed.data.avatar.outfit.top);
+
+  const seen = await req('/presence/avatars', { token: B.token });
+  check('the partner sees what you put on',
+    seen.data.theirs.outfit.top.id === 'jersey' && seen.data.theirs.skin === 'deep',
+    seen.data.theirs);
+  check('and their own is untouched', seen.data.mine.outfit.top.id !== 'jersey');
+
+  // The failure mode that matters: an unknown garment must not undress anyone.
+  const junk = await req('/presence/avatars', {
+    method: 'PUT', token: A.token,
+    body: { skin: 'plaid', hair: 'mohawk', outfit: { top: { id: 'spacesuit', color: 'ultraviolet' } } },
+  });
+  check('junk is accepted and normalised rather than rejected', junk.status === 200, junk.data);
+  check('an unknown garment falls back to clothed, not naked',
+    Boolean(junk.data.avatar.outfit.top.id && junk.data.avatar.outfit.bottom.id && junk.data.avatar.outfit.shoes.id),
+    junk.data.avatar.outfit);
+  check('and an unknown colour falls back to a real one',
+    /^[a-z]+$/.test(junk.data.avatar.outfit.top.color), junk.data.avatar.outfit.top.color);
+  check('an unknown skin falls back too', junk.data.avatar.skin === 'medium', junk.data.avatar.skin);
+
+  // You dress yours, never theirs.
+  const before = (await req('/presence/avatars', { token: B.token })).data.mine;
+  await req('/presence/avatars', { method: 'PUT', token: A.token, body: { ...before, userId: B.id, skin: 'porcelain' } });
+  const after = (await req('/presence/avatars', { token: B.token })).data.mine;
+  check('you cannot dress your partner by naming them in the body',
+    after.skin === before.skin, { before: before.skin, after: after.skin });
+}
+
 console.log(`\nPRESENCE RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
 process.exit(0);

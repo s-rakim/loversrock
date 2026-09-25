@@ -11,6 +11,8 @@ import { spacing, radius } from '../theme';
 import { useTheme } from './ThemeContext';
 import { MorphButton } from './Motion';
 import Mascot, { MASCOT_MOODS } from './Mascot';
+import Character from './Character';
+import useAvatars from './useAvatars';
 import usePartnerMood from './usePartnerMood';
 
 const LABELS = {
@@ -38,6 +40,7 @@ export default function MoodBar({ partnerName }) {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mood, note, updatedAt, mine, setMyMood } = usePartnerMood();
+  const { theirs: theirAvatar } = useAvatars();
 
   const [picking, setPicking] = useState(false);
   const [draftNote, setDraftNote] = useState('');
@@ -58,9 +61,9 @@ export default function MoodBar({ partnerName }) {
 
   return (
     <View style={styles.wrap}>
-      {/* THEIR mood, worn by the mascot. Not yours — you already know how you
-          feel; this is for noticing them. */}
-      <Mascot mood={mood} size={84} />
+      {/* THEIR character, wearing THEIR mood. Not yours — you already know
+          how you feel; this is for noticing them. */}
+      <Character avatar={theirAvatar} mood={mood} size={74} />
 
       <View style={{ flex: 1 }}>
         {mood ? (

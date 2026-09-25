@@ -386,6 +386,16 @@ export default function SettingsScreen() {
         </View>
       </FadeInUp>
 
+      <FadeInUp delay={52}>
+        <MorphButton onPress={() => navigation.navigate('Wardrobe')} style={styles.actionRow}>
+          <Icon name="shirt-outline" chip chipColor={colors.surfaceAlt} />
+          <View style={{ flex: 1 }}>
+            <Text style={font.body}>Your character</Text>
+            <Text style={font.muted}>Skin, hair and a wardrobe. They see what you put on.</Text>
+          </View>
+        </MorphButton>
+      </FadeInUp>
+
       <FadeInUp delay={98}>
         <MorphButton onPress={() => navigation.navigate('Diagnostics')} style={styles.actionRow}>
           <Icon name="pulse-outline" chip chipColor={colors.surfaceAlt} />
