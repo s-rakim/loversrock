@@ -49,4 +49,38 @@ router.get('/latest', async (req, res) => {
   res.json({ widgetPhoto: rows[0] || null });
 });
 
+/**
+ * The whole history, for the memories wall.
+ *
+ * Returned newest-first and grouped by the client rather than here: the
+ * grouping is a month heading on screen, and which month a photo belongs to
+ * depends on the reader's own timezone, not the server's.
+ *
+ * The counts ride along because the footer shows them and a second round trip
+ * for two integers is a second round trip.
+ */
+router.get('/', async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 300, 500);
+
+  const { rows } = await query(
+    `SELECT id, image_url, caption, sender_id, created_at
+       FROM widget_photos
+      WHERE pair_id = $1
+      ORDER BY created_at DESC
+      LIMIT $2`,
+    [req.pair.id, limit]
+  );
+
+  const [{ rows: totals }, { rows: pairRows }] = await Promise.all([
+    query('SELECT count(*)::int AS total FROM widget_photos WHERE pair_id = $1', [req.pair.id]),
+    query('SELECT streak_count FROM pairs WHERE id = $1', [req.pair.id]),
+  ]);
+
+  res.json({
+    widgetPhotos: rows,
+    total: totals[0]?.total ?? 0,
+    streak: pairRows[0]?.streak_count ?? 0,
+  });
+});
+
 export default router;

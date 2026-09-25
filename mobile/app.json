@@ -36,6 +36,12 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "loversrock uses the camera to take the photo that lands on your partner's home screen."
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "loversrock needs access to your photos to add them to your shared Memories.",

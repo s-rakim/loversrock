@@ -120,6 +120,24 @@ check("A's widget fetches the newest photo", aPhoto.status === 200, aPhoto.statu
 check('the latest always wins, so the widget is never stale by design',
   (await req('/widget-photos/latest', { token: A.token })).data.widgetPhoto.caption === 'goodnight');
 
+console.log('\n=== THE WALL: EVERY LOCKET EVER SENT ===');
+const wall = await req('/widget-photos', { token: A.token });
+check('the history loads', wall.status === 200, wall.status);
+check('both photos are in it', wall.data.widgetPhotos.length === 2, wall.data.widgetPhotos?.length);
+check('newest first, which is the order the wall groups by',
+  new Date(wall.data.widgetPhotos[0].created_at) >= new Date(wall.data.widgetPhotos[1].created_at),
+  wall.data.widgetPhotos.map((p) => p.created_at));
+check('each row carries what a tile needs',
+  wall.data.widgetPhotos.every((p) => p.id && p.image_url && p.created_at),
+  wall.data.widgetPhotos[0]);
+// The footer counts, sent with the list so the screen needs one request.
+check('the total rides along', wall.data.total === 2, wall.data.total);
+check('and the streak', typeof wall.data.streak === 'number', wall.data.streak);
+check('the partner sees the same wall',
+  (await req('/widget-photos', { token: B.token })).data.total === 2);
+check('a stranger sees none of it',
+  (await req('/widget-photos', { token: C.token })).status === 403);
+
 console.log('\n=== THE WIDGET TOKEN IS READ-ONLY AND SCOPED ===');
 check('it cannot send a photo',
   (await req('/widget-photos', { method: 'POST', widgetToken: bWidget, body: { image: PNG } })).status === 401);

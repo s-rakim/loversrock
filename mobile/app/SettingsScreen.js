@@ -20,8 +20,10 @@ import RemindersCard from '../components/RemindersCard';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import ConnectionCard from '../components/ConnectionCard';
+import ColorPicker from '../components/ColorPicker';
 import {
   useTheme, THEME_PREFERENCES, ACCENTS, ACCENT_NAMES, BACKGROUND_SPEEDS, TEXT_SCALES,
+  BLOB_PALETTES, BLOB_PALETTE_NAMES,
 } from '../components/ThemeContext';
 
 export default function SettingsScreen() {
@@ -29,6 +31,7 @@ export default function SettingsScreen() {
     colors, font, preference, setPreference, motionPreference, setMotionPreference, reduceMotion,
     accentName, setAccent, backgroundIntensity, setBackgroundIntensity,
     backgroundSpeed, setBackgroundSpeed, textScale, setTextScale,
+    customAccent, setCustomAccent, blobPalette, setBlobPalette, isDark,
   } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { intensity, setIntensity } = useGlass();
@@ -133,11 +136,58 @@ export default function SettingsScreen() {
           <View style={styles.swatchRow}>
             {ACCENT_NAMES.map((id) => {
               const preset = ACCENTS[id];
-              const active = accentName === id;
+              const active = !customAccent && accentName === id;
               return (
-                <MorphButton key={id} onPress={() => setAccent(id)} style={styles.swatchCell}>
+                <MorphButton
+                  key={id}
+                  onPress={() => { setCustomAccent(null); setAccent(id); }}
+                  style={styles.swatchCell}
+                >
                   <View style={[styles.swatch, { backgroundColor: preset.accent }, active && styles.swatchActive]}>
                     {active && <Icon name="checkmark" chip={false} size={18} color="#FFFFFF" />}
+                  </View>
+                  <Text style={[styles.swatchLabel, active && { color: colors.accent, fontWeight: '700' }]}>
+                    {preset.label}
+                  </Text>
+                </MorphButton>
+              );
+            })}
+          </View>
+
+          <View style={styles.divider} />
+          <Text style={font.h3}>Or any colour you like</Text>
+          <Text style={[font.muted, { marginTop: 2, marginBottom: spacing.sm }]}>
+            {customAccent
+              ? `Using ${customAccent.toUpperCase()}.`
+              : 'Pick one and it replaces the preset above.'}
+          </Text>
+          <ColorPicker
+            value={customAccent}
+            onChange={setCustomAccent}
+            onClear={() => setCustomAccent(null)}
+          />
+        </View>
+      </FadeInUp>
+
+      <FadeInUp delay={46}>
+        <View style={styles.card}>
+          <Text style={font.h2}>Background colours</Text>
+          <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.md }]}>
+            The blobs drifting behind every screen. Whole palettes rather than
+            four separate colours — four hues chosen independently almost
+            always come out as mud where they overlap.
+          </Text>
+          <View style={styles.swatchRow}>
+            {BLOB_PALETTE_NAMES.map((id) => {
+              const preset = BLOB_PALETTES[id];
+              const active = blobPalette === id;
+              const shown = isDark ? preset.dark : preset.light;
+              return (
+                <MorphButton key={id} onPress={() => setBlobPalette(id)} style={styles.swatchCell}>
+                  <View style={[styles.paletteSwatch, active && styles.swatchActive]}>
+                    {shown.map((c) => (
+                      <View key={c} style={{ flex: 1, backgroundColor: c }} />
+                    ))}
                   </View>
                   <Text style={[styles.swatchLabel, active && { color: colors.accent, fontWeight: '700' }]}>
                     {preset.label}
@@ -396,6 +446,14 @@ const makeStyles = (colors) =>
     borderWidth: 3, borderColor: 'transparent',
   },
   swatchActive: { borderColor: colors.textPrimary },
+  paletteSwatch: {
+    width: 44, height: 44, borderRadius: 22, overflow: 'hidden',
+    flexDirection: 'row', borderWidth: 3, borderColor: 'transparent',
+  },
+  divider: {
+    height: 1, backgroundColor: colors.border,
+    marginTop: spacing.lg, marginBottom: spacing.md,
+  },
   swatchLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
   segmentRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   segment: {

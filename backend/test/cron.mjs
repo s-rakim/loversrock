@@ -102,6 +102,59 @@ await cron.pushPeriodReminders();
 check('pushPeriodReminders() no-ops when nothing is due', true);
 
 
+
+console.log('\n=== THE QUIZ BANK REFILLS ITSELF ===');
+// It used to only warn. The seed ships five days, the daily prompts had a
+// refill job and the quiz did not, so on the sixth day the quiz became "No
+// quiz scheduled for today" permanently — with nothing but a line in a log.
+// This was found by the integration suite going quiet three days after it
+// last passed, which is exactly how long the seeded bank lasted.
+{
+  const { refillQuizBank } = await import('../src/cron/index.js');
+
+  // Clear the horizon so there is genuinely nothing ahead.
+  await query(`DELETE FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE`);
+  const before = await query(
+    `SELECT COUNT(DISTINCT scheduled_date)::int AS days FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE`
+  );
+  check('the bank starts empty for this check', before.rows[0].days === 0, before.rows[0].days);
+
+  const filled = await refillQuizBank();
+  check('the refill reports work done', filled.filled > 0, filled);
+
+  const after = await query(
+    `SELECT COUNT(DISTINCT scheduled_date)::int AS days FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE`
+  );
+  check('a fortnight of quiz is scheduled', after.rows[0].days === 14, after.rows[0].days);
+
+  const today = await query(
+    `SELECT COUNT(*)::int AS n FROM quiz_questions WHERE scheduled_date = CURRENT_DATE`
+  );
+  check('today has a full five questions', today.rows[0].n === 5, today.rows[0].n);
+
+  const dupes = await query(
+    `SELECT scheduled_date, COUNT(*)::int AS n, COUNT(DISTINCT question_text)::int AS distinct_text
+       FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE
+      GROUP BY scheduled_date HAVING COUNT(*) <> COUNT(DISTINCT question_text)`
+  );
+  check('no day repeats the same question twice', dupes.rows.length === 0, dupes.rows);
+
+  const orders = await query(
+    `SELECT scheduled_date FROM quiz_questions WHERE scheduled_date >= CURRENT_DATE
+      GROUP BY scheduled_date HAVING COUNT(DISTINCT question_order) <> 5`
+  );
+  check('every day has orders 1-5', orders.rows.length === 0, orders.rows);
+
+  // Running twice must not double anything up: the unique index plus
+  // ON CONFLICT is what makes two phones asking at once safe.
+  const second = await refillQuizBank();
+  check('running it again is a no-op', second.filled === 0, second);
+  const stillFive = await query(
+    `SELECT COUNT(*)::int AS n FROM quiz_questions WHERE scheduled_date = CURRENT_DATE`
+  );
+  check('and today still has exactly five', stillFive.rows[0].n === 5, stillFive.rows[0].n);
+}
+
 console.log(`\nCRON RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 await pool.end();
 process.exit(fails.length ? 1 : 0);

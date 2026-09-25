@@ -297,3 +297,228 @@ export function withAccent(colors, accentName, isDark) {
     ...scheme,
   };
 }
+
+
+/**
+ * Blob palettes for the live background.
+ *
+ * Kept as whole sets rather than letting four colours be picked independently:
+ * a lava lamp is a palette, and four individually-chosen hues almost always
+ * come out as mud where they overlap. Each set is measured in test/theme.mjs
+ * against the gradient it sits on, in both schemes, so a palette that looks
+ * pretty and leaves body text at 3:1 fails before it ships.
+ */
+export const BLOB_PALETTES = {
+  sunset: {
+    label: 'Sunset',
+    light: ['#FF5C93', '#8B55FF', '#FF922E', '#2FC6D6'],
+    dark: ['#7A34C9', '#D81B8C', '#4432E0', '#B02A8F'],
+  },
+  lagoon: {
+    label: 'Lagoon',
+    light: ['#2FA8D6', '#4FD6B0', '#5C7CFF', '#28C2A8'],
+    dark: ['#0E5C8A', '#1B7A6B', '#2A3FA8', '#146E8C'],
+  },
+  ember: {
+    label: 'Ember',
+    light: ['#FF6B3D', '#FF9F1C', '#E8455C', '#C64BD6'],
+    dark: ['#8C2A10', '#A85E06', '#8F1230', '#6E1A8C'],
+  },
+  forest: {
+    label: 'Forest',
+    light: ['#3FA372', '#7BC43F', '#2FA8A0', '#B7C43F'],
+    dark: ['#14502F', '#2E5C14', '#125450', '#4A5410'],
+  },
+  mono: {
+    label: 'Mono',
+    light: ['#8A8FA3', '#A9AEC2', '#6E7488', '#BFC4D6'],
+    dark: ['#464C63', '#5A6180', '#383D52', '#6B7291'],
+  },
+};
+
+export const BLOB_PALETTE_NAMES = Object.keys(BLOB_PALETTES);
+export const DEFAULT_BLOB_PALETTE = 'sunset';
+
+/** Swaps the background palette on a set of colours. */
+export function withBlobs(colors, paletteName, isDark) {
+  const preset = BLOB_PALETTES[paletteName] || BLOB_PALETTES[DEFAULT_BLOB_PALETTE];
+  return { ...colors, blobs: isDark ? preset.dark : preset.light };
+}
+
+/**
+ * A custom accent, from any hex the person picks.
+ *
+ * The glyph shade is DERIVED here rather than chosen, which is the one thing
+ * the five built-in presets deliberately do not do — they each carry a
+ * hand-measured shade. A free colour picker has no such luxury, so the shade
+ * is computed by pushing the hue to a fixed lightness known to clear 4.5:1 on
+ * this app's card colours: very dark in the light scheme, very light in the
+ * dark one. That is a rule that holds for every hue rather than a guess that
+ * holds for some.
+ */
+export function hexToHsl(hex) {
+  const clean = String(hex).replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  const r = parseInt(full.slice(0, 2), 16) / 255;
+  const g = parseInt(full.slice(2, 4), 16) / 255;
+  const b = parseInt(full.slice(4, 6), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return { h, s, l };
+}
+
+export function hslToHex(h, s, l) {
+  const f = (n) => {
+    const k = (n + h * 12) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const value = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+    return Math.round(value * 255).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/** True for a string this app will accept as a colour. */
+export const isHexColor = (value) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(value || ''));
+
+/** WCAG relative luminance. */
+export function luminanceOf(hex) {
+  const clean = String(hex).replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  const channel = (i) => {
+    const v = parseInt(full.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+}
+
+/** Flattens an rgba() over an opaque backdrop and returns the luminance. */
+function compositeLuminance(rgb, alpha, backdrop) {
+  const mixed = rgb.map((c, i) => alpha * c + (1 - alpha) * backdrop[i]);
+  const channel = (v) => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(mixed[0]) + 0.7152 * channel(mixed[1]) + 0.0722 * channel(mixed[2]);
+}
+
+const toRgb = (hex) => {
+  const clean = String(hex).replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+};
+
+const alphaOf = (rgba) => {
+  const m = String(rgba).match(/rgba?\(([^)]+)\)/);
+  return m ? (Number(m[1].split(',')[3]) || 1) : 1;
+};
+
+
+// Aim past the line rather than at it: 4.6 leaves room for the rounding that
+// 8-bit colour forces at the end.
+const CONTRAST_TARGET = 4.6;
+
+/**
+ * Builds the icon shade for an arbitrary accent.
+ *
+ * Solved for LUMINANCE against the measured backdrop, not for HSL lightness.
+ * Pinning lightness is the obvious approach and it is wrong twice over: HSL
+ * lightness is not perceptual, so the same "L" is a very different brightness
+ * per hue — yellow at 0.26 measured 3.52:1 while blue sailed past 7:1 — and a
+ * card-only target ignores that the chip under the glyph is a tint of the
+ * accent itself.
+ *
+ * Because lightness runs all the way to black and white for every hue, any
+ * luminance target is reachable without touching the hue or saturation the
+ * person chose. So only the axis that decides readability moves.
+ */
+export function glyphForAccent(hex, isDark, backdropLuminance) {
+  const { h, s } = hexToHsl(hex);
+  const saturation = Math.min(1, s * (isDark ? 0.9 : 1.05));
+
+  const backdrop = typeof backdropLuminance === 'number'
+    ? backdropLuminance
+    : (isDark ? 0.045 : 0.93);
+
+  // Solve the WCAG ratio for the glyph's luminance.
+  const target = isDark
+    ? CONTRAST_TARGET * (backdrop + 0.05) - 0.05
+    : (backdrop + 0.05) / CONTRAST_TARGET - 0.05;
+
+  if (target <= 0) return '#000000';
+  if (target >= 1) return '#ffffff';
+
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 20; i += 1) {
+    const mid = (low + high) / 2;
+    if (luminanceOf(hslToHex(h, saturation, mid)) > target) high = mid; else low = mid;
+  }
+
+  // `low` is the last lightness measured at or below the target. In the light
+  // scheme the glyph must be no brighter than the target, so that is the one
+  // to take; in the dark scheme it must be no dimmer, so take `high`.
+  return hslToHex(h, saturation, isDark ? high : low);
+}
+
+/** Applies a free-form accent, deriving everything that depends on it. */
+export function withCustomAccent(colors, hex, isDark) {
+  if (!isHexColor(hex)) return colors;
+  const full = hex.length === 4
+    ? `#${hex.slice(1).split('').map((c) => c + c).join('')}`
+    : hex;
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(full.slice(i, i + 2), 16));
+  const chipAlpha = isDark ? 0.26 : 0.20;
+
+  // Walk every layer the screen paints and keep the worst case: chip tint
+  // over card over each blob over each gradient stop.
+  const cardRgb = toRgb(String(colors.card).startsWith('rgba')
+    ? `#${String(colors.card).match(/\d+/g).slice(0, 3)
+      .map((n) => Number(n).toString(16).padStart(2, '0')).join('')}`
+    : colors.card);
+  const cardAlpha = alphaOf(colors.card);
+
+  // Which extreme is "worst" is the opposite of the intuition. A DARK glyph
+  // (light scheme) has its lowest contrast against the DARKEST backdrop, so
+  // the minimum is the one to design against; a light glyph in the dark
+  // scheme is bound by the brightest. Getting this backwards solves the glyph
+  // against the layer it was already safe on and leaves it failing on the
+  // other — it measured 2.73:1 that way.
+  let worst = isDark ? 0 : 1;
+  for (const stop of colors.backgroundGradient) {
+    for (const blob of colors.blobs) {
+      const painted = toRgb(blob).map((c, i) =>
+        colors.blobOpacity * c + (1 - colors.blobOpacity) * toRgb(stop)[i]);
+      const card = cardRgb.map((c, i) => cardAlpha * c + (1 - cardAlpha) * painted[i]);
+      for (const luminance of [
+        compositeLuminance(card, 1, card),
+        compositeLuminance([r, g, b], chipAlpha, card),
+      ]) {
+        worst = isDark ? Math.max(worst, luminance) : Math.min(worst, luminance);
+      }
+    }
+  }
+
+  const glyph = glyphForAccent(full, isDark, worst);
+
+  return {
+    ...colors,
+    accent: full,
+    accentPink: full,
+    accentSoft: `rgba(${r},${g},${b},${chipAlpha})`,
+    iconChip: `rgba(${r},${g},${b},${chipAlpha})`,
+    categoryChip: `rgba(${r},${g},${b},${isDark ? 0.26 : 0.18})`,
+    glassBorder: `rgba(${r},${g},${b},${isDark ? 0.34 : 0.30})`,
+    iconGlyph: glyph,
+    iconChipBorder: `${glyph}44`,
+  };
+}

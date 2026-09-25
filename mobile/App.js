@@ -36,7 +36,8 @@ import GamesScreen from './app/GamesScreen';
 import SettingsScreen from './app/SettingsScreen';
 import CallScreen from './app/CallScreen';
 import DiagnosticsScreen from './app/DiagnosticsScreen';
-import WidgetPhotoScreen from './app/WidgetPhotoScreen';
+import PhotoWidgetScreen from './app/PhotoWidgetScreen';
+import PhotoHistoryScreen from './app/PhotoHistoryScreen';
 import WallpaperScreen from './app/WallpaperScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
 import TicTacToeScreen from './app/games/TicTacToeScreen';
@@ -213,7 +214,11 @@ function Root() {
             <Stack.Screen name="DateIdeas" component={DateIdeasScreen} options={{ title: 'Date Ideas' }} />
             <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
-            <Stack.Screen name="WidgetPhoto" component={WidgetPhotoScreen} options={{ title: 'Photo Drop' }} />
+            {/* The locket, as its own section: a camera screen and the wall of
+                everything sent. headerShown false on the camera because the
+                camera IS the screen — a title bar over it is just a bar. */}
+            <Stack.Screen name="PhotoWidget" component={PhotoWidgetScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="PhotoHistory" component={PhotoHistoryScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Chat Wallpaper' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />

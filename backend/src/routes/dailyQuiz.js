@@ -4,6 +4,7 @@ import { requireAuth, requirePair } from '../middleware/auth.js';
 import { pairLocalDateString, getUserDeviceTokens } from '../models/pairs.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { answersMatch, matchResult } from '../models/quizResults.js';
+import { refillQuizBank } from '../cron/index.js';
 
 const router = asyncRouter();
 
@@ -20,10 +21,25 @@ async function attemptsFor(pairId, questionIds) {
 
 router.get('/today', async (req, res) => {
   const today = pairLocalDateString(req.pair);
-  const { rows: questions } = await query(
+
+  const load = async () => (await query(
     'SELECT * FROM quiz_questions WHERE scheduled_date = $1 ORDER BY question_order',
     [today]
-  );
+  )).rows;
+
+  let questions = await load();
+
+  // Empty today means the bank ran dry. The nightly job refills it, but
+  // "come back tomorrow" is not an answer for a daily feature someone is
+  // looking at right now — and a pair whose local date is already ahead of
+  // the server's would hit this every single evening. So fill it here and
+  // serve it immediately; the insert is idempotent, so two phones asking at
+  // once is fine.
+  if (questions.length === 0) {
+    await refillQuizBank();
+    questions = await load();
+  }
+
   if (questions.length === 0) return res.status(404).json({ error: 'No quiz scheduled for today' });
 
   const attempts = await attemptsFor(req.pair.id, questions.map((q) => q.id));

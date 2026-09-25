@@ -23,6 +23,7 @@ new Function('module', 'exports', 'require', code)(module_, module_.exports, req
 const {
   lightColors, darkColors, makeFont, lineHeightFor, radius, spacing,
   ACCENT_NAMES, withAccent, MIN_BACKGROUND_INTENSITY, MAX_BACKGROUND_INTENSITY,
+  BLOB_PALETTE_NAMES, withBlobs, withCustomAccent, hslToHex, glyphForAccent,
 } = module_.exports;
 
 // ---------- colour maths ----------
@@ -127,6 +128,74 @@ for (const [name, colors] of [['light', lightColors], ['dark', darkColors]]) {
     const separation = contrast(painted, stop);
     check(`${name}: blob ${blob} is distinguishable from the background (${separation.toFixed(2)}x)`,
       separation >= 1.25, separation.toFixed(3));
+  }
+}
+
+console.log('\n=== ANY COLOUR THE PERSON PICKS IS STILL READABLE ===');
+// A free colour picker is a lovely way to ship an unbounded number of
+// contrast bugs. The icon shade is not chosen, it is SOLVED: derived from the
+// worst backdrop the finished palette can paint, for whatever hue was picked.
+//
+// Two ways that went wrong while it was being written, both of which this
+// sweep catches: pinning HSL lightness instead of luminance (yellow measured
+// 3.52:1 while blue sailed past 7:1, because HSL lightness is not
+// perceptual), and solving against the lightest backdrop when a DARK glyph is
+// bound by the darkest one (2.73:1).
+{
+  let worstLight = Infinity; let worstDark = Infinity;
+  let whereLight = ''; let whereDark = '';
+
+  for (let deg = 0; deg < 360; deg += 15) {
+    for (const saturation of [0.25, 0.6, 1]) {
+      const accent = hslToHex(deg / 360, saturation, 0.55);
+      for (const [scheme, base, isDark] of [['light', lightColors, false], ['dark', darkColors, true]]) {
+        for (const palette of BLOB_PALETTE_NAMES) {
+          const colors = withCustomAccent(withBlobs(base, palette, isDark), accent, isDark);
+          for (const stop of colors.backgroundGradient) {
+            for (const blob of colors.blobs) {
+              const painted = asRgb(paint(blob, colors.blobOpacity, stop));
+              const card = asRgb(over(colors.card, painted));
+              const chip = asRgb(over(colors.iconChip, card));
+              const r = Math.min(contrast(colors.iconGlyph, card), contrast(colors.iconGlyph, chip));
+              if (isDark) {
+                if (r < worstDark) { worstDark = r; whereDark = `${accent} on ${palette}`; }
+              } else if (r < worstLight) { worstLight = r; whereLight = `${accent} on ${palette}`; }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  check(`light: every custom accent keeps icons >= 4.5 (worst ${worstLight.toFixed(2)}, ${whereLight})`,
+    worstLight >= 4.5, worstLight.toFixed(2));
+  check(`dark: every custom accent keeps icons >= 4.5 (worst ${worstDark.toFixed(2)}, ${whereDark})`,
+    worstDark >= 4.5, worstDark.toFixed(2));
+}
+
+console.log('\n=== EVERY BLOB PALETTE STAYS VISIBLE AND READABLE ===');
+for (const [scheme, base, isDark] of [['light', lightColors, false], ['dark', darkColors, true]]) {
+  for (const palette of BLOB_PALETTE_NAMES) {
+    const colors = withBlobs(base, palette, isDark);
+
+    let worstText = Infinity;
+    let leastVisible = Infinity;
+    for (const stop of colors.backgroundGradient) {
+      for (const blob of colors.blobs) {
+        const painted = asRgb(paint(blob, colors.blobOpacity, stop));
+        leastVisible = Math.min(leastVisible, contrast(painted, stop));
+        worstText = Math.min(
+          worstText,
+          contrast(colors.textSecondary, painted),
+          contrast(colors.textSecondary, asRgb(over(colors.card, painted)))
+        );
+      }
+    }
+    check(`${scheme}: "${palette}" keeps body text >= 4.5 (${worstText.toFixed(2)})`,
+      worstText >= 4.5, worstText.toFixed(2));
+    // A palette nobody can see is the bug this whole thing started as.
+    check(`${scheme}: "${palette}" is actually visible (${leastVisible.toFixed(2)}x)`,
+      leastVisible >= 1.15, leastVisible.toFixed(3));
   }
 }
 
@@ -281,6 +350,42 @@ check('no screen paints colors.bg over the lava lamp', painted.length === 0,
 
 const lava = fs.readFileSync(path.join(root, 'components', 'LavaLamp.js'), 'utf8');
 check('blob motion uses the native driver', /useNativeDriver: true/.test(lava));
+
+console.log('\n=== NOTHING PAINTS OVER THE LIVE BACKGROUND ===');
+// The lava lamp sits behind the whole navigator. A screen that gives its
+// container an opaque backgroundColor hides it for that screen, and the only
+// way that gets noticed is somebody saying the background "isn't constant".
+{
+  // Walked inline: the shared helper is declared further down this file.
+  const listScreens = (dir, out = []) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) listScreens(full, out);
+      else if (entry.name.endsWith('.js')) out.push(full);
+    }
+    return out;
+  };
+  const screens = listScreens(path.join(root, 'app'));
+  const opaque = [];
+  for (const file of screens) {
+    const src = fs.readFileSync(file, 'utf8');
+    // The root style of a screen: the one that also carries flex: 1.
+    for (const m of src.matchAll(/\b(container|root|screen)\s*:\s*\{([^}]*)\}/g)) {
+      const body = m[2];
+      if (!/flex:\s*1/.test(body)) continue;
+      const colour = body.match(/backgroundColor:\s*([^,}]+)/);
+      if (!colour) continue;                       // no background at all is fine
+      if (/transparent/.test(colour[1])) continue; // explicitly transparent is fine
+      opaque.push(`${path.relative(root, file)} -> ${colour[1].trim()}`);
+    }
+  }
+  // CallScreen is the deliberate exception: a full-screen video call is not a
+  // place for a drifting background behind the remote camera.
+  const unexpected = opaque.filter((entry) => !entry.includes('CallScreen'));
+  check(`no screen paints over the lava lamp (${screens.length} screens)`,
+    unexpected.length === 0, unexpected.join(', '));
+}
+
 const lavaSource = fs.readFileSync(path.join(root, 'components', 'LavaLamp.js'), 'utf8');
 check('the lava lamp clamps it rather than trusting the caller',
   /Math\.min\(1,\s*Math\.max\(/.test(lavaSource));

@@ -84,7 +84,7 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           <ShineBorder variant="shine" radius={radius.card} phase={0.25} style={{ marginTop: spacing.md }}>
-          <MorphButton onPress={() => navigation.navigate('WidgetPhoto')} style={styles.widgetWideInner}>
+          <MorphButton onPress={() => navigation.navigate('PhotoWidget')} style={styles.widgetWideInner}>
             {widgetPhoto ? (
               <>
                 <Image source={{ uri: mediaUrl(widgetPhoto.imageUrl || widgetPhoto.image_url) }} style={styles.widgetPhoto} />

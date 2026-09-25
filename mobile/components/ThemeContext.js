@@ -5,6 +5,8 @@ import {
   lightColors, darkColors, makeFont, gradientForCategory,
   ACCENTS, ACCENT_NAMES, DEFAULT_ACCENT, withAccent,
   BACKGROUND_SPEEDS, MIN_BACKGROUND_INTENSITY, MAX_BACKGROUND_INTENSITY,
+  BLOB_PALETTES, BLOB_PALETTE_NAMES, DEFAULT_BLOB_PALETTE, withBlobs,
+  withCustomAccent, isHexColor,
 } from '../theme';
 import { apiFetch } from '../services/api';
 
@@ -14,8 +16,10 @@ const ACCENT_KEY = 'loversrock_accent';
 const BG_INTENSITY_KEY = 'loversrock_background_intensity';
 const BG_SPEED_KEY = 'loversrock_background_speed';
 const TEXT_SCALE_KEY = 'loversrock_text_scale';
+const CUSTOM_ACCENT_KEY = 'loversrock_custom_accent';
+const BLOB_PALETTE_KEY = 'loversrock_blob_palette';
 
-export { ACCENTS, ACCENT_NAMES, BACKGROUND_SPEEDS };
+export { ACCENTS, ACCENT_NAMES, BACKGROUND_SPEEDS, BLOB_PALETTES, BLOB_PALETTE_NAMES, isHexColor };
 
 /** In-app nudge on top of the phone's own font-size setting. */
 export const TEXT_SCALES = [
@@ -51,6 +55,10 @@ export function ThemeProvider({ children }) {
   const [backgroundIntensity, setBackgroundIntensityState] = useState(1);
   const [backgroundSpeed, setBackgroundSpeedState] = useState('gentle');
   const [textScale, setTextScaleState] = useState('default');
+  // A free-form hex overrides the named preset when set. Null means "use the
+  // preset", which is why it is not simply another entry in ACCENTS.
+  const [customAccent, setCustomAccentState] = useState(null);
+  const [blobPalette, setBlobPaletteState] = useState(DEFAULT_BLOB_PALETTE);
 
   // Restore the saved choice before the first paint that matters. Failing to
   // read storage just means the OS scheme wins, which is the default anyway.
@@ -67,7 +75,8 @@ export function ThemeProvider({ children }) {
         if (!cancelled && ['system', 'on', 'off'].includes(saved)) setMotionPreferenceState(saved);
       })
       .catch(() => {});
-    AsyncStorage.multiGet([ACCENT_KEY, BG_INTENSITY_KEY, BG_SPEED_KEY, TEXT_SCALE_KEY])
+    AsyncStorage.multiGet([ACCENT_KEY, BG_INTENSITY_KEY, BG_SPEED_KEY, TEXT_SCALE_KEY,
+      CUSTOM_ACCENT_KEY, BLOB_PALETTE_KEY])
       .then((entries) => {
         if (cancelled) return;
         const saved = Object.fromEntries(entries);
@@ -76,6 +85,8 @@ export function ThemeProvider({ children }) {
         if (Number.isFinite(intensity)) setBackgroundIntensityState(clampIntensity(intensity));
         if (saved[BG_SPEED_KEY] in BACKGROUND_SPEEDS) setBackgroundSpeedState(saved[BG_SPEED_KEY]);
         if (TEXT_SCALES.some((t) => t.id === saved[TEXT_SCALE_KEY])) setTextScaleState(saved[TEXT_SCALE_KEY]);
+        if (isHexColor(saved[CUSTOM_ACCENT_KEY])) setCustomAccentState(saved[CUSTOM_ACCENT_KEY]);
+        if (BLOB_PALETTE_NAMES.includes(saved[BLOB_PALETTE_KEY])) setBlobPaletteState(saved[BLOB_PALETTE_KEY]);
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -134,6 +145,22 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => () => clearTimeout(intensityWrite.current), []);
 
+  /** Pass a hex to pin a custom accent, or null to fall back to the preset. */
+  const setCustomAccent = useCallback(async (next) => {
+    if (next !== null && !isHexColor(next)) return;
+    setCustomAccentState(next);
+    try {
+      if (next === null) await AsyncStorage.removeItem(CUSTOM_ACCENT_KEY);
+      else await AsyncStorage.setItem(CUSTOM_ACCENT_KEY, next);
+    } catch { /* session-only */ }
+  }, []);
+
+  const setBlobPalette = useCallback(async (next) => {
+    if (!BLOB_PALETTE_NAMES.includes(next)) return;
+    setBlobPaletteState(next);
+    try { await AsyncStorage.setItem(BLOB_PALETTE_KEY, next); } catch { /* session-only */ }
+  }, []);
+
   const setBackgroundSpeed = useCallback(async (next) => {
     if (!(next in BACKGROUND_SPEEDS)) return;
     setBackgroundSpeedState(next);
@@ -167,8 +194,13 @@ export function ThemeProvider({ children }) {
   const { fontScale } = useWindowDimensions();
 
   const value = useMemo(() => {
-    const base = isDark ? darkColors : lightColors;
-    const colors = withAccent(base, accentName, isDark);
+    // Order matters. The blob palette lands first because the accent's icon
+    // shade is derived FROM the finished background — it measures the worst
+    // backdrop a glyph can sit on, and the blobs are part of that backdrop.
+    const base = withBlobs(isDark ? darkColors : lightColors, blobPalette, isDark);
+    const colors = customAccent
+      ? withCustomAccent(base, customAccent, isDark)
+      : withAccent(base, accentName, isDark);
     // Kept as two separate multipliers on purpose — see makeFont. RN already
     // applies the phone's fontScale to fontSize; the in-app nudge it does not
     // know about, so that one has to be handed over explicitly.
@@ -178,6 +210,10 @@ export function ThemeProvider({ children }) {
       font: makeFont(colors, fontScale, textFactor),
       accentName,
       setAccent,
+      customAccent,
+      setCustomAccent,
+      blobPalette,
+      setBlobPalette,
       backgroundIntensity,
       setBackgroundIntensity,
       backgroundSpeed,
@@ -204,7 +240,8 @@ export function ThemeProvider({ children }) {
     };
   }, [isDark, scheme, preference, setPreference, reduceMotion, motionPreference, setMotionPreference,
     hydrated, fontScale, accentName, setAccent, backgroundIntensity, setBackgroundIntensity,
-    backgroundSpeed, setBackgroundSpeed, textScale, setTextScale]);
+    backgroundSpeed, setBackgroundSpeed, textScale, setTextScale,
+    customAccent, setCustomAccent, blobPalette, setBlobPalette]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
