@@ -163,5 +163,63 @@ check('a message notification opens the photo section, where the thread lives',
   /message: 'Photos'/.test(notif));
 check('a call notification opens the call', /call: 'Call'/.test(notif));
 
+console.log('\n=== NOTHING IS BUILT ON THE SERVER AND UNREACHABLE IN THE APP ===');
+// This is the gap that found three real features sitting unused: badges,
+// three of the four nudge kinds, and reactions that could be shown but never
+// added. None of them errors, none of them fails a test — the work is simply
+// there and nobody can get to it.
+const allSource = files.map((f) => fs.readFileSync(f, 'utf8')).join('\n') + app;
+
+for (const [route, what] of [
+  ['/achievements', 'the badge list'],
+  ['/achievements/streak', 'the streak and its repair'],
+  ['/presence/nudges', 'kisses in the app'],
+  ['/presence/reactions', 'reacting to things'],
+  ['/feed', 'the joint feed'],
+  ['/checkins/current', 'the monthly check-in'],
+  ['/checkins/challenge', 'the random challenge'],
+  ['/date-ideas/swipe', 'the swipe deck'],
+  ['/canvas', 'the drawing gallery'],
+  ['/widget/token', 'widget setup'],
+]) {
+  check(`${what} is actually called from the app`, allSource.includes(route), route);
+}
+
+// Every nudge kind the server accepts needs a way in. The widget can only
+// send a kiss — a home screen button has no room to ask — so if the app does
+// not offer the rest, three quarters of the feature is unreachable.
+const nudgeModel = fs.readFileSync(path.join(root, '..', 'backend', 'src', 'models', 'nudges.js'), 'utf8');
+const kinds = [...nudgeModel.slice(nudgeModel.indexOf('NUDGE_KINDS')).matchAll(/'(\w+)'/g)].map((m) => m[1]).slice(0, 4);
+check(`the server takes ${kinds.length} nudge kinds`, kinds.length === 4, kinds);
+for (const kind of kinds) {
+  check(`  ${kind} can be sent from the app`, new RegExp(`kind: '${kind}'`).test(allSource), kind);
+}
+
+// Reactions: the feed showed them and had no way to add one, which is a list
+// that can only ever be empty.
+const feed = read('app', 'FeedScreen.js');
+check('the feed can ADD a reaction, not just show them', /\/presence\/reactions/.test(feed));
+check('and remove one, because reacting is a toggle', /mine \? null : emoji/.test(feed));
+
+// Badges.
+check('there is a screen for the badges', fs.existsSync(path.join(root, 'app', 'AchievementsScreen.js')));
+check('and a way to reach it', /navigate\('Achievements'\)/.test(allSource));
+
+console.log('\n=== NO PAYWALL, AND NOTHING LEFT TO FLIP ===');
+// is_locked shipped 17 of 27 decks behind a Premium badge on a server two
+// people run for themselves. It was set false everywhere; the column is gone
+// now so there is no flag left for a seed file or a future good idea.
+const schema = fs.readFileSync(path.join(root, '..', 'backend', 'src', 'config', 'schema.sql'), 'utf8');
+check('the deck lock column is dropped', /ALTER TABLE question_decks DROP COLUMN IF EXISTS is_locked/.test(schema));
+check('the game lock column too', /ALTER TABLE games_catalog DROP COLUMN IF EXISTS is_locked/.test(schema));
+check('and the "not implemented" flag, since every game has a screen',
+  /DROP COLUMN IF EXISTS is_implemented/.test(schema));
+check('no seed row carries a lock',
+  !fs.readFileSync(path.join(root, '..', 'backend', 'seed', 'question_decks.json'), 'utf8').includes('isLocked')
+  && !fs.readFileSync(path.join(root, '..', 'backend', 'seed', 'games_catalog.json'), 'utf8').includes('isLocked'));
+check('nothing in the app reads a lock', !/is_locked|isLocked/.test(allSource));
+// A promise nobody had made.
+check('and no "Coming soon" label survives', !/Coming soon/.test(allSource));
+
 console.log(`\nNAV RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

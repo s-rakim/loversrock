@@ -850,3 +850,20 @@ ALTER TABLE reactions ADD CONSTRAINT reactions_target_kind_check
     'message', 'memory', 'note', 'doodle',
     'prompt', 'quiz', 'locket', 'drawing', 'date', 'challenge', 'checkin', 'milestone'
   ));
+
+-- ---------------------------------------------------------------------------
+-- The paywall columns, removed.
+-- ---------------------------------------------------------------------------
+
+-- `is_locked` shipped 17 of the 27 decks behind a Premium badge, on a server
+-- two people run for themselves — which meant the owner was locked out of his
+-- own content. It was set to false everywhere long ago; the column is dropped
+-- now so there is no longer a flag to flip, by a seed file, a migration, or
+-- anybody's future good idea.
+--
+-- `is_implemented` goes with it: every game in the catalogue has a screen, so
+-- the flag can only ever say something untrue, and the "Coming soon" label it
+-- drove was a promise nobody had made.
+ALTER TABLE question_decks DROP COLUMN IF EXISTS is_locked;
+ALTER TABLE games_catalog DROP COLUMN IF EXISTS is_locked;
+ALTER TABLE games_catalog DROP COLUMN IF EXISTS is_implemented;

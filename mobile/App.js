@@ -31,6 +31,7 @@ import DateIdeasScreen from './app/DateIdeasScreen';
 import SwipeDeckScreen from './app/SwipeDeckScreen';
 import CheckinScreen from './app/CheckinScreen';
 import FeedScreen from './app/FeedScreen';
+import AchievementsScreen from './app/AchievementsScreen';
 import CountdownScreen from './app/CountdownScreen';
 import CanvasScreen from './app/CanvasScreen';
 import PhotoSectionScreen from './app/PhotoSectionScreen';
@@ -240,6 +241,9 @@ function Root() {
             {/* What the two of you did, as opposed to what you said — which is
                 the message thread's job. */}
             <Stack.Screen name="Feed" component={FeedScreen} options={{ title: 'Your story' }} />
+            {/* Twenty-one badges were being awarded and stored with nowhere
+                to see them, which is the same as not having them. */}
+            <Stack.Screen name="Achievements" component={AchievementsScreen} options={{ title: 'Badges & streak' }} />
             <Stack.Screen name="Countdown" component={CountdownScreen} options={{ title: 'Countdowns' }} />
             {/* The shelf, and the canvas itself. The gallery is the entry
                 point of the two: you arrive wanting to see what is there far

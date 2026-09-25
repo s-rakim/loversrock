@@ -139,13 +139,11 @@ export default function GamesScreen({ navigation }) {
             <MorphButton
               key={game.slug}
               onPress={() => navigation.navigate(ROUTE_BY_SLUG[game.slug])}
-              disabled={!game.is_implemented}
               style={styles.card}
             >
               <Icon name={game.emoji} chip chipSize={44} style={{ marginBottom: spacing.sm }} />
               <Text style={font.h2}>{game.title}</Text>
               {game.subtitle ? <Text style={font.muted}>{game.subtitle}</Text> : null}
-              {!game.is_implemented && <Text style={font.muted}>Coming soon</Text>}
             </MorphButton>
           ))}
         </View>

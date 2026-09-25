@@ -271,10 +271,12 @@ check('decks grouped by category', decks.status === 200 && cats.length >= 11, ca
 check('the evergreen decks are all there', deckCount >= 27, deckCount);
 // There is no paywall. This is a server two people run for themselves, and
 // shipping 17 of the 27 decks behind a "Premium" badge meant the owner was
-// locked out of his own content. Asserted so it cannot creep back.
-check('no deck is locked behind anything',
-  Object.values(decks.data.decksByCategory).flat().every((d) => d.is_locked === false),
-  Object.values(decks.data.decksByCategory).flat().filter((d) => d.is_locked).map((d) => d.slug));
+// locked out of his own content. The column is DROPPED now rather than set
+// false, so there is nothing left for a seed file or a future good idea to
+// flip — asserted as an absence, which is the stronger claim.
+check('no deck carries a lock at all',
+  Object.values(decks.data.decksByCategory).flat().every((d) => !('is_locked' in d)),
+  Object.values(decks.data.decksByCategory).flat().filter((d) => 'is_locked' in d).map((d) => d.slug));
 const deckQs = await req('/decks/would-you-rather-classic/questions', { token: A.token });
 check('deck questions load', deckQs.status === 200 && deckQs.data.questions.length > 0);
 const dq = deckQs.data.questions[0];
@@ -331,8 +333,12 @@ check('the catalogue is not empty', slugs.length > 0, slugs.length);
 check('every playable multiplayer game has a catalogue row',
   games.data.multiplayer.every((slug) => slugs.includes(slug)),
   games.data.multiplayer.filter((slug) => !slugs.includes(slug)));
-check('every catalogue row is marked implemented', games.data.games.every((g) => g.is_implemented === true),
-  games.data.games.filter((g) => !g.is_implemented).map((g) => g.slug));
+// Every game in the catalogue has a screen, so a flag saying otherwise could
+// only ever be wrong — and the "Coming soon" label it drove was a promise
+// nobody had made. Gone, and asserted gone.
+check('no catalogue row carries a coming-soon flag',
+  games.data.games.every((g) => !('is_implemented' in g) && !('is_locked' in g)),
+  games.data.games.filter((g) => 'is_implemented' in g).map((g) => g.slug));
 check('no duplicate slugs', new Set(slugs).size === slugs.length, slugs);
 check('game icons are Ionicons names (not emoji)', games.data.games.every((g) => /^[a-z-]+$/.test(g.emoji)), games.data.games.map((g) => g.emoji));
 

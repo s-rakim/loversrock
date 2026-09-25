@@ -1,47 +1,253 @@
 [
-  { "slug": "would-you-rather-classic", "category": "Would You Rather", "emoji": "help-circle-outline", "title": "Classic Would You Rather", "isLocked": false, "sortOrder": 1 },
-  { "slug": "would-you-rather-spicy", "category": "Would You Rather", "emoji": "flame-outline", "title": "Spicy Would You Rather", "isLocked": false, "sortOrder": 2 },
-  { "slug": "would-you-rather-family", "category": "Would You Rather", "emoji": "people-outline", "title": "Family Edition", "isLocked": false, "sortOrder": 3 },
-
-  { "slug": "deep-questions-getting-serious", "category": "Deep Questions", "emoji": "chatbubbles-outline", "title": "Getting Serious", "isLocked": false, "sortOrder": 1 },
-  { "slug": "deep-questions-life-goals", "category": "Deep Questions", "emoji": "flag-outline", "title": "Life Goals", "isLocked": false, "sortOrder": 2 },
-  { "slug": "deep-questions-fears", "category": "Deep Questions", "emoji": "moon-outline", "title": "Facing Fears", "isLocked": false, "sortOrder": 3 },
-
-  { "slug": "spicy-heat-check", "category": "Hot & Spicy", "emoji": "flame-outline", "title": "Heat Check", "isLocked": false, "sortOrder": 1 },
-  { "slug": "spicy-truth-or-dare", "category": "Hot & Spicy", "emoji": "flash-outline", "title": "Truth or Dare", "isLocked": false, "sortOrder": 2 },
-
-  { "slug": "unhinged-chaos-questions", "category": "Unhinged", "emoji": "planet-outline", "title": "Chaos Questions", "isLocked": false, "sortOrder": 1 },
-  { "slug": "unhinged-would-you-rather", "category": "Unhinged", "emoji": "shuffle-outline", "title": "Unhinged Would You Rather", "isLocked": false, "sortOrder": 2 },
-
-  { "slug": "communication-love-languages", "category": "Effective Communication", "emoji": "heart-circle-outline", "title": "Love Languages Check-In", "isLocked": false, "sortOrder": 1 },
-  { "slug": "communication-conflict-styles", "category": "Effective Communication", "emoji": "hand-left-outline", "title": "Conflict Styles", "isLocked": false, "sortOrder": 2 },
-
-  { "slug": "money-matters-basics", "category": "Money Matters", "emoji": "cash-outline", "title": "Money Basics", "isLocked": false, "sortOrder": 1 },
-  { "slug": "money-matters-future", "category": "Money Matters", "emoji": "trending-up-outline", "title": "Planning Ahead", "isLocked": false, "sortOrder": 2 },
-
-  { "slug": "parenting-someday", "category": "Parenting Perspectives", "emoji": "happy-outline", "title": "Someday, Maybe Kids", "isLocked": false, "sortOrder": 1 },
-  { "slug": "parenting-values", "category": "Parenting Perspectives", "emoji": "book-outline", "title": "Parenting Values", "isLocked": false, "sortOrder": 2 },
-
-  { "slug": "wellness-check-in", "category": "Wellness", "emoji": "leaf-outline", "title": "Wellness Check-In", "isLocked": false, "sortOrder": 1 },
-  { "slug": "wellness-self-care", "category": "Wellness", "emoji": "water-outline", "title": "Self-Care Habits", "isLocked": false, "sortOrder": 2 },
-  { "slug": "wellness-mental-health", "category": "Wellness", "emoji": "sunny-outline", "title": "Mental Health Check-In", "isLocked": false, "sortOrder": 3 },
-
-  { "slug": "photo-prompts-throwback", "category": "Photo Prompts", "emoji": "camera-outline", "title": "Throwback Photos", "isLocked": false, "sortOrder": 1 },
-  { "slug": "photo-prompts-silly", "category": "Photo Prompts", "emoji": "happy-outline", "title": "Silly Selfies", "isLocked": false, "sortOrder": 2 },
-
-  { "slug": "future-five-year-plan", "category": "Future Plans & Dreams", "emoji": "rocket-outline", "title": "Five Year Plan", "isLocked": false, "sortOrder": 1 },
-  { "slug": "future-bucket-dreams", "category": "Future Plans & Dreams", "emoji": "star-outline", "title": "Bucket List Dreams", "isLocked": false, "sortOrder": 2 },
-  { "slug": "future-travel-goals", "category": "Future Plans & Dreams", "emoji": "airplane-outline", "title": "Travel Goals", "isLocked": false, "sortOrder": 3 },
-
-  { "slug": "popular-most-asked", "category": "Popular Community Questions", "emoji": "trophy-outline", "title": "Most Asked Questions", "isLocked": false, "sortOrder": 1 },
-  { "slug": "popular-newlywed-game", "category": "Popular Community Questions", "emoji": "heart-outline", "title": "The Newlywed Game", "isLocked": false, "sortOrder": 2 },
-  { "slug": "popular-late-night", "category": "Popular Community Questions", "emoji": "moon-outline", "title": "Late Night Talks", "isLocked": false, "sortOrder": 3 },
-
-  { "slug": "seasonal-valentines", "category": "Seasonal", "emoji": "heart-circle-outline", "title": "Valentine's", "isLocked": false, "sortOrder": 1, "seasonStart": "02-01", "seasonEnd": "02-20" },
-  { "slug": "seasonal-christmas", "category": "Seasonal", "emoji": "gift-outline", "title": "Christmas", "isLocked": false, "sortOrder": 2, "seasonStart": "12-01", "seasonEnd": "12-27" },
-  { "slug": "seasonal-new-year", "category": "Seasonal", "emoji": "sparkles-outline", "title": "New Year, Us", "isLocked": false, "sortOrder": 3, "seasonStart": "12-26", "seasonEnd": "01-07" },
-  { "slug": "seasonal-summer", "category": "Seasonal", "emoji": "sunny-outline", "title": "Summer Plans", "isLocked": false, "sortOrder": 4, "seasonStart": "05-15", "seasonEnd": "08-31" },
-  { "slug": "seasonal-autumn", "category": "Seasonal", "emoji": "leaf-outline", "title": "Cosy Season", "isLocked": false, "sortOrder": 5, "seasonStart": "09-15", "seasonEnd": "11-15" },
-  { "slug": "seasonal-halloween", "category": "Seasonal", "emoji": "moon-outline", "title": "Spooky Season", "isLocked": false, "sortOrder": 6, "seasonStart": "10-15", "seasonEnd": "11-02" },
-  { "slug": "seasonal-anniversary", "category": "Seasonal", "emoji": "calendar-outline", "title": "Your Anniversary Month", "isLocked": false, "sortOrder": 7, "seasonAnchor": "anniversary" }
+  {
+    "slug": "would-you-rather-classic",
+    "category": "Would You Rather",
+    "emoji": "help-circle-outline",
+    "title": "Classic Would You Rather",
+    "sortOrder": 1
+  },
+  {
+    "slug": "would-you-rather-spicy",
+    "category": "Would You Rather",
+    "emoji": "flame-outline",
+    "title": "Spicy Would You Rather",
+    "sortOrder": 2
+  },
+  {
+    "slug": "would-you-rather-family",
+    "category": "Would You Rather",
+    "emoji": "people-outline",
+    "title": "Family Edition",
+    "sortOrder": 3
+  },
+  {
+    "slug": "deep-questions-getting-serious",
+    "category": "Deep Questions",
+    "emoji": "chatbubbles-outline",
+    "title": "Getting Serious",
+    "sortOrder": 1
+  },
+  {
+    "slug": "deep-questions-life-goals",
+    "category": "Deep Questions",
+    "emoji": "flag-outline",
+    "title": "Life Goals",
+    "sortOrder": 2
+  },
+  {
+    "slug": "deep-questions-fears",
+    "category": "Deep Questions",
+    "emoji": "moon-outline",
+    "title": "Facing Fears",
+    "sortOrder": 3
+  },
+  {
+    "slug": "spicy-heat-check",
+    "category": "Hot & Spicy",
+    "emoji": "flame-outline",
+    "title": "Heat Check",
+    "sortOrder": 1
+  },
+  {
+    "slug": "spicy-truth-or-dare",
+    "category": "Hot & Spicy",
+    "emoji": "flash-outline",
+    "title": "Truth or Dare",
+    "sortOrder": 2
+  },
+  {
+    "slug": "unhinged-chaos-questions",
+    "category": "Unhinged",
+    "emoji": "planet-outline",
+    "title": "Chaos Questions",
+    "sortOrder": 1
+  },
+  {
+    "slug": "unhinged-would-you-rather",
+    "category": "Unhinged",
+    "emoji": "shuffle-outline",
+    "title": "Unhinged Would You Rather",
+    "sortOrder": 2
+  },
+  {
+    "slug": "communication-love-languages",
+    "category": "Effective Communication",
+    "emoji": "heart-circle-outline",
+    "title": "Love Languages Check-In",
+    "sortOrder": 1
+  },
+  {
+    "slug": "communication-conflict-styles",
+    "category": "Effective Communication",
+    "emoji": "hand-left-outline",
+    "title": "Conflict Styles",
+    "sortOrder": 2
+  },
+  {
+    "slug": "money-matters-basics",
+    "category": "Money Matters",
+    "emoji": "cash-outline",
+    "title": "Money Basics",
+    "sortOrder": 1
+  },
+  {
+    "slug": "money-matters-future",
+    "category": "Money Matters",
+    "emoji": "trending-up-outline",
+    "title": "Planning Ahead",
+    "sortOrder": 2
+  },
+  {
+    "slug": "parenting-someday",
+    "category": "Parenting Perspectives",
+    "emoji": "happy-outline",
+    "title": "Someday, Maybe Kids",
+    "sortOrder": 1
+  },
+  {
+    "slug": "parenting-values",
+    "category": "Parenting Perspectives",
+    "emoji": "book-outline",
+    "title": "Parenting Values",
+    "sortOrder": 2
+  },
+  {
+    "slug": "wellness-check-in",
+    "category": "Wellness",
+    "emoji": "leaf-outline",
+    "title": "Wellness Check-In",
+    "sortOrder": 1
+  },
+  {
+    "slug": "wellness-self-care",
+    "category": "Wellness",
+    "emoji": "water-outline",
+    "title": "Self-Care Habits",
+    "sortOrder": 2
+  },
+  {
+    "slug": "wellness-mental-health",
+    "category": "Wellness",
+    "emoji": "sunny-outline",
+    "title": "Mental Health Check-In",
+    "sortOrder": 3
+  },
+  {
+    "slug": "photo-prompts-throwback",
+    "category": "Photo Prompts",
+    "emoji": "camera-outline",
+    "title": "Throwback Photos",
+    "sortOrder": 1
+  },
+  {
+    "slug": "photo-prompts-silly",
+    "category": "Photo Prompts",
+    "emoji": "happy-outline",
+    "title": "Silly Selfies",
+    "sortOrder": 2
+  },
+  {
+    "slug": "future-five-year-plan",
+    "category": "Future Plans & Dreams",
+    "emoji": "rocket-outline",
+    "title": "Five Year Plan",
+    "sortOrder": 1
+  },
+  {
+    "slug": "future-bucket-dreams",
+    "category": "Future Plans & Dreams",
+    "emoji": "star-outline",
+    "title": "Bucket List Dreams",
+    "sortOrder": 2
+  },
+  {
+    "slug": "future-travel-goals",
+    "category": "Future Plans & Dreams",
+    "emoji": "airplane-outline",
+    "title": "Travel Goals",
+    "sortOrder": 3
+  },
+  {
+    "slug": "popular-most-asked",
+    "category": "Popular Community Questions",
+    "emoji": "trophy-outline",
+    "title": "Most Asked Questions",
+    "sortOrder": 1
+  },
+  {
+    "slug": "popular-newlywed-game",
+    "category": "Popular Community Questions",
+    "emoji": "heart-outline",
+    "title": "The Newlywed Game",
+    "sortOrder": 2
+  },
+  {
+    "slug": "popular-late-night",
+    "category": "Popular Community Questions",
+    "emoji": "moon-outline",
+    "title": "Late Night Talks",
+    "sortOrder": 3
+  },
+  {
+    "slug": "seasonal-valentines",
+    "category": "Seasonal",
+    "emoji": "heart-circle-outline",
+    "title": "Valentine's",
+    "sortOrder": 1,
+    "seasonStart": "02-01",
+    "seasonEnd": "02-20"
+  },
+  {
+    "slug": "seasonal-christmas",
+    "category": "Seasonal",
+    "emoji": "gift-outline",
+    "title": "Christmas",
+    "sortOrder": 2,
+    "seasonStart": "12-01",
+    "seasonEnd": "12-27"
+  },
+  {
+    "slug": "seasonal-new-year",
+    "category": "Seasonal",
+    "emoji": "sparkles-outline",
+    "title": "New Year, Us",
+    "sortOrder": 3,
+    "seasonStart": "12-26",
+    "seasonEnd": "01-07"
+  },
+  {
+    "slug": "seasonal-summer",
+    "category": "Seasonal",
+    "emoji": "sunny-outline",
+    "title": "Summer Plans",
+    "sortOrder": 4,
+    "seasonStart": "05-15",
+    "seasonEnd": "08-31"
+  },
+  {
+    "slug": "seasonal-autumn",
+    "category": "Seasonal",
+    "emoji": "leaf-outline",
+    "title": "Cosy Season",
+    "sortOrder": 5,
+    "seasonStart": "09-15",
+    "seasonEnd": "11-15"
+  },
+  {
+    "slug": "seasonal-halloween",
+    "category": "Seasonal",
+    "emoji": "moon-outline",
+    "title": "Spooky Season",
+    "sortOrder": 6,
+    "seasonStart": "10-15",
+    "seasonEnd": "11-02"
+  },
+  {
+    "slug": "seasonal-anniversary",
+    "category": "Seasonal",
+    "emoji": "calendar-outline",
+    "title": "Your Anniversary Month",
+    "sortOrder": 7,
+    "seasonAnchor": "anniversary"
+  }
 ]

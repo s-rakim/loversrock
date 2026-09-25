@@ -33,6 +33,10 @@ const KIND = {
   milestone: { icon: 'ribbon-outline', label: 'Milestone' },
 };
 
+// Six, not a keyboard. A picker with everything in it is a picker nobody
+// uses twice; these are the ones a couple actually reaches for.
+const EMOJI = ['❤️', '😂', '🥺', '🔥', '👏', '😮'];
+
 const when = (iso) => {
   const d = new Date(iso);
   const days = Math.floor((Date.now() - d.getTime()) / 86400000);
@@ -51,6 +55,9 @@ export default function FeedScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [drafts, setDrafts] = useState({});
+  // Which items have the emoji row open. Six emoji on thirty cards is a wall
+  // of faces; the row appears when asked for.
+  const [picking, setPicking] = useState({});
   const [me, setMe] = useState(null);
   // A second page request in flight must not start a third, or a fast scroll
   // fetches the same page four times.
@@ -92,6 +99,26 @@ export default function FeedScreen({ navigation }) {
       loadingMore.current = false;
     }
   }, [cursor]);
+
+  async function react(item, emoji) {
+    const key = `${item.kind}:${item.id}`;
+    // Moved first, then saved. Waiting on a round trip to see your own tap
+    // land is the one place in an app where lag is unmistakable.
+    setItems((prev) => prev.map((i) => {
+      if (`${i.kind}:${i.id}` !== key) return i;
+      const others = i.reactions.filter((r) => r.userId !== me);
+      return { ...i, reactions: emoji ? [...others, { userId: me, emoji }] : others };
+    }));
+    try {
+      await apiFetch('/presence/reactions', {
+        method: 'PUT',
+        body: { targetKind: item.kind, targetId: item.id, emoji },
+      });
+    } catch (err) {
+      load();
+      Alert.alert('Could not react', err.message);
+    }
+  }
 
   async function comment(item) {
     const key = `${item.kind}:${item.id}`;
@@ -189,13 +216,37 @@ export default function FeedScreen({ navigation }) {
 
         {body(item)}
 
-        {item.reactions.length > 0 && (
-          <View style={styles.reactions}>
-            {item.reactions.map((r, i) => (
-              <Text key={r.userId + i} style={styles.reaction}>{r.emoji}</Text>
-            ))}
-          </View>
-        )}
+        {/* Reactions were displayed and could not be added, which is a list
+            that can only ever be empty. Tapping yours again takes it off —
+            reacting is a toggle, which is what the server has always done. */}
+        <View style={styles.reactions}>
+          {EMOJI.map((emoji) => {
+            const mine = item.reactions.some((r) => r.userId === me && r.emoji === emoji);
+            const theirs = item.reactions.some((r) => r.userId !== me && r.emoji === emoji);
+            if (!mine && !theirs && !picking[key]) return null;
+            return (
+              <Pressable
+                key={emoji}
+                onPress={() => react(item, mine ? null : emoji)}
+                style={[styles.reactionChip, mine && styles.reactionChipMine]}
+              >
+                <Text style={styles.reaction}>{emoji}</Text>
+                {theirs && <View style={styles.theirDot} />}
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={() => setPicking((p) => ({ ...p, [key]: !p[key] }))}
+            hitSlop={8}
+            style={styles.reactionChip}
+          >
+            <Ionicons
+              name={picking[key] ? 'close' : 'happy-outline'}
+              size={15}
+              color={colors.textMuted}
+            />
+          </Pressable>
+        </View>
 
         {item.comments.map((c) => (
           <Pressable
@@ -288,7 +339,19 @@ const makeStyles = (colors) =>
       backgroundColor: colors.surfaceAlt, borderRadius: radius.md,
       padding: spacing.sm, marginTop: spacing.xs,
     },
-    reactions: { flexDirection: 'row', gap: 4, marginTop: 2 },
+    reactions: { flexDirection: 'row', gap: 4, marginTop: 2, alignItems: 'center', flexWrap: 'wrap' },
+    reactionChip: {
+      minWidth: 30, height: 28, paddingHorizontal: 6, borderRadius: radius.pill,
+      alignItems: 'center', justifyContent: 'center', flexDirection: 'row',
+      backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: 'transparent',
+    },
+    reactionChipMine: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+    // A small mark rather than a second copy of the emoji: the two of you
+    // reacting the same way should read as agreement, not as duplication.
+    theirDot: {
+      width: 5, height: 5, borderRadius: 2.5, marginLeft: 3,
+      backgroundColor: colors.accentPink,
+    },
     reaction: { fontSize: 16 },
     comment: {
       paddingTop: spacing.sm, marginTop: spacing.xs,

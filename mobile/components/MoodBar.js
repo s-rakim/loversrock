@@ -28,6 +28,16 @@ const ICONS = {
   lonely: 'person-outline', unwell: 'medkit-outline',
 };
 
+// The four the server takes. The widget can only send the first — a home
+// screen button has no room to ask — so this is the only way to the rest.
+const NUDGES = [
+  { kind: 'kiss', icon: 'heart', label: 'Kiss' },
+  { kind: 'hug', icon: 'body', label: 'Hug' },
+  { kind: 'thinking', icon: 'sparkles', label: 'Thinking of you' },
+  { kind: 'miss', icon: 'moon', label: 'Miss you' },
+];
+const NUDGE_ICONS = Object.fromEntries(NUDGES.map((n) => [n.kind, n.icon]));
+
 const ago = (iso) => {
   if (!iso) return null;
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -45,6 +55,7 @@ export default function MoodBar({ partnerName }) {
   const nudges = useNudges();
 
   const [picking, setPicking] = useState(false);
+  const [pickingNudge, setPickingNudge] = useState(false);
   const [draftNote, setDraftNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -106,14 +117,20 @@ export default function MoodBar({ partnerName }) {
 
           {/* The same kiss the home-screen widget sends. A throttled press —
               the pocket case — comes back sent:false, and saying "sent" for
-              one would be a small lie the app tells often. */}
+              one would be a small lie the app tells often.
+
+              Tap sends a kiss; hold picks which. The widget can only ever
+              send a kiss, because a home-screen button has no room to ask —
+              but the server has always taken four kinds, and three of them
+              had no way in. */}
           <MorphButton
             onPress={() => nudges.send('kiss').catch(() => {})}
+            onLongPress={() => setPickingNudge(true)}
             disabled={nudges.sending}
             style={[styles.kissButton, nudges.sending && { opacity: 0.6 }]}
           >
             <Ionicons
-              name={nudges.mine ? 'heart' : 'heart-outline'}
+              name={nudges.mine ? NUDGE_ICONS[nudges.mine.kind] || 'heart' : 'heart-outline'}
               size={14}
               color={colors.accentPink}
             />
@@ -123,6 +140,31 @@ export default function MoodBar({ partnerName }) {
           </MorphButton>
         </View>
       </View>
+
+      <Modal visible={pickingNudge} transparent animationType="fade" onRequestClose={() => setPickingNudge(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setPickingNudge(false)}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <Text style={font.h2}>Send what?</Text>
+            <View style={styles.nudgeRow}>
+              {NUDGES.map((n) => (
+                <Pressable
+                  key={n.kind}
+                  onPress={() => {
+                    setPickingNudge(false);
+                    nudges.send(n.kind).catch(() => {});
+                  }}
+                  style={styles.nudgeCell}
+                >
+                  <View style={styles.nudgeIcon}>
+                    <Ionicons name={n.icon} size={20} color={colors.accentPink} />
+                  </View>
+                  <Text style={[font.muted, { fontSize: 11 }]}>{n.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={picking} transparent animationType="fade" onRequestClose={() => setPicking(false)}>
         <Pressable style={styles.backdrop} onPress={() => setPicking(false)}>
@@ -194,6 +236,13 @@ const makeStyles = (colors) =>
       borderRadius: radius.pill, backgroundColor: colors.accentSoft,
     },
     kissBannerText: { fontSize: 11, color: colors.accentPink, fontWeight: '700' },
+    nudgeRow: { flexDirection: 'row', gap: spacing.sm },
+    nudgeCell: { flex: 1, alignItems: 'center', gap: 4 },
+    nudgeIcon: {
+      width: 48, height: 48, borderRadius: 24,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: colors.accentSoft,
+    },
     setButton: {
       flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
       alignSelf: 'flex-start', marginTop: spacing.sm,

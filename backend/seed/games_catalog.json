@@ -4,8 +4,6 @@
     "emoji": "close-outline",
     "title": "Tic Tac Toe",
     "subtitle": "Three in a row, live against your partner",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 1
   },
   {
@@ -13,8 +11,6 @@
     "emoji": "grid-outline",
     "title": "Four in a Row",
     "subtitle": "Connect four, live against your partner",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 2
   },
   {
@@ -22,8 +18,6 @@
     "emoji": "ellipse-outline",
     "title": "Checkers",
     "subtitle": "Forced captures, multi-jumps, kings",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 3
   },
   {
@@ -31,8 +25,6 @@
     "emoji": "trophy-outline",
     "title": "Chess",
     "subtitle": "Full rules — castling, en passant, promotion",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 4
   },
   {
@@ -40,8 +32,6 @@
     "emoji": "layers-outline",
     "title": "Uno Reverse",
     "subtitle": "Your hand stays yours — they only see the count",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 5
   },
   {
@@ -49,8 +39,6 @@
     "emoji": "apps-outline",
     "title": "Block Blitz",
     "subtitle": "Same pieces, two boards, race for the high score",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 6
   },
   {
@@ -58,8 +46,6 @@
     "emoji": "text-outline",
     "title": "Anagrams",
     "subtitle": "Same eight words, both phones — unscramble faster",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 7
   },
   {
@@ -67,8 +53,6 @@
     "emoji": "chatbox-ellipses-outline",
     "title": "What You Saying",
     "subtitle": "Guess with as few letters showing as you can",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 8
   },
   {
@@ -76,8 +60,6 @@
     "emoji": "link-outline",
     "title": "Perfect Pair",
     "subtitle": "Follow the chain — longest run wins",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 9
   },
   {
@@ -85,8 +67,6 @@
     "emoji": "albums-outline",
     "title": "Love Letters",
     "subtitle": "Same seven letters, five rounds, best word takes it",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 10
   },
   {
@@ -94,8 +74,6 @@
     "emoji": "golf-outline",
     "title": "Love Golf",
     "subtitle": "Six shared holes, tilt to steer, fewest strokes",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 11
   },
   {
@@ -103,8 +81,6 @@
     "emoji": "brush-outline",
     "title": "Draw Duel",
     "subtitle": "One draws, one guesses, live",
-    "isLocked": false,
-    "isImplemented": true,
     "sortOrder": 12
   }
 ]

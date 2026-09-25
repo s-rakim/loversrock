@@ -72,17 +72,17 @@ async function seedQuestionDecks() {
   const decks = loadJson('question_decks.json');
   for (const deck of decks) {
     await query(
-      `INSERT INTO question_decks (slug, category, emoji, title, is_locked, sort_order,
+      `INSERT INTO question_decks (slug, category, emoji, title, sort_order,
                                    season_start, season_end, season_anchor)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (slug) DO UPDATE SET
          category = EXCLUDED.category, emoji = EXCLUDED.emoji, title = EXCLUDED.title,
-         is_locked = EXCLUDED.is_locked, sort_order = EXCLUDED.sort_order,
+         sort_order = EXCLUDED.sort_order,
          -- Re-seeding must be able to CLEAR a season as well as set one, so
          -- these take the new value even when it is null.
          season_start = EXCLUDED.season_start, season_end = EXCLUDED.season_end,
          season_anchor = EXCLUDED.season_anchor`,
-      [deck.slug, deck.category, deck.emoji, deck.title, deck.isLocked, deck.sortOrder,
+      [deck.slug, deck.category, deck.emoji, deck.title, deck.sortOrder,
         deck.seasonStart || null, deck.seasonEnd || null, deck.seasonAnchor || null]
     );
   }
@@ -149,12 +149,12 @@ async function seedGamesCatalog() {
   const games = loadJson('games_catalog.json');
   for (const game of games) {
     await query(
-      `INSERT INTO games_catalog (slug, emoji, title, subtitle, is_locked, is_implemented, sort_order)
+      `INSERT INTO games_catalog (slug, emoji, title, subtitle, sort_order)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (slug) DO UPDATE SET
          emoji = EXCLUDED.emoji, title = EXCLUDED.title, subtitle = EXCLUDED.subtitle,
-         is_locked = EXCLUDED.is_locked, is_implemented = EXCLUDED.is_implemented, sort_order = EXCLUDED.sort_order`,
-      [game.slug, game.emoji, game.title, game.subtitle, game.isLocked, game.isImplemented, game.sortOrder]
+         sort_order = EXCLUDED.sort_order`,
+      [game.slug, game.emoji, game.title, game.subtitle, game.sortOrder]
     );
   }
   console.log(`[seed] games_catalog: ${games.length} games`);

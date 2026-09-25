@@ -49,11 +49,16 @@ check('profile.partner has name + nickname + displayName', prof.data.partner && 
 check('profile.me has nickname + displayName', 'nickname' in prof.data.me && 'displayName' in prof.data.me, prof.data.me);
 check('displayName is never null (falls back to the real name)', typeof prof.data.partner.displayName === 'string' && prof.data.partner.displayName.length > 0, prof.data.partner);
 const games = await req('/games', { token: A.token });
-check('GamesScreen: slug/emoji/title/subtitle/is_implemented present', games.data.games.every((g) => g.slug && g.emoji && g.title && 'is_implemented' in g));
+check('GamesScreen: slug/emoji/title/subtitle present', games.data.games.every((g) => g.slug && g.emoji && g.title));
+// The lock and the "not implemented" flag are gone, and the screen must not
+// be reading a field that no longer exists.
+check('GamesScreen: no lock or coming-soon flag comes back',
+  games.data.games.every((g) => !('is_locked' in g) && !('is_implemented' in g)), games.data.games[0]);
 
 const decks = await req('/decks', { token: A.token });
 const oneDeck = Object.values(decks.data.decksByCategory)[0][0];
-check('HomeScreen deck card: id/slug/title/emoji/is_locked present', !!(oneDeck.id && oneDeck.slug && oneDeck.title && oneDeck.emoji) && 'is_locked' in oneDeck, oneDeck);
+check('HomeScreen deck card: id/slug/title/emoji present', !!(oneDeck.id && oneDeck.slug && oneDeck.title && oneDeck.emoji), oneDeck);
+check('HomeScreen deck card: no lock field survives', !('is_locked' in oneDeck), oneDeck);
 
 await req('/bucket-list', { method: 'POST', token: A.token, body: { title: 'x' } });
 const bl = await req('/bucket-list', { token: A.token });

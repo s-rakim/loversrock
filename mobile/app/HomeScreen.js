@@ -23,6 +23,7 @@ const QUICK_LINKS = [
   ['Cycle', 'Cycle Tracker', 'water-outline'],
   ['Checkin', 'Monthly Check-In', 'clipboard-outline'],
   ['Feed', 'Your Story', 'time-outline'],
+  ['Achievements', 'Badges & Streak', 'ribbon-outline'],
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -62,10 +63,10 @@ export default function HomeScreen({ navigation }) {
         <FadeInUp>
           <View style={styles.headerRow}>
             <Text style={font.wordmark}>loversrock.</Text>
-            <View style={styles.streakPill}>
-              <Icon name="flame" size={16} color={colors.gold} />
+            <MorphButton onPress={() => navigation.navigate('Achievements')} style={styles.streakPill}>
+              <Icon name="flame" size={16} color={colors.gold} chip={false} />
               <Text style={styles.streakText}>{streak}</Text>
-            </View>
+            </MorphButton>
           </View>
           {profile?.paired && (
             <Text style={styles.greeting}>
