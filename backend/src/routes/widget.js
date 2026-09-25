@@ -97,6 +97,19 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     latestPhotoUrl: null,
     partnerCyclePhase: null,
     partnerNextPeriodDate: null,
+    // Ambient presence: the whole reason a widget exists is to show these
+    // without anything being opened.
+    daysTogether: null,
+    togetherSince: null,
+    partnerMood: null,
+    partnerMoodNote: null,
+    partnerMoodAt: null,
+    // A sealed note is ANNOUNCED, never revealed. The widget runs in another
+    // process with no session, and a home screen is the one place a secret
+    // must not be printed.
+    sealedNoteWaiting: false,
+    latestNote: null,
+    latestNoteAt: null,
     updatedAt: new Date().toISOString(),
   };
 
@@ -104,7 +117,7 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
 
   const partnerId = pair.user_a_id === req.userId ? pair.user_b_id : pair.user_a_id;
 
-  const [promptRes, countdownRes, photoRes, locationRes, partnerPeriodRes] = await Promise.all([
+  const [promptRes, countdownRes, photoRes, locationRes, partnerPeriodRes, moodRes, noteRes] = await Promise.all([
     query(
       `SELECT 1 FROM prompt_responses pr
        JOIN daily_prompts dp ON dp.id = pr.prompt_id
@@ -126,7 +139,33 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
       [[req.userId, partnerId]]
     ),
     query('SELECT * FROM period_settings WHERE user_id = $1 AND sharing_enabled = TRUE', [partnerId]),
+    query('SELECT mood, note, updated_at FROM partner_moods WHERE pair_id = $1 AND user_id = $2',
+      [pair.id, partnerId]),
+    query(
+      `SELECT body, sealed, opened_at, created_at FROM notes
+        WHERE pair_id = $1 AND author_id = $2
+        ORDER BY created_at DESC LIMIT 1`,
+      [pair.id, partnerId]
+    ),
   ]);
+
+  summary.togetherSince = pair.together_since || null;
+  summary.daysTogether = pair.together_since
+    ? Math.max(0, Math.floor((Date.now() - new Date(pair.together_since).getTime()) / 86400000))
+    : null;
+
+  if (moodRes.rows[0]) {
+    summary.partnerMood = moodRes.rows[0].mood;
+    summary.partnerMoodNote = moodRes.rows[0].note;
+    summary.partnerMoodAt = moodRes.rows[0].updated_at;
+  }
+
+  const latestNote = noteRes.rows[0];
+  if (latestNote) {
+    summary.latestNoteAt = latestNote.created_at;
+    if (latestNote.sealed && !latestNote.opened_at) summary.sealedNoteWaiting = true;
+    else summary.latestNote = String(latestNote.body).slice(0, 140);
+  }
 
   summary.promptAnsweredToday = promptRes.rows.length > 0;
 

@@ -97,10 +97,20 @@ router.get('/', requireAuth, async (req, res) => {
     }
   }
 
+  // Days together, computed here so both phones agree rather than each
+  // doing its own date arithmetic in its own timezone.
+  const togetherSince = pair?.together_since || null;
+  const daysTogether = togetherSince
+    ? Math.max(0, Math.floor((Date.now() - new Date(togetherSince).getTime()) / 86400000))
+    : null;
+
   res.json({
     paired: Boolean(pair),
     me: present(byId.get(req.userId), nicknameTheyGaveMe),
     partner: present(partnerId ? byId.get(partnerId) : null, nicknameIGaveThem),
+    togetherSince,
+    daysTogether,
+    streak: pair?.streak_count ?? 0,
   });
 });
 
@@ -132,6 +142,40 @@ router.put('/keys', requireAuth, async (req, res) => {
     [publicKey, req.userId]
   );
   res.json({ publicKey: rows[0].public_key, publicKeySetAt: rows[0].public_key_set_at });
+});
+
+/**
+ * When the two of you started.
+ *
+ * On the pair rather than either person, because it is not a fact about a
+ * user — and it is what "days together" and the anniversary countdown both
+ * read, neither of which is a screen anybody opens on purpose.
+ */
+router.put('/together-since', requireAuth, requirePair, async (req, res) => {
+  const value = req.body?.togetherSince;
+
+  if (value === null) {
+    const { rows } = await query(
+      'UPDATE pairs SET together_since = NULL WHERE id = $1 RETURNING together_since',
+      [req.pair.id]
+    );
+    return res.json({ togetherSince: rows[0].together_since });
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) {
+    return res.status(400).json({ error: 'togetherSince must be YYYY-MM-DD or null' });
+  }
+  // A start date in the future would make "days together" negative, which is
+  // not a state a relationship can be in.
+  if (new Date(value) > new Date()) {
+    return res.status(400).json({ error: 'togetherSince cannot be in the future' });
+  }
+
+  const { rows } = await query(
+    'UPDATE pairs SET together_since = $1 WHERE id = $2 RETURNING together_since',
+    [value, req.pair.id]
+  );
+  res.json({ togetherSince: rows[0].together_since });
 });
 
 /**

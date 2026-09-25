@@ -25,6 +25,7 @@ import locationRoutes from './routes/location.js';
 import periodRoutes from './routes/period.js';
 import widgetRoutes from './routes/widget.js';
 import profileRoutes from './routes/profile.js';
+import presenceRoutes from './routes/presence.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -52,6 +53,8 @@ app.use('/location', locationRoutes);
 app.use('/period', periodRoutes);
 app.use('/widget', widgetRoutes);
 app.use('/profile', profileRoutes);
+// Moods, notes and reactions — see routes/presence.js for why they share one.
+app.use('/presence', presenceRoutes);
 
 /** image/jpeg for a .jpg, and so on. */
 const EXTENSION_TYPES = {

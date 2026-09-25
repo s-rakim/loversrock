@@ -93,6 +93,38 @@ check('revoke succeeds', (await req(`/widget/token/${list.data.tokens[0].id}`, {
 check('revoked token immediately stops working', (await req('/widget/summary', { widgetToken: WT })).status === 401);
 check("revoking the widget did NOT log the phone out", (await req('/memories', { token: A.token })).status === 200);
 
+
+console.log('\n=== AMBIENT PRESENCE REACHES THE WIDGET ===');
+// A widget exists so these can be seen without opening anything. If the
+// payload does not carry them, the feature stops at the app.
+{
+  await req('/profile/together-since', { method: 'PUT', token: A.token, body: { togetherSince: '2024-02-14' } });
+  await req('/presence/moods', { method: 'PUT', token: B.token, body: { mood: 'loved', note: 'miss you' } });
+
+  const token = (await req('/widget/token', { method: 'POST', token: A.token })).data.widgetToken;
+  const view = await req('/widget/summary', { widgetToken: token });
+
+  check('days together reaches the widget', view.data.daysTogether > 500, view.data.daysTogether);
+  check('and the date it counts from', String(view.data.togetherSince).startsWith('2024-02-14'), view.data.togetherSince);
+  check("the partner's mood reaches it", view.data.partnerMood === 'loved', view.data.partnerMood);
+  check('with its note', view.data.partnerMoodNote === 'miss you', view.data.partnerMoodNote);
+
+  // An open note may be shown in full.
+  await req('/presence/notes', { method: 'POST', token: B.token, body: { body: 'coffee is on' } });
+  const withNote = await req('/widget/summary', { widgetToken: token });
+  check('an open note is shown on the widget', withNote.data.latestNote === 'coffee is on', withNote.data.latestNote);
+  check('and is not flagged as sealed', withNote.data.sealedNoteWaiting === false);
+
+  // A sealed one must be announced and NOT printed. A home screen is the one
+  // place a secret cannot be, and the widget process has no way to ask
+  // whether it has been opened.
+  await req('/presence/notes', { method: 'POST', token: B.token, body: { body: 'ring is in the drawer', sealed: true } });
+  const sealedView = await req('/widget/summary', { widgetToken: token });
+  check('a sealed note is announced', sealedView.data.sealedNoteWaiting === true, sealedView.data.sealedNoteWaiting);
+  check('and its body is NOT on the widget', sealedView.data.latestNote === null, sealedView.data.latestNote);
+  check('nor anywhere in the payload', !JSON.stringify(sealedView.data).includes('drawer'));
+}
+
 console.log(`\nWIDGET API RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) console.log('FAILURES:', fails);
 process.exit(fails.length ? 1 : 0);

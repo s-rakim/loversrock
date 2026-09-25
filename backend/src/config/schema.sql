@@ -456,3 +456,70 @@ CREATE INDEX IF NOT EXISTS idx_period_cycles_user_start ON period_cycles(user_id
 CREATE INDEX IF NOT EXISTS idx_period_daily_logs_user_date ON period_daily_logs(user_id, log_date);
 CREATE INDEX IF NOT EXISTS idx_widget_tokens_active ON widget_tokens(token_hash) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_pair_nicknames_pair ON pair_nicknames(pair_id);
+
+
+-- ---------------------------------------------------------------------------
+-- Ambient presence: the things that make a partner feel present without the
+-- app being open. Anniversary, mood, notes, reactions.
+-- ---------------------------------------------------------------------------
+
+-- When the two of you started. Drives "days together" and the anniversary
+-- countdown, both of which are widgets rather than screens — nobody opens an
+-- app to find out how long they have been together.
+ALTER TABLE pairs ADD COLUMN IF NOT EXISTS together_since DATE;
+
+-- The current mood, one row per person per pair.
+--
+-- Deliberately NOT the cycle mood log, which is private by default and
+-- belongs to one person's health data. This is the thing you WANT the other
+-- to see, so it is a different table with different rules.
+CREATE TABLE IF NOT EXISTS partner_moods (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  mood        TEXT NOT NULL,
+  note        TEXT,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (pair_id, user_id)
+);
+
+-- Love notes, and the sealed kind.
+--
+-- `sealed` is what makes the secret-message widget work: the widget says a
+-- note is waiting without saying what it is, and opening it in the app is
+-- what reveals it. `opened_at` is therefore meaningful state, not analytics —
+-- it is the difference between "you have something" and "you read it".
+CREATE TABLE IF NOT EXISTS notes (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  author_id   UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body        TEXT NOT NULL,
+  sealed      BOOLEAN NOT NULL DEFAULT FALSE,
+  opened_at   TIMESTAMPTZ,
+  pinned      BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS notes_pair_idx ON notes (pair_id, created_at DESC);
+
+-- Reactions on anything a pair shares.
+--
+-- One table rather than one per target, keyed by (kind, target_id): the
+-- alternative is message_reactions, memory_reactions, note_reactions and a
+-- fourth the day something else becomes reactable.
+--
+-- The unique index is per person per target, so reacting again REPLACES
+-- rather than stacks — two people cannot run up a counter between them, which
+-- is the whole point when there are only two of you.
+CREATE TABLE IF NOT EXISTS reactions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_kind TEXT NOT NULL CHECK (target_kind IN ('message', 'memory', 'note', 'doodle')),
+  target_id   UUID NOT NULL,
+  emoji       TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, target_kind, target_id)
+);
+
+CREATE INDEX IF NOT EXISTS reactions_target_idx ON reactions (target_kind, target_id);
