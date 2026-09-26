@@ -268,6 +268,10 @@ export function mediaUrl(key) {
 
 let socket = null;
 let socketState = 'idle';   // idle | connecting | connected | disconnected | unauthorized
+// Why the server last refused the handshake, in its own words. Kept because
+// 'unauthorized' alone was reported as a network fault: the live-connection
+// error blamed Tailscale for what was actually "Not currently paired".
+let socketRefusal = null;
 const socketWatchers = new Set();
 let reconnectTimer = null;
 let reconnectDelay = 500;
@@ -280,6 +284,11 @@ function setSocketState(next) {
 
 export function getSocketState() {
   return socketState;
+}
+
+/** The server's reason for the last refused handshake, or null. */
+export function getSocketRefusal() {
+  return socketRefusal;
 }
 
 /** Subscribe to connection state. Returns an unsubscribe function. */
@@ -388,6 +397,7 @@ export async function connectSocket() {
 
   socket.on('connect', () => {
     reconnectDelay = 500;
+    socketRefusal = null;
     setSocketState('connected');
   });
 
@@ -398,7 +408,7 @@ export async function connectSocket() {
     if (reason === 'io server disconnect') scheduleReconnect();
   });
 
-  socket.on('connect_error', () => {
+  socket.on('connect_error', (err) => {
     // socket.active distinguishes the two failure modes. True: an ordinary
     // transport problem, and socket.io is already retrying. False: the
     // handshake middleware rejected us and socket.io has given up for good —
@@ -407,6 +417,10 @@ export async function connectSocket() {
       setSocketState('connecting');
       return;
     }
+    // The middleware's own message ("Not currently paired", an expired
+    // token) arrives as err.message. It is the only accurate explanation of
+    // this state, so it is kept for whoever has to report it.
+    socketRefusal = err?.message || null;
     setSocketState('unauthorized');
     scheduleReconnect();   // with a freshly-fetched token, via the auth callback
   });
@@ -424,6 +438,15 @@ export async function waitForSocket(timeoutMs = 8000) {
   const live = await connectSocket();
   if (live.connected) return live;
 
+  // Refused rather than unreachable: say what the server said, now, instead
+  // of waiting out the timeout and blaming the network.
+  const refused = () => new Error(
+    socketRefusal === UNPAIRED_ERROR
+      ? 'Live updates start once you are paired.'
+      : `The server refused the live connection${socketRefusal ? `: ${socketRefusal}` : ''}.`
+  );
+  if (socketState === 'unauthorized') throw refused();
+
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       stop();
@@ -437,6 +460,10 @@ export async function waitForSocket(timeoutMs = 8000) {
         clearTimeout(timer);
         stop();
         resolve(live);
+      } else if (state === 'unauthorized') {
+        clearTimeout(timer);
+        stop();
+        reject(refused());
       }
     });
   });

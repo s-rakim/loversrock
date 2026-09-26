@@ -467,5 +467,62 @@ console.log('\n=== THE PARTNER’S CALENDAR IS THEIR PARTNER’S, AND CANNOT WRI
     /periodDatesOf\(partnerCalendar\)/.test(ctx2) && /periodDatesOf\(calendar\)/.test(ctx2));
 }
 
+console.log('\n=== NOTHING INSIDE A TAB GUESSES WHERE THE TAB BAR IS ===');
+// The tab bar floats over every tab screen, so anything a tab screen pins to
+// its bottom has to clear it — and three screens guessed instead: the cycle
+// tabs sat under it, "New drawing" sat on top of Quiz and Settings, and the
+// message box guessed a 90px margin that is right on one kind of phone and
+// wrong on the other. useBarClearance() measures it; nothing should guess.
+{
+  const tabScreens = [
+    'PhotoWidgetScreen', 'PhotoHistoryScreen', 'MessagesScreen', 'CanvasGalleryScreen',
+    'GamesScreen', 'HomeScreen', 'QuizScreen', 'SettingsScreen',
+  ].map((n) => [n, read('app', `${n}.js`)]);
+  for (const f of fs.readdirSync(path.join(root, 'app', 'cycle'))) {
+    if (f.endsWith('.js')) tabScreens.push([`cycle/${f.replace('.js', '')}`, read('app', 'cycle', f)]);
+  }
+
+  const guesses = [];
+  for (const [name, src] of tabScreens) {
+    // A floating control: absolute, with a bottom offset that is not zero.
+    // Zero is a caption pinned inside its own card, which is fine.
+    for (const m of src.matchAll(/\{[^{}]*position: 'absolute'[^{}]*\}/g)) {
+      // Offsets under 8px position something inside a small element (the
+      // ovulation dot in a calendar cell), not a control above the tab bar.
+      const bottom = m[0].match(/bottom: ([^,}\n]+)/)?.[1]?.trim();
+      const small = /^\d+$/.test(bottom || '') && Number(bottom) < 8;
+      if (bottom && bottom !== '0' && !small) guesses.push(`${name}: absolute, bottom: ${bottom}`);
+    }
+    // A large literal bottom margin is a guess at the bar's height.
+    for (const m of src.matchAll(/marginBottom: (\d+)/g)) {
+      if (Number(m[1]) >= 60) guesses.push(`${name}: marginBottom: ${m[1]}`);
+    }
+  }
+  check('no tab screen pins something at a guessed distance from the bottom',
+    guesses.length === 0, guesses.join('; '));
+
+  check('the drawing button clears the bar by measurement',
+    /bottom: clearance\.above/.test(read('app', 'CanvasGalleryScreen.js')));
+  check('and so does the message box',
+    /marginBottom: clearance\.above/.test(read('app', 'MessagesScreen.js')));
+}
+
+console.log('\n=== A REFUSED LIVE CONNECTION SAYS WHY ===');
+// The server refused the socket because nobody was paired, and Diagnostics
+// reported it as "Can't reach the server... check Tailscale" — sending
+// somebody to debug a network that was fine.
+{
+  const api = read('services', 'api.js');
+  const diag = read('app', 'DiagnosticsScreen.js');
+  check('the server’s refusal reason is kept', /socketRefusal = err\?\.message/.test(api));
+  check('a refused socket is reported at once, not after a timeout',
+    /if \(socketState === 'unauthorized'\) throw refused\(\)/.test(api));
+  check('and in the server’s terms, not as a network fault',
+    /Live updates start once you are paired/.test(api));
+  check('Diagnostics shows "waiting on pairing", not a red failure, for things pairing will fix',
+    /isUnpaired\(err\) \? \[WARN, WAITING_ON_PAIR\]/.test(diag)
+    && /getSocketRefusal\(\) === UNPAIRED_ERROR/.test(diag));
+}
+
 console.log(`\nNAV RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

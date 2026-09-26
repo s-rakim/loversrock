@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiFetch, connectSocket, getSocket } from '../services/api';
 import { spacing, radius } from '../theme';
+import { useBarClearance } from '../components/LumaBar';
 import { FadeInUp, MorphButton, ProgressDot } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
@@ -16,6 +17,8 @@ export default function QuizScreen() {
   // stack header supplying a title or clearing the status bar. It carries its
   // own.
   const insets = useSafeAreaInsets();
+  // Prev/Next sit last on a tab screen, under the floating tab bar's reach.
+  const clearance = useBarClearance();
   const styles = useMemo(() => makeStyles(colors, font), [colors, font]);
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
@@ -231,7 +234,7 @@ export default function QuizScreen() {
         )}
       </FadeInUp>
 
-      <View style={styles.nav}>
+      <View style={[styles.nav, { marginBottom: clearance.above }]}>
         <MorphButton
           onPress={() => setIndex((i) => Math.max(0, i - 1))}
           disabled={index === 0}
@@ -271,7 +274,7 @@ const makeStyles = (colors, font) =>
   },
   resultCard: { marginTop: spacing.md, padding: spacing.md, backgroundColor: colors.surfaceAlt, borderRadius: radius.md },
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  nav: { marginBottom: 110, flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
+  nav: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.xl },
   navButton: { backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   celebrationLayer: {
     position: 'absolute', top: 60, left: 0, right: 0, height: 200, alignItems: 'center', justifyContent: 'center', zIndex: 5,

@@ -15,10 +15,7 @@ import {
   PermissionsAndroid, Share,
 } from 'react-native';
 import Constants from 'expo-constants';
-import {
-  apiFetch, pingServer, getApiUrl, getAccessToken, mediaUrl,
-  connectSocket, waitForSocket, getSocketState,
-} from '../services/api';
+import { apiFetch, pingServer, getApiUrl, getAccessToken, mediaUrl, connectSocket, waitForSocket, getSocketState, isUnpaired, getSocketRefusal, UNPAIRED_ERROR } from '../services/api';
 import { BUILD_STAMP, API_CONTRACT } from '../buildInfo';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
@@ -32,6 +29,18 @@ const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS
 const OK = 'ok';
 const BAD = 'bad';
 const WARN = 'warn';
+
+/**
+ * A check that failed only because nobody is paired yet.
+ *
+ * Every two-person endpoint answers 403 "Not currently paired" before
+ * pairing, and each of those used to show as its own red cross: upload,
+ * calls, the live connection. Four red failures for one missing step sends
+ * somebody hunting four problems. The "Paired" row stays red — it is the one
+ * thing to act on — and everything downstream of it points back to it.
+ */
+const WAITING_ON_PAIR = 'Waiting on pairing — see "Paired" above';
+const verdict = (err) => (isUnpaired(err) ? [WARN, WAITING_ON_PAIR] : [BAD, err.message]);
 
 export default function DiagnosticsScreen() {
   const { colors, font } = useTheme();
@@ -80,7 +89,9 @@ export default function DiagnosticsScreen() {
       me = profile?.me;
       add('Authenticated request', OK, `Signed in as ${me?.displayName || me?.name || me?.id}`);
       add('Paired', profile?.paired ? OK : BAD,
-        profile?.paired ? `With ${profile.partner?.displayName || 'your partner'}` : 'Not paired yet');
+        profile?.paired
+          ? `With ${profile.partner?.displayName || 'your partner'}`
+          : 'Not paired yet — messages, calls and shared photos start once you pair');
     } catch (err) {
       add('Authenticated request', BAD, err.message);
     }
@@ -92,7 +103,10 @@ export default function DiagnosticsScreen() {
       await waitForSocket(10000);
       add('Live connection', OK, 'Socket connected and in your pair room');
     } catch (err) {
-      add('Live connection', BAD, `${err.message} (state: ${getSocketState()})`);
+      // Refused for want of a partner is not a network fault — this used to
+      // tell people to check Tailscale when the server had simply said no.
+      if (getSocketRefusal() === UNPAIRED_ERROR) add('Live connection', WARN, WAITING_ON_PAIR);
+      else add('Live connection', BAD, `${err.message} (state: ${getSocketState()})`);
     }
 
     // ---------------------------------------------------------------- media
@@ -118,7 +132,7 @@ export default function DiagnosticsScreen() {
         setProbeUrl(url);
       }
     } catch (err) {
-      add('Image upload', BAD, err.message);
+      add('Image upload', ...verdict(err));
     }
 
     // ---------------------------------------------------------------- calls
@@ -160,7 +174,7 @@ export default function DiagnosticsScreen() {
           ? 'Configured — calls work even behind strict NAT'
           : 'Not configured. Fine on Tailscale; calls may fail on some mobile networks');
     } catch (err) {
-      add('Call servers', BAD, err.message);
+      add('Call servers', ...verdict(err));
     }
 
     try {

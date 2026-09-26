@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { apiFetch, connectSocket, mediaUrl, isUnpaired } from '../services/api';
 import NotPaired from '../components/NotPaired';
 import { spacing, radius } from '../theme';
+import { useBarClearance } from '../components/LumaBar';
 import { MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
@@ -81,6 +82,10 @@ const dayLabel = (message) => {
 
 export default function MessagesScreen({ navigation }) {
   const { colors, font } = useTheme();
+  // The message box is the last thing on a screen the tab bar floats over.
+  // It used to guess a fixed 90px margin, which clears the bar on a phone with
+  // button navigation and leaves the box under it on one with a gesture strip.
+  const clearance = useBarClearance();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -335,7 +340,7 @@ export default function MessagesScreen({ navigation }) {
         </Text>
       </View>
 
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { marginBottom: clearance.above }]}>
         <Icon name="brush-outline" chip chipColor={colors.surfaceAlt} onPress={() => navigation.navigate('Canvas')} />
         <Icon name="image-outline" chip chipColor={colors.surfaceAlt} onPress={sendPhoto} />
         <TextInput
@@ -409,7 +414,7 @@ const makeStyles = (colors) =>
     encryptionText: { fontSize: 11, color: colors.textMuted },
     inputBar: {
       flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs, padding: spacing.md,
-      borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 90,
+      borderTopWidth: 1, borderTopColor: colors.border,
     },
     input: {
       flex: 1, backgroundColor: colors.surface, color: colors.text,

@@ -16,6 +16,7 @@ import { apiFetch, onSocketEvent } from '../services/api';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton, FadeInUp } from '../components/Motion';
+import { useBarClearance } from '../components/LumaBar';
 import Doodle from '../components/Doodle';
 
 const GAP = spacing.sm;
@@ -30,6 +31,10 @@ const when = (iso) => {
 };
 
 export default function CanvasGalleryScreen({ navigation }) {
+  // The New drawing button floats, and so does the app's tab bar — at the
+  // same spot. It used to sit a fixed spacing.lg from the bottom, which put it
+  // squarely on the Quiz and Settings buttons.
+  const clearance = useBarClearance();
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -183,7 +188,7 @@ export default function CanvasGalleryScreen({ navigation }) {
         keyExtractor={(d) => d.id}
         numColumns={2}
         columnWrapperStyle={{ gap: GAP }}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: clearance.content + 64 }]}
         renderItem={renderItem}
         refreshControl={
           <RefreshControl
@@ -206,7 +211,10 @@ export default function CanvasGalleryScreen({ navigation }) {
         }
       />
 
-      <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.fab}>
+      <MorphButton
+        onPress={() => navigation.navigate('Canvas')}
+        style={[styles.fab, { bottom: clearance.above }]}
+      >
         <Ionicons name="brush" size={20} color="#fff" />
         <Text style={styles.fabText}>New drawing</Text>
       </MorphButton>
@@ -253,7 +261,8 @@ const makeStyles = (colors) =>
     empty: { alignItems: 'center', paddingTop: 80, paddingHorizontal: spacing.xl },
     emptyText: { textAlign: 'center', marginTop: spacing.xs },
     fab: {
-      position: 'absolute', right: spacing.md, bottom: spacing.lg,
+      // `bottom` comes from useBarClearance at render time.
+      position: 'absolute', right: spacing.md,
       flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
       backgroundColor: colors.accent, paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md, borderRadius: radius.pill,
