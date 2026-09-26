@@ -56,6 +56,19 @@ class WidgetBridge: NSObject {
         resolve(nil)
     }
 
+    /// Settings > Widget look: the look as JSON (components/widgetLook.js),
+    /// read by LRLook in the extension through the shared App Group.
+    @objc(setWidgetLook:resolver:rejecter:)
+    func setWidgetLook(
+        _ json: String,
+        resolver resolve: RCTPromiseResolveBlock,
+        rejecter reject: RCTPromiseRejectBlock
+    ) {
+        defaults?.set(json, forKey: "widgetLook")
+        WidgetCenter.shared.reloadAllTimelines()
+        resolve(nil)
+    }
+
     /// iOS has real lock screen widgets, so there is no notification fallback
     /// to toggle here — this exists only so the JS API is identical on both
     /// platforms.

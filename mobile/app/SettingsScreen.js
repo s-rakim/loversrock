@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, Switch, ScrollView } from 'react-native';
 import Slider from '@react-native-community/slider';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { apiFetch, clearTokens, disconnectSocket } from '../services/api';
 import Constants from 'expo-constants';
@@ -12,9 +13,6 @@ import {
   getLockScreenStatus,
   openLiveUpdateSettings,
   widgetsSupported,
-  WIDGET_OPACITY,
-  getWidgetOpacity,
-  setWidgetOpacity,
 } from '../services/widgetBridge';
 import { useGlass } from '../components/GlassContext';
 import Icon from '../components/Icon';
@@ -57,9 +55,7 @@ export default function SettingsScreen() {
     if (st) setLockScreenOn(Boolean(st.enabled));
   });
   useEffect(() => { loadLockStatus(); }, []);
-  const [widgetOpacity, setWidgetOpacityState] = useState(WIDGET_OPACITY.default);
 
-  useEffect(() => { getWidgetOpacity().then(setWidgetOpacityState); }, []);
   const [cycleRole, setCycleRole] = useState(null);
 
   useEffect(() => {
@@ -478,40 +474,16 @@ export default function SettingsScreen() {
                 )}
               </View>
 
-              {/* Grey glass behind every widget but the locket. The phone
-                  cannot blur the wallpaper behind an app's widget, so this
-                  is how much of it shows through, untouched. */}
-              <View style={styles.motionRow}>
+              {/* Colour, gradient, pattern and translucency all live on their
+                  own screen, with a live preview. */}
+              <MorphButton onPress={() => navigation.navigate('WidgetLook')} style={styles.motionRow}>
+                <Icon name="color-palette-outline" chip chipColor={colors.surfaceAlt} />
                 <View style={{ flex: 1 }}>
-                  <Text style={font.body}>Widget translucency</Text>
-                  <Text style={font.muted}>
-                    How much of your wallpaper shows through the grey glass. Very clear glass
-                    can be hard to read over a busy wallpaper.
-                  </Text>
+                  <Text style={font.body}>Widget look</Text>
+                  <Text style={font.muted}>Colours, gradients, patterns and how see-through they are.</Text>
                 </View>
-                <View style={styles.glassSample}>
-                  <View style={[styles.glassSampleFill, { opacity: widgetOpacity / 100 }]} />
-                  <Text style={styles.glassSampleText}>Aa</Text>
-                </View>
-              </View>
-              <Slider
-                minimumValue={WIDGET_OPACITY.min}
-                maximumValue={WIDGET_OPACITY.max}
-                step={WIDGET_OPACITY.step}
-                value={widgetOpacity}
-                onValueChange={setWidgetOpacityState}
-                // Saved and sent to the widgets on release, not on every
-                // step: each send repaints every widget on the home screen.
-                onSlidingComplete={(v) => setWidgetOpacity(v).then(setWidgetOpacityState)}
-                minimumTrackTintColor={colors.accent}
-                maximumTrackTintColor={colors.border}
-                thumbTintColor={colors.accent}
-              />
-              <View style={styles.sliderEnds}>
-                <Text style={[font.muted, { fontSize: 11 }]}>Clear</Text>
-                <Text style={[font.muted, { fontSize: 11 }]}>{widgetOpacity}%</Text>
-                <Text style={[font.muted, { fontSize: 11 }]}>Solid</Text>
-              </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+              </MorphButton>
 
               <MorphButton onPress={refreshWidgets} style={styles.refreshButton}>
                 <Icon name="refresh-outline" chip={false} color={colors.accent} size={16} />
@@ -654,15 +626,6 @@ const makeStyles = (colors) =>
   },
   swatchLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
   sliderEnds: { flexDirection: 'row', justifyContent: 'space-between' },
-  // A little window onto the glass: a colourful "wallpaper" with the grey
-  // body over it at the chosen opacity, as the widgets draw it.
-  glassSample: {
-    width: 56, height: 44, borderRadius: 12, overflow: 'hidden',
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#5B7FD6', borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)',
-  },
-  glassSampleFill: { ...StyleSheet.absoluteFillObject, backgroundColor: '#C9CCD2' },
-  glassSampleText: { fontSize: 15, fontWeight: '700', color: '#2B2320' },
   segmentRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   segment: {
     alignItems: 'center', justifyContent: 'center',

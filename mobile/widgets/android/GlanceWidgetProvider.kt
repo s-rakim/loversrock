@@ -56,6 +56,13 @@ abstract class GlanceWidgetProvider : AppWidgetProvider() {
         }.start()
     }
 
+    /** Resized on the home screen: repaint, so a painted look fits the new shape. */
+    override fun onAppWidgetOptionsChanged(
+        context: Context, manager: AppWidgetManager, widgetId: Int, newOptions: android.os.Bundle
+    ) {
+        render(context, manager, widgetId, WidgetRepository.cached(context))
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == refreshAction) {
@@ -85,7 +92,7 @@ abstract class GlanceWidgetProvider : AppWidgetProvider() {
         data: WidgetRepository.Summary?
     ) {
         val views = RemoteViews(context.packageName, layoutId)
-        GlassStyle.apply(context, views, R.id.widget_root)
+        GlassStyle.apply(context, views, layoutId, manager, widgetId)
 
         // Three states before the widget has anything to say, and each needs
         // to tell the person what to DO about it rather than showing a dash.

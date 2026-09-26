@@ -339,7 +339,8 @@ check(`no static colour imports across ${screens.length} screens/components`, of
 
 const missing = screens.filter((f) => {
   const text = fs.readFileSync(f, 'utf8');
-  return /\bcolors\.|(^|[^.\w])font\./.test(text) && !text.includes('useTheme');
+  // `look.colors.x` is somebody's own data, not the theme's colours.
+  return /(^|[^.\w])colors\.|(^|[^.\w])font\./.test(text) && !text.includes('useTheme');
 });
 check('every screen that uses tokens calls useTheme()', missing.length === 0,
   missing.map((f) => path.relative(root, f)).join(', '));

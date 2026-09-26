@@ -1,53 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A button, and a line saying what happened. The whole tile is the target:
      a small hit area on a home screen widget is a widget nobody uses. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_frame"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="12dp"
-    android:gravity="center"
-    android:background="@drawable/widget_background">
+    android:layout_height="match_parent">
 
+    <!-- The background: grey glass by default, or the colour, gradient or
+         pattern chosen under Settings > Widget look, painted by
+         WidgetPainter into this image (GlassStyle.apply). An image rather
+         than the root's background because RemoteViews can only swap a
+         background for a resource, and a look can be any colours at all. -->
     <ImageView
-        android:id="@+id/kiss_button"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:src="@drawable/widget_kiss_icon"
-        android:contentDescription="Send a kiss" />
-
-    <TextView
-        android:id="@+id/glance_value"
+        android:id="@+id/widget_bg"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:gravity="center"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="@color/widget_text"
-        android:text="Send a kiss" />
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_background"
+        android:importantForAccessibility="no" />
 
-    <TextView
-        android:id="@+id/glance_caption"
+    <LinearLayout
+        android:id="@+id/widget_root"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:textSize="10sp"
-        android:maxLines="2"
-        android:ellipsize="end"
-        android:textColor="@color/widget_text_muted"
-        android:text="" />
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:gravity="center">
 
-    <!-- Present so the shared "not set up yet" states in GlanceWidgetProvider
-         have somewhere to write, and invisible because this widget's own
-         refresh is the button itself. -->
-    <TextView
-        android:id="@+id/glance_label"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        android:text="" />
-</LinearLayout>
+        <ImageView
+            android:id="@+id/kiss_button"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:src="@drawable/widget_kiss_icon"
+            android:contentDescription="Send a kiss" />
+
+        <TextView
+            android:id="@+id/glance_value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/widget_text"
+            android:text="Send a kiss" />
+
+        <TextView
+            android:id="@+id/glance_caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textSize="10sp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/widget_text_muted"
+            android:text="" />
+
+        <!-- Present so the shared "not set up yet" states in GlanceWidgetProvider
+             have somewhere to write, and invisible because this widget's own
+             refresh is the button itself. -->
+        <TextView
+            android:id="@+id/glance_label"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
+            android:text="" />
+    </LinearLayout>
+</FrameLayout>

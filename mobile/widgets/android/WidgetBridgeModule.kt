@@ -106,6 +106,18 @@ class WidgetBridgeModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    /** Settings > Widget look: the look as JSON (components/widgetLook.js). */
+    @ReactMethod
+    fun setWidgetLook(json: String, promise: Promise) {
+        try {
+            GlassStyle.setLook(reactContext, json)
+            refreshWidgets()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("WIDGET_LOOK_FAILED", e)
+        }
+    }
+
     @ReactMethod
     fun setLockScreenEnabled(enabled: Boolean, promise: Promise) {
         prefs().edit().putBoolean("lockScreenEnabled", enabled).apply()

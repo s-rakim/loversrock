@@ -17,6 +17,10 @@ RCT_EXTERN_METHOD(setWidgetOpacity:(nonnull NSNumber *)percent
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(setWidgetLook:(NSString *)json
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(setLockScreenEnabled:(BOOL)enabled
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

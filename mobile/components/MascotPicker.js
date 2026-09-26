@@ -71,7 +71,11 @@ export default function MascotPicker() {
       await refreshMascotOwners();
       refreshWidgets();
     } catch (err) {
-      Alert.alert('Could not set your mascot', err.message);
+      // A 404 here is not a missing picture: it is a server older than the
+      // app, without the mascot route. Say what to do about it.
+      Alert.alert('Could not set your mascot', err.status === 404
+        ? 'Your server is older than the app. Update the backend (docker compose up -d --build) and try again.'
+        : err.message);
     } finally {
       setBusy(null);
     }

@@ -43,6 +43,7 @@ import SettingsScreen from './app/SettingsScreen';
 import CallScreen from './app/CallScreen';
 import DiagnosticsScreen from './app/DiagnosticsScreen';
 import WardrobeScreen from './app/WardrobeScreen';
+import WidgetLookScreen from './app/WidgetLookScreen';
 import WallpaperScreen from './app/WallpaperScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
 import TicTacToeScreen from './app/games/TicTacToeScreen';
@@ -277,6 +278,7 @@ function Root() {
             <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Chat Wallpaper' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />
+            <Stack.Screen name="WidgetLook" component={WidgetLookScreen} options={{ title: 'Widget look' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />
             <Stack.Screen

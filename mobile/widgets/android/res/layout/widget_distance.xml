@@ -18,195 +18,213 @@
 
      Only RemoteViews-safe classes: LinearLayout, FrameLayout, ImageView,
      TextView. A plain View is refused by the launcher outright. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_frame"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="12dp"
-    android:background="@drawable/widget_background">
+    android:layout_height="match_parent">
+
+    <!-- The background: grey glass by default, or the colour, gradient or
+         pattern chosen under Settings > Widget look, painted by
+         WidgetPainter into this image (GlassStyle.apply). An image rather
+         than the root's background because RemoteViews can only swap a
+         background for a resource, and a look can be any colours at all. -->
+    <ImageView
+        android:id="@+id/widget_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_background"
+        android:importantForAccessibility="no" />
 
     <LinearLayout
+        android:id="@+id/widget_root"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <TextView
-            android:id="@+id/glance_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:textColor="@color/widget_text_muted"
-            android:text="Our distance:" />
-
-        <TextView
-            android:id="@+id/glance_value"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textColor="@color/widget_text"
-            android:text="—" />
-
-        <ImageView
-            android:id="@+id/widget_refresh"
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:src="@drawable/widget_refresh_icon"
-            android:contentDescription="Refresh" />
-    </LinearLayout>
-
-    <!-- [her] ~·~·~·♥·~·~·~ [him] -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:layout_marginTop="6dp"
-        android:orientation="horizontal">
-
-        <!-- Her. The column is a fixed width and the picture scales to fit
-             the height it is given (fitCenter), so the whole figure is always
-             in frame at any widget size — head to toe, scaled down. -->
         <LinearLayout
-            android:layout_width="60dp"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_horizontal">
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
-
-                <ImageView
-                    android:id="@+id/distance_left_art"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_marginEnd="6dp"
-                    android:layout_marginBottom="6dp"
-                    android:background="@drawable/widget_mascot_frame"
-                    android:clipToOutline="true"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/widget_mascot_placeholder"
-                    android:contentDescription="Her" />
-
-                <TextView
-                    android:id="@+id/distance_left_mood"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="bottom|end"
-                    android:gravity="center"
-                    android:background="@drawable/widget_emoji_badge"
-                    android:textSize="13sp"
-                    android:visibility="gone"
-                    android:text="" />
-            </FrameLayout>
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
             <TextView
-                android:id="@+id/distance_left_symptoms"
+                android:id="@+id/glance_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textSize="11sp"
-                android:maxLines="1"
-                android:visibility="gone"
-                android:text="" />
-        </LinearLayout>
-
-        <!-- The line between you. centerCrop in a strip exactly as tall as
-             the drawable, so it is cropped to the width, never stretched —
-             the dots stay round at every size. -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="24dp">
-
-                <ImageView
-                    android:layout_width="match_parent"
-                    android:layout_height="24dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/widget_distance_wiggle"
-                    android:importantForAccessibility="no" />
-
-                <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:layout_gravity="center"
-                    android:padding="3dp"
-                    android:background="@drawable/widget_emoji_badge"
-                    android:src="@drawable/widget_kiss_icon"
-                    android:importantForAccessibility="no" />
-            </FrameLayout>
-
-            <TextView
-                android:id="@+id/glance_caption"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:textSize="11sp"
-                android:maxLines="2"
-                android:ellipsize="end"
+                android:textSize="12sp"
                 android:textColor="@color/widget_text_muted"
-                android:text="" />
-        </LinearLayout>
-
-        <!-- Him. -->
-        <LinearLayout
-            android:layout_width="60dp"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_horizontal">
-
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1">
-
-                <ImageView
-                    android:id="@+id/distance_right_art"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginBottom="6dp"
-                    android:background="@drawable/widget_mascot_frame"
-                    android:clipToOutline="true"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/widget_mascot_placeholder"
-                    android:contentDescription="Him" />
-
-                <TextView
-                    android:id="@+id/distance_right_mood"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="bottom|start"
-                    android:gravity="center"
-                    android:background="@drawable/widget_emoji_badge"
-                    android:textSize="13sp"
-                    android:visibility="gone"
-                    android:text="" />
-            </FrameLayout>
+                android:text="Our distance:" />
 
             <TextView
-                android:id="@+id/distance_right_symptoms"
-                android:layout_width="wrap_content"
+                android:id="@+id/glance_value"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textSize="11sp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:textSize="16sp"
+                android:textStyle="bold"
                 android:maxLines="1"
-                android:visibility="gone"
-                android:text="" />
+                android:ellipsize="end"
+                android:textColor="@color/widget_text"
+                android:text="—" />
+
+            <ImageView
+                android:id="@+id/widget_refresh"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/widget_refresh_icon"
+                android:contentDescription="Refresh" />
+        </LinearLayout>
+
+        <!-- [her] ~·~·~·♥·~·~·~ [him] -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <!-- Her. The column is a fixed width and the picture scales to fit
+                 the height it is given (fitCenter), so the whole figure is always
+                 in frame at any widget size — head to toe, scaled down. -->
+            <LinearLayout
+                android:layout_width="60dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center_horizontal">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1">
+
+                    <ImageView
+                        android:id="@+id/distance_left_art"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginEnd="6dp"
+                        android:layout_marginBottom="6dp"
+                        android:background="@drawable/widget_mascot_frame"
+                        android:clipToOutline="true"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/widget_mascot_placeholder"
+                        android:contentDescription="Her" />
+
+                    <TextView
+                        android:id="@+id/distance_left_mood"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="bottom|end"
+                        android:gravity="center"
+                        android:background="@drawable/widget_emoji_badge"
+                        android:textSize="13sp"
+                        android:visibility="gone"
+                        android:text="" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/distance_left_symptoms"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:visibility="gone"
+                    android:text="" />
+            </LinearLayout>
+
+            <!-- The line between you. centerCrop in a strip exactly as tall as
+                 the drawable, so it is cropped to the width, never stretched —
+                 the dots stay round at every size. -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="24dp">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="24dp"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/widget_distance_wiggle"
+                        android:importantForAccessibility="no" />
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_gravity="center"
+                        android:padding="3dp"
+                        android:background="@drawable/widget_emoji_badge"
+                        android:src="@drawable/widget_kiss_icon"
+                        android:importantForAccessibility="no" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/glance_caption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:textSize="11sp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textColor="@color/widget_text_muted"
+                    android:text="" />
+            </LinearLayout>
+
+            <!-- Him. -->
+            <LinearLayout
+                android:layout_width="60dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center_horizontal">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1">
+
+                    <ImageView
+                        android:id="@+id/distance_right_art"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginBottom="6dp"
+                        android:background="@drawable/widget_mascot_frame"
+                        android:clipToOutline="true"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/widget_mascot_placeholder"
+                        android:contentDescription="Him" />
+
+                    <TextView
+                        android:id="@+id/distance_right_mood"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="bottom|start"
+                        android:gravity="center"
+                        android:background="@drawable/widget_emoji_badge"
+                        android:textSize="13sp"
+                        android:visibility="gone"
+                        android:text="" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/distance_right_symptoms"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="11sp"
+                    android:maxLines="1"
+                    android:visibility="gone"
+                    android:text="" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+</FrameLayout>

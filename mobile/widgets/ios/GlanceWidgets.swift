@@ -13,14 +13,170 @@ import AppIntents
 
 private extension Color {
     static let glAccent = Color(red: 0.91, green: 0.38, blue: 0.48)   // #E8607A
-    static let glText = Color(red: 0.17, green: 0.14, blue: 0.13)     // #2B2320
-    static let glMuted = Color(red: 0.55, green: 0.50, blue: 0.47)    // #8C7F79
+    // Dark on the grey glass and light looks; white on a dark look chosen
+    // under Settings > Widget look (see LRLook).
+    static var glText: Color {
+        LRLook.current?.lightInk == true ? .white : Color(red: 0.17, green: 0.14, blue: 0.13)   // #2B2320
+    }
+    static var glMuted: Color {
+        LRLook.current?.lightInk == true ? Color.white.opacity(0.8)
+            : Color(red: 0.33, green: 0.35, blue: 0.38)                                         // #555A62
+    }
 }
 
 /// Grey liquid glass: the background of every loversrock widget, matching the
 /// Android widgets' drawable/widget_background.xml. A translucent grey body a
 /// shade lighter at the top, a sheen over the upper half, and a bright rim
 /// following the widget's own corner shape.
+/// A widget look chosen in the app under Settings > Widget look, as the app
+/// stored it (WidgetBridge.setWidgetLook). The rules for drawing each one are
+/// in the app, in components/widgetLook.js; LRLookCanvas follows them.
+struct LRLook {
+    let kind: String
+    let gradient: String
+    let pattern: String
+    let colors: [Color]
+    let rgb: [(Double, Double, Double)]
+    let angle: Double
+    let scale: Double
+    let lightInk: Bool
+
+    static var current: LRLook? {
+        guard let json = UserDefaults(suiteName: WidgetDataLoader.appGroup)?.string(forKey: "widgetLook"),
+              let data = json.data(using: .utf8),
+              let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let kind = o["kind"] as? String, kind != "glass",
+              let hexes = o["colors"] as? [String]
+        else { return nil }
+        let rgb = hexes.prefix(4).compactMap(LRLook.parse)
+        guard !rgb.isEmpty else { return nil }
+        return LRLook(
+            kind: kind,
+            gradient: o["gradient"] as? String ?? "linear",
+            pattern: o["pattern"] as? String ?? "stripes",
+            colors: rgb.map { Color(red: $0.0, green: $0.1, blue: $0.2) },
+            rgb: rgb,
+            angle: (o["angle"] as? NSNumber)?.doubleValue ?? 0,
+            scale: min(10, max(1, (o["scale"] as? NSNumber)?.doubleValue ?? 4)),
+            lightInk: (o["ink"] as? String) == "light"
+        )
+    }
+
+    static func parse(_ hex: String) -> (Double, Double, Double)? {
+        var s = hex.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("#") { s.removeFirst() }
+        if s.count == 3 { s = s.map { "\($0)\($0)" }.joined() }
+        guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
+        return (Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255)
+    }
+
+    /// 35% of the way to white: a one-colour pattern's second colour.
+    static func tint(_ c: (Double, Double, Double)) -> Color {
+        Color(red: c.0 + (1 - c.0) * 0.35, green: c.1 + (1 - c.1) * 0.35, blue: c.2 + (1 - c.2) * 0.35)
+    }
+
+    /// At least two colours: a single colour runs into its tint.
+    var atLeastTwo: [Color] { colors.count == 1 ? [colors[0], LRLook.tint(rgb[0])] : colors }
+}
+
+/// Draws a look (not the glass) edge to edge; LRGlass adds opacity, sheen and rim.
+struct LRLookCanvas: View {
+    let look: LRLook
+
+    var body: some View {
+        Canvas { ctx, size in
+            let w = size.width, h = size.height
+            let rect = CGRect(origin: .zero, size: size)
+            let c = CGPoint(x: w / 2, y: h / 2)
+            let n = look.colors.count
+            func mod(_ a: Int, _ m: Int) -> Int { ((a % m) + m) % m }
+
+            switch look.kind {
+            case "solid":
+                ctx.fill(Path(rect), with: .color(look.colors[0]))
+            case "gradient":
+                switch look.gradient {
+                case "radial":
+                    ctx.fill(Path(rect), with: .radialGradient(
+                        Gradient(colors: look.atLeastTwo), center: c,
+                        startRadius: 0, endRadius: hypot(w, h) / 2))
+                case "blend":
+                    let k = (0..<4).map { look.colors[$0 % n] }
+                    ctx.fill(Path(rect), with: .linearGradient(
+                        Gradient(colors: [k[2], k[3]]), startPoint: .zero, endPoint: CGPoint(x: w, y: 0)))
+                    ctx.drawLayer { layer in
+                        layer.fill(Path(rect), with: .linearGradient(
+                            Gradient(colors: [k[0], k[1]]), startPoint: .zero, endPoint: CGPoint(x: w, y: 0)))
+                        layer.blendMode = .destinationIn
+                        layer.fill(Path(rect), with: .linearGradient(
+                            Gradient(colors: [.black, .clear]), startPoint: .zero, endPoint: CGPoint(x: 0, y: h)))
+                    }
+                default:
+                    let a = look.angle * .pi / 180
+                    let dx = cos(a), dy = sin(a)
+                    let len = abs(w / 2 * dx) + abs(h / 2 * dy)
+                    let p1 = CGPoint(x: c.x - dx * len, y: c.y - dy * len)
+                    let p2 = CGPoint(x: c.x + dx * len, y: c.y + dy * len)
+                    ctx.fill(Path(rect), with: .linearGradient(Gradient(colors: look.atLeastTwo), startPoint: p1, endPoint: p2))
+                    if look.gradient == "aurora" {
+                        ctx.fill(Path(rect), with: .linearGradient(Gradient(stops: [
+                            .init(color: .white.opacity(0), location: 0.33),
+                            .init(color: .white.opacity(0.5), location: 0.45),
+                            .init(color: .white.opacity(0), location: 0.57),
+                        ]), startPoint: p1, endPoint: p2))
+                    }
+                }
+            default:
+                // Patterns, in a frame turned about the centre.
+                let s = min(w, h) * (0.02 + 0.04 * look.scale)
+                let reach = hypot(w, h) / 2
+                let cells = Int(ceil(reach / s)) + 1
+                let list = look.atLeastTwo
+                var turned = ctx
+                turned.translateBy(x: c.x, y: c.y)
+                turned.rotate(by: .degrees(look.angle))
+                switch look.pattern {
+                case "stripes":
+                    for i in -cells..<cells {
+                        turned.fill(Path(CGRect(x: Double(i) * s, y: -reach - s, width: s + 0.5, height: 2 * (reach + s))),
+                                    with: .color(list[mod(i, list.count)]))
+                    }
+                case "checks":
+                    for i in -cells..<cells { for j in -cells..<cells {
+                        turned.fill(Path(CGRect(x: Double(i) * s, y: Double(j) * s, width: s + 0.5, height: s + 0.5)),
+                                    with: .color(list[mod(i + j, list.count)]))
+                    } }
+                case "dots":
+                    ctx.fill(Path(rect), with: .color(look.colors[0]))
+                    let dots = n == 1 ? [LRLook.tint(look.rgb[0])] : Array(look.colors.dropFirst())
+                    for i in -cells..<cells { for j in -cells..<cells {
+                        let r = 0.32 * s
+                        turned.fill(Path(ellipseIn: CGRect(x: (Double(i) + 0.5) * s - r, y: (Double(j) + 0.5) * s - r,
+                                                           width: 2 * r, height: 2 * r)),
+                                    with: .color(dots[mod(i + j, dots.count)]))
+                    } }
+                default: // waves
+                    let amp = 0.35 * s, wave = 3 * s, step = wave / 16
+                    ctx.fill(Path(rect), with: .color(list[mod(-cells - 1, list.count)]))
+                    for k in -cells...cells {
+                        var path = Path()
+                        var x = -reach - wave
+                        path.move(to: CGPoint(x: x, y: Double(k) * s + amp * sin(2 * .pi * x / wave)))
+                        while x <= reach + wave {
+                            x += step
+                            path.addLine(to: CGPoint(x: x, y: Double(k) * s + amp * sin(2 * .pi * x / wave)))
+                        }
+                        path.addLine(to: CGPoint(x: reach + wave, y: reach + s))
+                        path.addLine(to: CGPoint(x: -reach - wave, y: reach + s))
+                        path.closeSubpath()
+                        turned.fill(path, with: .color(list[mod(k, list.count)]))
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct LRGlass: View {
     /// Percent opaque from the Settings slider (WidgetBridge.setWidgetOpacity),
     /// 70 until it is moved — the same default as Android.
@@ -29,12 +185,21 @@ struct LRGlass: View {
         return Double(max(0, min(100, stored ?? 70))) / 100
     }
 
-    var body: some View {
-        ZStack {
+    @ViewBuilder
+    private var body0: some View {
+        if let look = LRLook.current {
+            LRLookCanvas(look: look).opacity(opacity)
+        } else {
             LinearGradient(
                 colors: [Color(red: 0.894, green: 0.902, blue: 0.918).opacity(min(1, opacity + 0.03)),
                          Color(red: 0.682, green: 0.698, blue: 0.729).opacity(max(0, opacity - 0.03))],
                 startPoint: .top, endPoint: .bottom)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            body0
             LinearGradient(
                 colors: [Color.white.opacity(0.45), Color.white.opacity(0)],
                 startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.45))

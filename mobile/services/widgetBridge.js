@@ -1,5 +1,6 @@
 import { NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { normalizeLook } from '../components/widgetLook';
 import { apiFetch, getApiUrl } from './api';
 
 // The native module only exists in a dev-client/EAS build that ran
@@ -33,6 +34,7 @@ export async function provisionWidgets() {
     // Re-send the chosen translucency too: a fresh install, or a widget
     // store wiped some other way, should still wear the glass you picked.
     pushWidgetOpacity(await getWidgetOpacity());
+    pushWidgetLook(await getWidgetLook());
     return { provisioned: true };
   } catch (err) {
     return { provisioned: false, reason: err.message };
@@ -123,6 +125,37 @@ export async function openLiveUpdateSettings() {
     return null;
   }
 }
+
+// ------------------------------------------------------------------ look
+
+const LOOK_KEY = 'loversrock.widgetLook';
+
+/** The widgets' look (components/widgetLook.js), as last saved on this phone. */
+export async function getWidgetLook() {
+  try {
+    const raw = await AsyncStorage.getItem(LOOK_KEY);
+    return normalizeLook(raw ? JSON.parse(raw) : null);
+  } catch {
+    return normalizeLook(null);
+  }
+}
+
+function pushWidgetLook(look) {
+  // Guarded by name: an older build has the bridge but not this.
+  if (!native || typeof native.setWidgetLook !== 'function') return Promise.resolve();
+  return native.setWidgetLook(JSON.stringify(look)).catch(() => {});
+}
+
+/** Remembers the look and repaints every widget with it. */
+export async function setWidgetLook(look) {
+  const value = normalizeLook(look);
+  try { await AsyncStorage.setItem(LOOK_KEY, JSON.stringify(value)); } catch {}
+  await pushWidgetLook(value);
+  return value;
+}
+
+/** True when this build's widgets can draw colours and patterns. */
+export const widgetLooksSupported = Boolean(native && typeof native.setWidgetLook === 'function');
 
 export async function setLockScreenEnabled(enabled) {
   if (!native) return;

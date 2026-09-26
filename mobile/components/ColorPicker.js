@@ -15,25 +15,34 @@ import { useTheme } from './ThemeContext';
 
 const HUES = Array.from({ length: 12 }, (_, i) => i / 12);
 const SATURATIONS = [0.25, 0.45, 0.65, 0.85, 1];
+// Offered only where readability is not at stake — a widget background can
+// be navy or pastel; an accent that buttons are drawn in cannot.
+const LIGHTNESSES = [0.12, 0.25, 0.4, 0.55, 0.7, 0.85, 0.95];
 
-export default function ColorPicker({ value, onChange, onClear }) {
+/**
+ * @param lightness  also offer light and dark shades (the widget colours).
+ * @param clearLabel the text of the clear button; hidden when no onClear.
+ */
+export default function ColorPicker({ value, onChange, onClear, lightness = false, clearLabel = 'Use a preset' }) {
   const { colors, font, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const current = isHexColor(value) ? hexToHsl(value) : { h: 0.95, s: 0.85, l: 0.55 };
   const [hue, setHue] = useState(current.h);
   const [sat, setSat] = useState(current.s || 0.85);
+  const [light, setLight] = useState(lightness ? current.l : 0.55);
   const [typed, setTyped] = useState(value || '');
 
-  const pick = (h, s) => {
+  const pick = (h, s, l = light) => {
     setHue(h);
     setSat(s);
-    const hex = hslToHex(h, s, 0.55);
+    setLight(l);
+    const hex = hslToHex(h, s, l);
     setTyped(hex);
     onChange(hex);
   };
 
-  const preview = hslToHex(hue, sat, 0.55);
+  const preview = hslToHex(hue, sat, light);
 
   return (
     <View>
@@ -75,13 +84,32 @@ export default function ColorPicker({ value, onChange, onClear }) {
             <View
               style={[
                 styles.stripCell,
-                { backgroundColor: hslToHex(hue, s, 0.55) },
+                { backgroundColor: hslToHex(hue, s, lightness ? light : 0.55) },
                 Math.abs(s - sat) < 0.001 && styles.stripCellActive,
               ]}
             />
           </Pressable>
         ))}
       </View>
+
+      {lightness && (
+        <>
+          <Text style={[font.muted, styles.label]}>Light</Text>
+          <View style={styles.strip}>
+            {LIGHTNESSES.map((l) => (
+              <Pressable key={l} onPress={() => pick(hue, sat, l)} style={{ flex: 1 }}>
+                <View
+                  style={[
+                    styles.stripCell,
+                    { backgroundColor: hslToHex(hue, sat, l) },
+                    Math.abs(l - light) < 0.02 && styles.stripCellActive,
+                  ]}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
 
       <Text style={[font.muted, styles.label]}>Or type one</Text>
       <View style={styles.hexRow}>
@@ -93,6 +121,7 @@ export default function ColorPicker({ value, onChange, onClear }) {
               const parsed = hexToHsl(t);
               setHue(parsed.h);
               setSat(parsed.s);
+              if (lightness) setLight(parsed.l);
               onChange(t);
             }
           }}
@@ -102,9 +131,11 @@ export default function ColorPicker({ value, onChange, onClear }) {
           autoCorrect={false}
           style={styles.hexInput}
         />
-        <Pressable onPress={onClear} style={styles.clearButton}>
-          <Text style={{ color: colors.accent, fontWeight: '600' }}>Use a preset</Text>
-        </Pressable>
+        {onClear && (
+          <Pressable onPress={onClear} style={styles.clearButton}>
+            <Text style={{ color: colors.accent, fontWeight: '600' }}>{clearLabel}</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
