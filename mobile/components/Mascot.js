@@ -15,6 +15,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Image, Animated, Easing, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Ellipse, G, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { artFor } from '../assets/mascot';
+import useMascotOwners from './useMascotOwners';
 import { useTheme } from './ThemeContext';
 
 /**
@@ -263,6 +264,7 @@ function DrawnMascot({ expression, colors, uid }) {
  */
 export default function Mascot({ mood, size = 96, animated = true, style, drawn = false }) {
   const { colors, reduceMotion } = useTheme();
+  useMascotOwners();
   const expression = EXPRESSIONS[mood] || EXPRESSIONS.neutral;
   const art = drawn ? null : artFor(mood);
   // Per-instance, because SVG gradient ids are document-global and the

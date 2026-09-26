@@ -1,6 +1,8 @@
 import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
+import { MASCOT_ARTS, resolveMascotArt } from '../models/mascotArt.js';
+import { getActivePairForUser, otherUserId } from '../models/pairs.js';
 
 const router = asyncRouter();
 
@@ -44,7 +46,7 @@ function validateNickname(raw) {
 }
 
 /** The name to render for someone: their nickname if one was given, else their real name. */
-function present(user, nickname) {
+function present(user, nickname, mascotArt = null) {
   if (!user) return null;
   return {
     id: user.id,
@@ -58,6 +60,11 @@ function present(user, nickname) {
     // null when they have not chosen yet. Null is what makes the app ask
     // rather than assume, so it is passed through as-is.
     cycleRole: user.cycle_role || null,
+    // Which mascot picture is this person, 'a' or 'b' — always resolved,
+    // never null, so the two phones cannot both claim the same picture.
+    // mascotArtChosen says whether it was picked or inferred.
+    mascotArt,
+    mascotArtChosen: MASCOT_ARTS.includes(user.mascot_art),
     // Null for the partner by construction — see the query in GET /.
     chatWallpaper: user.chat_wallpaper || null,
     // The public half of their encryption key. Public by design: it is what
@@ -91,7 +98,7 @@ router.get('/', requireAuth, async (req, res) => {
   // anyone who is not the person asking.
   const { rows: users } = await query(
     `SELECT id, name, avatar_url, theme_preference, public_key, public_key_set_at,
-            cycle_role,
+            cycle_role, mascot_art,
             CASE WHEN id = $2 THEN chat_wallpaper ELSE NULL END AS chat_wallpaper
      FROM users WHERE id = ANY($1::uuid[])`,
     [partnerId ? [req.userId, partnerId] : [req.userId], req.userId]
@@ -120,10 +127,18 @@ router.get('/', requireAuth, async (req, res) => {
     ? Math.max(0, Math.floor((Date.now() - new Date(togetherSince).getTime()) / 86400000))
     : null;
 
+  const meRow = byId.get(req.userId);
+  const partnerRow = partnerId ? byId.get(partnerId) : null;
+  const art = resolveMascotArt(
+    { art: meRow?.mascot_art, cycleRole: meRow?.cycle_role },
+    partnerRow ? { art: partnerRow.mascot_art, cycleRole: partnerRow.cycle_role } : null,
+    pair ? pair.user_a_id === req.userId : true
+  );
+
   res.json({
     paired: Boolean(pair),
-    me: present(byId.get(req.userId), nicknameTheyGaveMe),
-    partner: present(partnerId ? byId.get(partnerId) : null, nicknameIGaveThem),
+    me: present(meRow, nicknameTheyGaveMe, art.mine),
+    partner: present(partnerRow, nicknameIGaveThem, partnerRow ? art.theirs : null),
     togetherSince,
     daysTogether,
     streak: pair?.streak_count ?? 0,
@@ -199,7 +214,25 @@ router.put('/together-since', requireAuth, requirePair, async (req, res) => {
  * `userId` — a client can only ever write its own row.
  */
 router.patch('/preferences', requireAuth, async (req, res) => {
-  const { themePreference, chatWallpaper, cycleRole } = req.body || {};
+  const { themePreference, chatWallpaper, cycleRole, mascotArt } = req.body || {};
+
+  if (mascotArt !== undefined) {
+    // null hands the choice back to the inference in models/mascotArt.js.
+    if (mascotArt !== null && !MASCOT_ARTS.includes(mascotArt)) {
+      return res.status(400).json({ error: `mascotArt must be one of ${MASCOT_ARTS.join(', ')}, or null` });
+    }
+    await query('UPDATE users SET mascot_art = $1 WHERE id = $2', [mascotArt, req.userId]);
+    // There are two pictures and two of you, so saying which one is you says
+    // which one is them. A partner who had claimed the same picture is reset
+    // to follow, rather than left disagreeing phone to phone.
+    if (mascotArt !== null) {
+      const pair = await getActivePairForUser(req.userId);
+      if (pair) {
+        await query('UPDATE users SET mascot_art = NULL WHERE id = $1 AND mascot_art = $2',
+          [otherUserId(pair, req.userId), mascotArt]);
+      }
+    }
+  }
 
   if (cycleRole !== undefined) {
     // null is a legitimate value: it clears the choice and makes the app ask

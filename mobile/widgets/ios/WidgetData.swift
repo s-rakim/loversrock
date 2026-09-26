@@ -12,6 +12,17 @@ struct WidgetSummary: Codable {
     let distanceStatus: String?
     /// The letter in the partner's bubble on the distance widget.
     let partnerInitial: String?
+    /// Which bundled full-body picture ("a" or "b") is you, and which is
+    /// them. Decided by the server so both phones agree on who is who.
+    let myArt: String?
+    let partnerArt: String?
+    /// Each of you as emoji: a mood, and up to three of today's symptoms.
+    /// The server has already dropped anything that must never appear on a
+    /// home screen, and the partner's symptoms unless they share them.
+    let myMoodEmoji: String?
+    let partnerMoodEmoji: String?
+    let mySymptomEmoji: [String]?
+    let partnerSymptomEmoji: [String]?
     let latestPhotoUrl: String?
     let partnerCyclePhase: String?
     let partnerNextPeriodDate: String?
@@ -51,6 +62,12 @@ struct WidgetSummary: Codable {
         distanceKm: 8.2,
         distanceStatus: "ok",
         partnerInitial: "M",
+        myArt: "a",
+        partnerArt: "b",
+        myMoodEmoji: "😴",
+        partnerMoodEmoji: "🥰",
+        mySymptomEmoji: ["🤕"],
+        partnerSymptomEmoji: ["😖", "😪"],
         latestPhotoUrl: nil,
         partnerCyclePhase: "luteal",
         partnerNextPeriodDate: nil,
@@ -72,6 +89,8 @@ struct WidgetSummary: Codable {
     static let signedOut = WidgetSummary(
         paired: false, streakCount: 0, promptAnsweredToday: false, nextCountdown: nil,
         distanceKm: nil, distanceStatus: nil, partnerInitial: nil,
+        myArt: nil, partnerArt: nil, myMoodEmoji: nil, partnerMoodEmoji: nil,
+        mySymptomEmoji: nil, partnerSymptomEmoji: nil,
         latestPhotoUrl: nil, partnerCyclePhase: nil, partnerNextPeriodDate: nil,
         daysTogether: nil, togetherSince: nil, partnerMood: nil, partnerMoodNote: nil,
         todaysQuestion: nil, nextDate: nil, sealedNoteWaiting: nil, latestNote: nil,

@@ -10,7 +10,9 @@ buckets = collections.defaultdict(set)
 for path in glob.glob(f'{res}/**/*', recursive=True):
     if not os.path.isfile(path):
         continue
-    kind = os.path.basename(os.path.dirname(path))
+    # drawable-nodpi, values-night …: the qualifier picks a variant, the
+    # resource type (and so the R class) is the part before the dash.
+    kind = os.path.basename(os.path.dirname(path)).split('-')[0]
     name = os.path.splitext(os.path.basename(path))[0]
     if kind in ('layout', 'drawable', 'xml'):
         buckets[kind].add(name)

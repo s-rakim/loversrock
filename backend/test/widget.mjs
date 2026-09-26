@@ -101,7 +101,55 @@ await req('/period/log', { method: 'POST', token: B.token, body: { date: new Dat
 await req('/period/settings', { method: 'PATCH', token: B.token, body: { sharingEnabled: true } });
 const s2 = await req('/widget/summary', { widgetToken: WT });
 check('partner phase appears once THEY enable sharing', s2.data.partnerCyclePhase === 'menstrual', s2.data.partnerCyclePhase);
-check('widget summary leaks NO raw symptoms/flow/notes (SPEC #5)', !/private note|Cramps|heavy|flow|symptom/i.test(JSON.stringify(s2.data)), s2.data);
+// The two *SymptomEmoji fields are allowed by name; their VALUES are checked
+// below. Everything else must carry no trace of the raw log.
+const { mySymptomEmoji: _m, partnerSymptomEmoji: _p, ...s2rest } = s2.data;
+check('widget summary leaks NO raw symptoms/flow/notes (SPEC #5)', !/private note|Cramps|heavy|flow|symptom/i.test(JSON.stringify(s2rest)), s2.data);
+check('partner symptom emoji withheld while they share the phase but not symptoms', Array.isArray(s2.data.partnerSymptomEmoji) && s2.data.partnerSymptomEmoji.length === 0, s2.data.partnerSymptomEmoji);
+
+console.log('\n=== DISTANCE WIDGET: MASCOTS, MOODS, SYMPTOMS ===');
+const WTB = (await req('/widget/token', { method: 'POST', token: B.token, body: { label: 'her phone' } })).data.widgetToken;
+let sa = (await req('/widget/summary', { widgetToken: WT })).data;
+let sb = (await req('/widget/summary', { widgetToken: WTB })).data;
+check('each phone gets two different mascot pictures', ['a', 'b'].includes(sa.myArt) && sa.myArt !== sa.partnerArt, sa);
+check('and the two phones agree on who is who', sa.myArt === sb.partnerArt && sa.partnerArt === sb.myArt, { sa: [sa.myArt, sa.partnerArt], sb: [sb.myArt, sb.partnerArt] });
+
+// She picks her picture; his follows without him touching anything.
+await req('/profile/preferences', { method: 'PATCH', token: B.token, body: { mascotArt: 'a' } });
+sa = (await req('/widget/summary', { widgetToken: WT })).data;
+sb = (await req('/widget/summary', { widgetToken: WTB })).data;
+check("a pick on one phone moves the other phone's pictures too", sb.myArt === 'a' && sa.myArt === 'b' && sa.partnerArt === 'a', { sa: [sa.myArt, sa.partnerArt], sb: [sb.myArt, sb.partnerArt] });
+const prof = (await req('/profile', { token: A.token })).data;
+check('/profile agrees with the widget', prof.me.mascotArt === 'b' && prof.partner.mascotArt === 'a' && prof.partner.mascotArtChosen === true && prof.me.mascotArtChosen === false, prof);
+// He then claims the same picture she already claimed: his word settles both.
+await req('/profile/preferences', { method: 'PATCH', token: A.token, body: { mascotArt: 'a' } });
+sa = (await req('/widget/summary', { widgetToken: WT })).data;
+sb = (await req('/widget/summary', { widgetToken: WTB })).data;
+check('two claims on one picture cannot leave the phones disagreeing', sa.myArt === 'a' && sb.myArt === 'b' && sb.partnerArt === 'a', { sa: [sa.myArt, sa.partnerArt], sb: [sb.myArt, sb.partnerArt] });
+await req('/profile/preferences', { method: 'PATCH', token: B.token, body: { mascotArt: 'a' } });
+check('an unknown picture is refused', (await req('/profile/preferences', { method: 'PATCH', token: A.token, body: { mascotArt: 'c' } })).status === 400);
+
+check('no mood picked yet means no mood emoji', sa.myMoodEmoji === null && sa.partnerMoodEmoji === null, sa);
+await req('/presence/moods', { method: 'PUT', token: A.token, body: { mood: 'tired' } });
+await req('/presence/moods', { method: 'PUT', token: B.token, body: { mood: 'loved' } });
+sa = (await req('/widget/summary', { widgetToken: WT })).data;
+check('my mood shows as its emoji', sa.myMoodEmoji === '😴', sa.myMoodEmoji);
+check("my partner's mood shows as its emoji", sa.partnerMoodEmoji === '🥰', sa.partnerMoodEmoji);
+
+// Today is the pair's today; the pair here was invited with deviceTimezone UTC.
+const todayUtc = new Date().toISOString().slice(0, 10);
+await req('/period/log', { method: 'POST', token: A.token, body: { date: todayUtc, symptoms: ['headache', 'backache', 'neck_ache', 'fluid_green'] } });
+await req('/period/log', { method: 'POST', token: B.token, body: { date: todayUtc, symptoms: ['cramps', 'cervical_opening', 'fatigue', 'bloating', 'nausea'], flow: 'heavy' } });
+sa = (await req('/widget/summary', { widgetToken: WT })).data;
+check('my own symptoms show, repeats collapsed, intimate ones never', JSON.stringify(sa.mySymptomEmoji) === JSON.stringify(['🤕', '💢']), sa.mySymptomEmoji);
+check("partner's symptoms still withheld: sharing on, symptoms off", sa.partnerSymptomEmoji.length === 0, sa.partnerSymptomEmoji);
+await req('/period/sharing', { method: 'PATCH', token: B.token, body: { share_symptoms: true } });
+sa = (await req('/widget/summary', { widgetToken: WT })).data;
+check("partner's symptoms appear once they share symptoms, capped at three", JSON.stringify(sa.partnerSymptomEmoji) === JSON.stringify(['😖', '😪', '🎈']), sa.partnerSymptomEmoji);
+await req('/period/settings', { method: 'PATCH', token: B.token, body: { sharingEnabled: false } });
+sa = (await req('/widget/summary', { widgetToken: WT })).data;
+check('the master sharing switch still wins over the symptoms switch', sa.partnerSymptomEmoji.length === 0, sa.partnerSymptomEmoji);
+await req('/period/settings', { method: 'PATCH', token: B.token, body: { sharingEnabled: true } });
 
 console.log('\n=== WIDGET PHOTO ENDPOINT (image loaders cannot set headers) ===');
 const photo = await req(`/widget/photo?token=${WT}`, { raw: true });

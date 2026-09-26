@@ -21,6 +21,14 @@ import java.net.URL
 private fun JSONObject.optStringOrNull(key: String): String? =
     if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
 
+/** A JSON array of strings, or empty — a missing or malformed field is "none". */
+private fun JSONObject.optStringList(key: String): List<String> {
+    val array = optJSONArray(key) ?: return emptyList()
+    return (0 until array.length()).mapNotNull { i ->
+        if (array.isNull(i)) null else array.optString(i).takeIf { it.isNotEmpty() }
+    }
+}
+
 /**
  * Talks to GET /widget/summary using the long-lived widget token the app
  * wrote into SharedPreferences (see WidgetBridgeModule).
@@ -51,6 +59,18 @@ object WidgetRepository {
         val distanceStatus: String?,
         // The letter in the partner's bubble on the distance widget.
         val partnerInitial: String?,
+        // The distance widget's two full-body pictures: which bundled picture
+        // ("a" or "b") is you and which is them. Decided by the server so
+        // both phones agree on who is who.
+        val myArt: String?,
+        val partnerArt: String?,
+        // Each of you as emoji: a mood, and up to three of today's symptoms.
+        // The server has already dropped anything that must never appear on
+        // a home screen, and the partner's symptoms unless they share them.
+        val myMoodEmoji: String?,
+        val partnerMoodEmoji: String?,
+        val mySymptomEmoji: List<String>,
+        val partnerSymptomEmoji: List<String>,
         val hasPhoto: Boolean,
         val partnerCyclePhase: String?,
         val partnerNextPeriodDate: String?,
@@ -346,6 +366,12 @@ object WidgetRepository {
             distanceKm = if (json.isNull("distanceKm")) null else json.optDouble("distanceKm"),
             distanceStatus = json.optStringOrNull("distanceStatus"),
             partnerInitial = json.optStringOrNull("partnerInitial"),
+            myArt = json.optStringOrNull("myArt"),
+            partnerArt = json.optStringOrNull("partnerArt"),
+            myMoodEmoji = json.optStringOrNull("myMoodEmoji"),
+            partnerMoodEmoji = json.optStringOrNull("partnerMoodEmoji"),
+            mySymptomEmoji = json.optStringList("mySymptomEmoji"),
+            partnerSymptomEmoji = json.optStringList("partnerSymptomEmoji"),
             hasPhoto = !json.isNull("latestPhotoUrl"),
             partnerCyclePhase = if (json.isNull("partnerCyclePhase")) null else json.optString("partnerCyclePhase"),
             partnerNextPeriodDate = if (json.isNull("partnerNextPeriodDate")) null else json.optString("partnerNextPeriodDate"),

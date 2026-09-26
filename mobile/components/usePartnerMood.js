@@ -6,6 +6,7 @@
 // signal you receive, not a page you visit.
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, connectSocket, getSocket } from '../services/api';
+import { refreshWidgets } from '../services/widgetBridge';
 
 export default function usePartnerMood() {
   const [theirs, setTheirs] = useState(null);
@@ -27,7 +28,9 @@ export default function usePartnerMood() {
       // The event carries the row, but not whose it is in a form worth
       // trusting for this — reloading is one small request and keeps the two
       // sides of the pair from diverging.
-      socket.on('mood:changed', () => load());
+      // The distance widget wears both moods, so it re-fetches too rather
+      // than waiting out its 30-minute timer.
+      socket.on('mood:changed', () => { load(); refreshWidgets(); });
     })();
     return () => { cancelled = true; getSocket()?.off('mood:changed'); };
   }, [load]);
@@ -37,6 +40,7 @@ export default function usePartnerMood() {
       method: 'PUT', body: { mood, note: note || null },
     });
     setMine(saved);
+    refreshWidgets();
     return saved;
   }, []);
 

@@ -22,6 +22,7 @@ import Svg, { Path, Circle, Ellipse, G, Rect, Defs, RadialGradient, LinearGradie
 import { useTheme } from './ThemeContext';
 import { EXPRESSIONS } from './Mascot';
 import { artFor, hasArtFor, headFor } from '../assets/mascot';
+import useMascotOwners from './useMascotOwners';
 
 export const SKINS = {
   porcelain: '#F3D7C4', light: '#E8BE9C', medium: '#C98C63',
@@ -412,6 +413,8 @@ export default function Character({
   crop = 'full',
 }) {
   const { reduceMotion } = useTheme();
+  // Re-render when this phone learns which picture is whose.
+  useMascotOwners();
   const a = avatar || {};
 
   // Real artwork wins, always, and is used exactly as supplied — no tinting,

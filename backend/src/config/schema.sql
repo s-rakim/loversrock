@@ -883,3 +883,9 @@ ALTER TABLE reactions ADD CONSTRAINT reactions_target_kind_check
 ALTER TABLE question_decks DROP COLUMN IF EXISTS is_locked;
 ALTER TABLE games_catalog DROP COLUMN IF EXISTS is_locked;
 ALTER TABLE games_catalog DROP COLUMN IF EXISTS is_implemented;
+
+-- Which of the two mascot pictures is this person ('a' or 'b'). Null until
+-- they choose; src/models/mascotArt.js decides in the meantime, so a null
+-- here never shows the same picture on both sides.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_art TEXT
+  CHECK (mascot_art IN ('a', 'b'));

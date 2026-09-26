@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import UIKit
 import AppIntents
 
 // The six one-fact widgets: anniversary, today's question, the next date, a
@@ -521,6 +522,73 @@ private struct DistanceLine: View {
     }
 }
 
+/// The wiggly line between the two of you: a sine wave, stroked as round dots
+/// (a zero-length dash with a round cap is a dot). It crosses the middle at the
+/// centre, where the heart sits.
+private struct DistanceWiggle: Shape {
+    var amplitude: CGFloat = 6.5
+    var wavelength: CGFloat = 56
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let mid = rect.midX
+        let y = { (x: CGFloat) -> CGFloat in
+            rect.midY + amplitude * sin(2 * .pi * (x - mid) / wavelength)
+        }
+        path.move(to: CGPoint(x: rect.minX, y: y(rect.minX)))
+        var x = rect.minX
+        while x < rect.maxX {
+            x = min(x + 1, rect.maxX)
+            path.addLine(to: CGPoint(x: x, y: y(x)))
+        }
+        return path
+    }
+}
+
+/// One of you, head to toe: the full picture scaled to fit, never cropped,
+/// with your mood tucked into a corner and today's symptoms underneath.
+private struct DistanceMascot: View {
+    let art: String
+    let mood: String?
+    let symptoms: [String]
+    let moodOnTrailingEdge: Bool
+
+    var body: some View {
+        VStack(spacing: 2) {
+            ZStack(alignment: moodOnTrailingEdge ? Alignment.bottomTrailing : Alignment.bottomLeading) {
+                picture
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .padding(moodOnTrailingEdge ? Edge.Set.trailing : Edge.Set.leading, 6)
+                    .padding(.bottom, 6)
+                if let mood = mood, !mood.isEmpty {
+                    Text(mood)
+                        .font(.system(size: 13))
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(Color(UIColor.systemBackground)))
+                        .overlay(Circle().stroke(Color.primary.opacity(0.12), lineWidth: 1))
+                }
+            }
+            if !symptoms.isEmpty {
+                Text(symptoms.joined())
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+            }
+        }
+        .frame(width: 60)
+    }
+
+    /// The copy of the app's own picture, bundled into the extension by
+    /// plugins/withIosWidgets.js. A missing file draws nothing rather than
+    /// crashing the widget.
+    private var picture: Image {
+        let name = art == "b" ? "widget_mascot_b.jpg" : "widget_mascot_a.jpg"
+        if let image = UIImage(named: name) { return Image(uiImage: image) }
+        return Image(systemName: "person.fill")
+    }
+}
+
 struct DistanceView: View {
     let entry: GlanceEntry
     @Environment(\.widgetFamily) private var family
@@ -537,12 +605,13 @@ struct DistanceView: View {
     }
 
     var body: some View {
-        let initial = entry.summary.partnerInitial ?? "♥"
+        let s = entry.summary
+        let initial = s.partnerInitial ?? "♥"
         if family == .accessoryRectangular {
             // The lock-screen card this is modelled on. The system tints
-            // accessory widgets itself, so this sticks to .primary and lets
-            // it: a fixed colour here is ignored at best.
-            let ready = entry.signedIn && entry.summary.paired
+            // accessory widgets itself — photographs come out as flat grey
+            // shapes — so this keeps the bubbles and sticks to .primary.
+            let ready = entry.signedIn && s.paired
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 3) {
                     Text("Our Distance:").font(.system(size: 11))
@@ -554,7 +623,7 @@ struct DistanceView: View {
         } else if let blocked = notReady(entry, "Our distance") {
             blocked
         } else {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Text("Our distance:")
                         .font(.system(size: 12))
@@ -563,17 +632,37 @@ struct DistanceView: View {
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(.glText)
                 }
-                DistanceLine(initial: initial, bubble: 36, heart: .glAccent)
-                    .foregroundColor(.glText)
-                if !reading.caption.isEmpty {
-                    Text(reading.caption)
-                        .font(.system(size: 11))
-                        .foregroundColor(.glMuted)
-                        .lineLimit(1)
+                HStack(alignment: .center, spacing: 6) {
+                    DistanceMascot(art: s.myArt ?? "a", mood: s.myMoodEmoji,
+                                   symptoms: s.mySymptomEmoji ?? [], moodOnTrailingEdge: true)
+                    VStack(spacing: 6) {
+                        ZStack {
+                            DistanceWiggle()
+                                .stroke(Color.glAccent.opacity(0.75),
+                                        style: StrokeStyle(lineWidth: 3.2, lineCap: .round, dash: [0, 6.5]))
+                                .frame(height: 24)
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.glAccent)
+                                .frame(width: 22, height: 22)
+                                .background(Circle().fill(Color(UIColor.systemBackground)))
+                        }
+                        if !reading.caption.isEmpty {
+                            Text(reading.caption)
+                                .font(.system(size: 11))
+                                .foregroundColor(.glMuted)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    DistanceMascot(art: s.partnerArt ?? "b", mood: s.partnerMoodEmoji,
+                                   symptoms: s.partnerSymptomEmoji ?? [], moodOnTrailingEdge: false)
                 }
+                .frame(maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .padding(14)
+            .padding(12)
         }
     }
 }
@@ -588,7 +677,7 @@ struct DistanceWidget: Widget {
             }
         }
         .configurationDisplayName("Distance apart")
-        .description("How far apart you are, with the two of you either side of a heart.")
+        .description("How far apart you are: the two of you, a wiggly line and a heart, and how you are both feeling.")
         .supportedFamilies([.systemMedium, .accessoryRectangular])
     }
 }

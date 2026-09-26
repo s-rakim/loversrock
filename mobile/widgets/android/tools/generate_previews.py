@@ -171,27 +171,78 @@ def canvas():
     return finish(img, 'canvas')
 
 
+MASCOTS = os.path.join(HERE, '..', 'res', 'drawable-nodpi')
+EMOJI_FONT = '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf'
+
+
+def emoji(img, text, cx, cy, size):
+    """Paste colour emoji centred on (cx, cy). Noto Color Emoji is a bitmap
+    font that only renders at 109px, so each is drawn there and scaled."""
+    f = ImageFont.truetype(EMOJI_FONT, 109)
+    glyphs = Image.new('RGBA', (140 * len(text), 140), (0, 0, 0, 0))
+    ImageDraw.Draw(glyphs).text((0, 0), text, font=f, embedded_color=True)
+    glyphs = glyphs.crop(glyphs.getbbox())
+    scale = size / glyphs.height
+    glyphs = glyphs.resize((max(1, int(glyphs.width * scale)), int(size)), Image.LANCZOS)
+    img.alpha_composite(glyphs, (int(cx - glyphs.width / 2), int(cy - glyphs.height / 2)))
+
+
+def wiggle(d, s, x0, x1, cy):
+    """The dotted sine from generate_wiggle.py, at preview scale."""
+    amp, wave, gap, r = 7, 60, 7, 1.9
+    mid = (x0 + x1) / 2
+    yv = lambda x: cy + amp * math.sin(2 * math.pi * (x - mid) / wave)
+    for direction in (-1, 1):
+        x, px, py, run = mid, mid, yv(mid), 0.0
+        while x0 <= x <= x1:
+            x += direction * 0.1
+            run += math.hypot(x - px, yv(x) - py)
+            px, py = x, yv(x)
+            if run >= gap:
+                run -= gap
+                if abs(x - mid) > 18:        # the heart covers the middle
+                    d.ellipse([(x - r) * s, (py - r) * s, (x + r) * s, (py + r) * s], fill=ACCENT)
+
+
 def distance():
-    img, d, s = card(4, 1)
-    w, h = 4 * CELL, CELL
+    img, d, s = card(4, 2)
+    w, h = 4 * CELL, 2 * CELL
     d.text((PAD * s, 22 * s), 'Our distance:', font=font(18 * s), fill=MUTED)
     lw = d.textlength('Our distance:', font=font(18 * s)) / s
     d.text(((PAD + lw + 8) * s, 19 * s), '1,305 km', font=font(22 * s, True), fill=TEXT)
-    cy = 96
-    r = 26
-    for cx, text in ((PAD + r, 'Me'), (w - PAD - r, 'M')):
-        d.ellipse([(cx - r) * s, (cy - r) * s, (cx + r) * s, (cy + r) * s],
-                  fill=BORDER, outline=MUTED, width=2 * s)
-        f = font((16 if text == 'Me' else 20) * s, True)
-        tw = d.textlength(text, font=f) / s
-        d.text(((cx - tw / 2) * s, (cy - 12) * s), text, font=f, fill=TEXT)
-    mid = w / 2
-    for x0, x1 in ((PAD + 2 * r + 8, mid - 26), (mid + 26, w - PAD - 2 * r - 8)):
-        x = x0
-        while x < x1:
-            d.line([(x * s, cy * s), (min(x + 8, x1) * s, cy * s)], fill=MUTED, width=3 * s)
-            x += 14
-    heart(d, mid * s, (cy + 2) * s, 34 * s, ACCENT)
+
+    # The two of you, head to toe, in rounded frames.
+    top, bottom = 58, h - 46
+    col = 78
+    boxes = []
+    for x0, art in ((PAD, 'a'), (w - PAD - col, 'b')):
+        pic = Image.open(os.path.join(MASCOTS, f'widget_mascot_{art}.jpg')).convert('RGBA')
+        ph = (bottom - top) * s
+        pw = int(pic.width * ph / pic.height)
+        pic = pic.resize((pw, ph), Image.LANCZOS)
+        mask = Image.new('L', pic.size, 0)
+        ImageDraw.Draw(mask).rounded_rectangle([0, 0, pw - 1, ph - 1], radius=14 * s, fill=255)
+        px = int((x0 + col / 2) * s - pw / 2)
+        img.paste(pic, (px, top * s), mask)
+        boxes.append((px / s, pw / s))
+
+    cy = (top + bottom) / 2 - 10
+    wiggle(d, s, boxes[0][0] + boxes[0][1] + 8, boxes[1][0] - 8, cy)
+    d.ellipse([(w / 2 - 17) * s, (cy - 17) * s, (w / 2 + 17) * s, (cy + 17) * s],
+              fill=SURFACE, outline=BORDER, width=2 * s)
+    heart(d, (w / 2) * s, (cy + 1) * s, 24 * s, ACCENT)
+    cap = 'Last known distance'
+    cw = d.textlength(cap, font=font(15 * s)) / s
+    d.text(((w / 2 - cw / 2) * s, (cy + 30) * s), cap, font=font(15 * s), fill=MUTED)
+
+    # Moods in the picture corners, symptoms underneath.
+    for (px, pw), mood, symptoms, corner in ((boxes[0], '😴', '🤕💢', 1), (boxes[1], '🥰', '😖😪', -1)):
+        bx = px + pw if corner == 1 else px
+        by = bottom - 4
+        d.ellipse([(bx - 15) * s, (by - 15) * s, (bx + 15) * s, (by + 15) * s],
+                  fill=SURFACE, outline=BORDER, width=2 * s)
+        emoji(img, mood, bx * s, by * s, 19 * s)
+        emoji(img, symptoms, (px + pw / 2) * s, (bottom + 24) * s, 17 * s)
     return finish(img, 'distance')
 
 

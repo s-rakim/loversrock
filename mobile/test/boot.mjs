@@ -114,6 +114,7 @@ const hooks = {
     return c && c._currentValue !== undefined ? c._currentValue : {};
   },
   useReducer: (r, i) => [i, () => {}],
+  useSyncExternalStore: (subscribe, getSnapshot) => getSnapshot(),
   useImperativeHandle: () => {}, useDebugValue: () => {},
 };
 const reactStub = { ...React, ...hooks };

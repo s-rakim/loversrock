@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind each full-body picture on the distance widget. The pictures are
+     photographs with their own backgrounds, so they get a soft rounded frame
+     rather than pretending to be cut-outs. The corners clip on Android 12+
+     (clipToOutline); earlier, the picture simply sits on the tint. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_border" />
+    <corners android:radius="12dp" />
+</shape>

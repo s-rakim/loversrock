@@ -16,6 +16,7 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import ServerAddress from '../components/ServerAddress';
 import NicknameCard from '../components/NicknameCard';
+import MascotPicker from '../components/MascotPicker';
 import RemindersCard from '../components/RemindersCard';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
@@ -487,6 +488,10 @@ export default function SettingsScreen() {
             <Text style={font.muted}>Skin, hair and a wardrobe. They see what you put on.</Text>
           </View>
         </MorphButton>
+      </FadeInUp>
+
+      <FadeInUp delay={60}>
+        <MascotPicker />
       </FadeInUp>
 
       {/* The cycle tracker is the one asymmetric part of the app, so the

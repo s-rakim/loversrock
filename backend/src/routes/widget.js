@@ -4,7 +4,9 @@ import { query } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getObjectStream } from '../config/storage.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
-import { getUserDeviceTokens } from '../models/pairs.js';
+import { getUserDeviceTokens, pairLocalDateString } from '../models/pairs.js';
+import { resolveMascotArt } from '../models/mascotArt.js';
+import { moodEmoji, symptomEmoji } from '../models/widgetEmoji.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { NUDGE_LABELS, normalizeKind, NUDGE_THROTTLE_SECONDS } from '../models/nudges.js';
 
@@ -129,6 +131,19 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     // nickname YOU gave them if there is one, since that is how you think of
     // them, else their own name.
     partnerInitial: null,
+    // The two full-body mascots on the distance widget: which bundled picture
+    // is you and which is them ('a' | 'b'). Always different from each other.
+    myArt: null,
+    partnerArt: null,
+    // Each of you as an emoji, under your mascot: the mood you picked on the
+    // mood bar, and up to three of today's logged symptoms. Only symptoms
+    // with an emoji in models/widgetEmoji.js ever appear — anything intimate
+    // is never sent to a home screen — and the partner's only when they
+    // share symptoms with you.
+    myMoodEmoji: null,
+    partnerMoodEmoji: null,
+    mySymptomEmoji: [],
+    partnerSymptomEmoji: [],
     latestPhotoUrl: null,
     partnerCyclePhase: null,
     partnerNextPeriodDate: null,
@@ -168,9 +183,14 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
 
   const partnerId = pair.user_a_id === req.userId ? pair.user_b_id : pair.user_a_id;
 
+  // Every widget reads this endpoint, so a bad stored timezone must cost the
+  // symptom row its precision, not the whole home screen its data.
+  let today;
+  try { today = pairLocalDateString(pair); } catch { today = new Date().toISOString().slice(0, 10); }
+
   const [
     promptRes, countdownRes, photoRes, locationRes, partnerPeriodRes, moodRes, noteRes,
-    questionRes, dateRes, kissInRes, kissOutRes, drawingRes,
+    questionRes, dateRes, kissInRes, kissOutRes, drawingRes, myMoodRes, logRes, partnerSharingRes,
   ] = await Promise.all([
     query(
       `SELECT 1 FROM prompt_responses pr
@@ -189,7 +209,8 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
       [pair.id]
     ),
     query(
-      'SELECT id, name, last_lat, last_lng, location_sharing_enabled FROM users WHERE id = ANY($1::uuid[])',
+      `SELECT id, name, last_lat, last_lng, location_sharing_enabled, mascot_art, cycle_role
+         FROM users WHERE id = ANY($1::uuid[])`,
       [[req.userId, partnerId]]
     ),
     query('SELECT * FROM period_settings WHERE user_id = $1 AND sharing_enabled = TRUE', [partnerId]),
@@ -223,6 +244,13 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
       'SELECT title, updated_at FROM canvas_drawings WHERE pair_id = $1 ORDER BY updated_at DESC LIMIT 1',
       [pair.id]
     ),
+    query('SELECT mood FROM partner_moods WHERE pair_id = $1 AND user_id = $2', [pair.id, req.userId]),
+    // Today in the pair's pinned timezone, the same "today" as everything else.
+    query(
+      'SELECT user_id, symptoms FROM period_daily_logs WHERE user_id = ANY($1::uuid[]) AND log_date = $2',
+      [[req.userId, partnerId], today]
+    ),
+    query('SELECT share_symptoms FROM period_sharing WHERE user_id = $1', [partnerId]),
   ]);
 
   summary.todaysQuestion = questionRes.rows[0]?.content || null;
@@ -292,6 +320,28 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     [pair.id, req.userId]
   );
   summary.partnerInitial = initialOf(nickRows[0]?.nickname || partner?.name);
+
+  const art = resolveMascotArt(
+    { art: me?.mascot_art, cycleRole: me?.cycle_role },
+    { art: partner?.mascot_art, cycleRole: partner?.cycle_role },
+    pair.user_a_id === req.userId
+  );
+  summary.myArt = art.mine;
+  summary.partnerArt = art.theirs;
+
+  summary.myMoodEmoji = moodEmoji(myMoodRes.rows[0]?.mood);
+  summary.partnerMoodEmoji = moodEmoji(moodRes.rows[0]?.mood);
+
+  const symptomsOf = (id) => {
+    const raw = logRes.rows.find((r) => r.user_id === id)?.symptoms;
+    return Array.isArray(raw) ? raw : [];
+  };
+  summary.mySymptomEmoji = symptomEmoji(symptomsOf(req.userId));
+  // Two switches, both theirs: the master sharing switch (partnerPeriodRes
+  // only returns a row when it is on) and symptoms specifically.
+  if (partnerPeriodRes.rows[0] && partnerSharingRes.rows[0]?.share_symptoms) {
+    summary.partnerSymptomEmoji = symptomEmoji(symptomsOf(partnerId));
+  }
 
   // Same privacy boundary as GET /period/partner (docs/SPEC.md #5): phase and
   // predicted date only, never raw flow/symptoms/mood/notes.

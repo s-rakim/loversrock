@@ -242,6 +242,7 @@ const reactStub = {
   useState: (v) => [typeof v === 'function' ? v() : v, () => {}],
   useCallback: (f) => f,
   useContext: () => ({}),
+  useSyncExternalStore: (subscribe, getSnapshot) => getSnapshot(),
 };
 
 // Art is supplied now, so the real manifest returns a photograph and the
@@ -249,8 +250,12 @@ const reactStub = {
 // OFF, because the drawing is still what a person with no art of their own
 // gets and it still has to be right.
 const noArt = {
-  ME_ART: {}, PARTNER_ART: {}, PAIR_ART: null,
+  ART_SETS: {}, PAIR_ART: null,
   artFor: () => null, hasArtFor: () => false, HAS_ART: false,
+  headFor: () => ({ cx: 0.5, cy: 0.2, h: 0.36 }),
+  getMascotOwners: () => ({ me: 'a', partner: 'b' }),
+  subscribeMascotOwners: () => () => {},
+  setMascotOwners: () => {},
 };
 const Character = load('components/Character.js', {
   react: reactStub,
@@ -393,12 +398,15 @@ console.log('\n=== SUPPLIED ARTWORK IS USED AS SUPPLIED ===');
 // it is drawn with no tint, no recolouring and no clothes painted over it.
 const fakeArt = { uri: 'art://me-neutral.jpg', width: 315, height: 760 };
 const artStub = {
-  ME_ART: { neutral: fakeArt },
-  PARTNER_ART: { neutral: null },
+  ART_SETS: { a: { neutral: fakeArt }, b: { neutral: null } },
   PAIR_ART: null,
   artFor: (mood, who) => (who === 'me' ? fakeArt : null),
   hasArtFor: (who) => who === 'me',
   HAS_ART: true,
+  headFor: (who) => (who === 'me' ? { cx: 0.29, cy: 0.17, h: 0.34 } : { cx: 0.75, cy: 0.16, h: 0.34 }),
+  getMascotOwners: () => ({ me: 'a', partner: 'b' }),
+  subscribeMascotOwners: () => () => {},
+  setMascotOwners: () => {},
 };
 const CharacterArt = load('components/Character.js', {
   react: reactStub,
@@ -463,6 +471,24 @@ for (const mood of MOODS) {
   check(`  ${mood} falls back rather than returning nothing`,
     realArt.artFor(mood, 'me') !== null && realArt.artFor(mood, 'partner') !== null, mood);
 }
+// Same bundle on both phones: "me" is whichever picture the server says, so
+// on her phone me and partner must swap — the bug was that they never did.
+const heads = () => [realArt.headFor('me').cx, realArt.headFor('partner').cx];
+const onHis = { me: realArt.artFor('neutral', 'me'), partner: realArt.artFor('neutral', 'partner'), heads: heads() };
+check('the two people get different pictures', onHis.me !== onHis.partner);
+let heard = 0;
+const unsubscribe = realArt.subscribeMascotOwners(() => { heard += 1; });
+realArt.setMascotOwners('b');
+check('told "you are b", me and partner swap pictures',
+  realArt.artFor('neutral', 'me') === onHis.partner && realArt.artFor('neutral', 'partner') === onHis.me);
+check('and the head crops follow their pictures', JSON.stringify(heads()) === JSON.stringify([...onHis.heads].reverse()), heads());
+check('and whatever draws a mascot is told to re-render', heard === 1, heard);
+realArt.setMascotOwners('b');
+realArt.setMascotOwners('z');
+check('repeating the answer, or a nonsense one, changes nothing', heard === 1 && realArt.getMascotOwners().me === 'b', heard);
+realArt.setMascotOwners('a');
+unsubscribe();
+
 // A bundle is downloaded over a phone network. Three photographs should not
 // be a megabyte of it.
 const bytes = ['me-neutral.jpg', 'partner-neutral.jpg', 'pair.jpg']

@@ -5,6 +5,7 @@
 // "Loading…". Screens read what they need and call `saveLog` / `refresh`.
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../services/api';
+import { refreshWidgets } from '../../services/widgetBridge';
 
 const CycleContext = createContext(null);
 
@@ -109,6 +110,8 @@ export function CycleProvider({ children }) {
 
   const saveLog = useCallback(async (patch) => {
     const { log } = await apiFetch('/period/log', { method: 'POST', body: patch });
+    // Today's symptoms show on the distance widget.
+    refreshWidgets();
     await refresh();
     return log;
   }, [refresh]);
