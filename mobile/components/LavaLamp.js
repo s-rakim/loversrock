@@ -123,11 +123,22 @@ function Blob({ spec, colour, opacity, diameter, width, height, animate, speedFa
 export default function LavaLamp() {
   const { colors, isDark, reduceMotion, backgroundIntensity, backgroundSpeed } = useTheme();
   const { width, height } = useWindowDimensions();
-  const [active, setActive] = React.useState(AppState.currentState === 'active');
+  // Anything that is not explicitly backgrounded counts as active.
+  //
+  // This used to be `AppState.currentState === 'active'`, which is false on
+  // Android at first render: currentState is 'unknown' until the native module
+  // reports in. The listener below only fires on a CHANGE, and an app that
+  // launches straight into the foreground never changes — so `active` stayed
+  // false forever and the background never moved. It would start drifting if
+  // you backgrounded the app and came back, which is the sort of detail that
+  // makes a bug look like a mystery.
+  const [active, setActive] = React.useState(AppState.currentState !== 'background');
 
   // A drifting background is pure cost while nobody is looking at it.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => setActive(state === 'active'));
+    const sub = AppState.addEventListener('change', (state) => {
+      setActive(state !== 'background' && state !== 'inactive');
+    });
     return () => sub.remove();
   }, []);
 

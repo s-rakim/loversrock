@@ -21,7 +21,7 @@ import { Animated, Easing, Image, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Ellipse, G, Rect, Defs, RadialGradient, LinearGradient, Stop } from 'react-native-svg';
 import { useTheme } from './ThemeContext';
 import { EXPRESSIONS } from './Mascot';
-import { artFor, hasArtFor } from '../assets/mascot';
+import { artFor, hasArtFor, headFor } from '../assets/mascot';
 
 export const SKINS = {
   porcelain: '#F3D7C4', light: '#E8BE9C', medium: '#C98C63',
@@ -406,6 +406,10 @@ export default function Character({
   // up filling about sixty per cent of its own box.
   height = 140,
   animated = true, style, shadow = true,
+  // 'full' shows the whole figure; 'head' frames the face, for avatar sizes
+  // where a whole figure is too small to read. Only meaningful for supplied
+  // artwork — the drawn character is legible at any size by construction.
+  crop = 'full',
 }) {
   const { reduceMotion } = useTheme();
   const a = avatar || {};
@@ -470,9 +474,47 @@ export default function Character({
     // already carries them, so the raw value is the right fallback rather
     // than a crash.
     const meta = Image.resolveAssetSource ? Image.resolveAssetSource(art) : art;
-    const artWidth = meta?.width && meta?.height
-      ? height * (meta.width / meta.height)
-      : width;
+    const ratio = meta?.width && meta?.height ? meta.width / meta.height : null;
+
+    // `crop="head"` frames the face instead of the whole figure.
+    //
+    // Sized by height, a full-body crop at avatar scale is a sliver: at 96px
+    // tall the 0.37-ratio artwork is 35px wide and the face lands at about
+    // twelve pixels. Scaling the picture so the head fills the frame is what
+    // makes a small mascot legible; showing the whole body is right only when
+    // there is room for a whole body.
+    if (crop === 'head') {
+      const box = headFor(who);
+      const frame = height;
+      // Blow the image up until the head rect spans the frame, then slide it
+      // so the head's centre lands in the frame's centre.
+      const shownHeight = frame / box.h;
+      const shownWidth = ratio ? shownHeight * ratio : frame;
+      return (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.artFrame,
+            { width: frame, height: frame, transform: [{ translateY }] },
+            style,
+          ]}
+        >
+          <Image
+            source={art}
+            style={{
+              position: 'absolute',
+              width: shownWidth,
+              height: shownHeight,
+              left: frame / 2 - box.cx * shownWidth,
+              top: frame / 2 - box.cy * shownHeight,
+            }}
+            resizeMode="cover"
+          />
+        </Animated.View>
+      );
+    }
+
+    const artWidth = ratio ? height * ratio : width;
 
     return (
       <Animated.View

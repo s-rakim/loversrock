@@ -43,7 +43,10 @@ export default function PeriodTrackerScreen() {
           animation: reduceMotion ? 'fade' : 'slide_from_right',
           animationDuration: 240,
           gestureEnabled: true,
-          contentStyle: { backgroundColor: 'transparent' },
+          // Opaque, for the reason the photo and play sections are: this is a
+          // nested stack, so the thing behind a pushed screen is the sibling
+          // you came from, not the lava lamp.
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         <Stack.Screen name="CycleHome" component={CycleHomeScreen} />

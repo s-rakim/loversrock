@@ -70,6 +70,29 @@ export const PARTNER_ART = {
 export const PAIR_ART = require('./pair.jpg');
 
 /**
+ * Where each person's head sits in their picture.
+ *
+ * The supplied crops are full-body, roughly 0.4 wide to tall. Sized by height
+ * for an avatar — 96px in the mood card — that makes a 35px-wide sliver in
+ * which the face is about twelve pixels across. The mascot was rendering
+ * perfectly and could not be seen.
+ *
+ * `cx`/`cy` are the centre of the head as a fraction of the image, and `h` is
+ * how much of the image height a head-and-shoulders crop should span. Read off
+ * the artwork rather than guessed, and kept here beside the art so a new
+ * picture brings its own numbers instead of inheriting someone else's.
+ */
+export const HEAD = {
+  me: { cx: 0.29, cy: 0.17, h: 0.34 },
+  partner: { cx: 0.75, cy: 0.16, h: 0.34 },
+};
+
+/** The head rect for a person, with a safe middle-of-the-frame fallback. */
+export function headFor(who) {
+  return HEAD[who === 'me' ? 'me' : 'partner'] || { cx: 0.5, cy: 0.2, h: 0.36 };
+}
+
+/**
  * Art for a person's current mood.
  *
  * @param who 'me' | 'partner' — defaults to the partner, because that is

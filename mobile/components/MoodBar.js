@@ -51,7 +51,7 @@ export default function MoodBar({ partnerName }) {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mood, note, updatedAt, mine, setMyMood } = usePartnerMood();
-  const { theirs: theirAvatar } = useAvatars();
+  const { theirs: theirAvatar, mine: myAvatar } = useAvatars();
   const nudges = useNudges();
 
   const [picking, setPicking] = useState(false);
@@ -74,9 +74,20 @@ export default function MoodBar({ partnerName }) {
 
   return (
     <View style={styles.wrap}>
-      {/* THEIR character, wearing THEIR mood. Not yours — you already know
-          how you feel; this is for noticing them. */}
-      <Character avatar={theirAvatar} mood={mood} who="partner" height={96} />
+      {/* Both of you, each wearing your own mood.
+          Only theirs used to be here, on the reasoning that you already know
+          how you feel. In practice a card about the two of you that shows one
+          person reads as half-finished, and seeing your own mood beside theirs
+          is the comparison that makes the card worth looking at.
+
+          Cropped to the face: the supplied art is full-body at roughly 0.37
+          wide to tall, so at this size the whole figure is a 35px sliver with
+          a twelve-pixel head. */}
+      <View style={styles.faces}>
+        <Character avatar={theirAvatar} mood={mood} who="partner" height={62} crop="head" />
+        <Character avatar={myAvatar} mood={mine?.mood} who="me" height={62} crop="head"
+          style={styles.myFace} />
+      </View>
 
       <View style={{ flex: 1 }}>
         {nudges.unseen > 0 && (
@@ -213,7 +224,11 @@ export default function MoodBar({ partnerName }) {
 
 const makeStyles = (colors) =>
   StyleSheet.create({
-    wrap: {
+    // The two faces overlap slightly, which reads as a pair rather than as two
+  // separate avatars that happen to be next to each other.
+  faces: { flexDirection: 'row', alignItems: 'center' },
+  myFace: { marginLeft: -18 },
+  wrap: {
       flexDirection: 'row', alignItems: 'center', gap: spacing.md,
       backgroundColor: colors.surface, borderRadius: radius.card,
       padding: spacing.md, borderWidth: 1, borderColor: colors.border,

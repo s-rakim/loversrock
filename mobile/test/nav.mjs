@@ -268,7 +268,11 @@ console.log('\n=== A SECTION SCREEN COVERS THE ONE IT WAS PUSHED OVER ===');
 // the lava lamp. Inside a section the thing behind is the sibling you just
 // came from, so tapping Chat drew the thread over the live camera and read
 // as a button that does nothing.
-for (const [tab, file] of [['Photos', 'PhotoSectionScreen.js'], ['Play', 'PlaySectionScreen.js']]) {
+for (const [tab, file] of [
+  ['Photos', 'PhotoSectionScreen.js'],
+  ['Play', 'PlaySectionScreen.js'],
+  ['Cycle', 'PeriodTrackerScreen.js'],
+]) {
   const src = read('app', file);
   const style = src.match(/contentStyle:\s*\{([^}]*)\}/)?.[1] || '';
   check(`  the ${tab} section gives its screens a background`,
