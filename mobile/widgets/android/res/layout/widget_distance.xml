@@ -4,9 +4,9 @@
      each of you as an emoji — a mood in the corner of each picture, today's
      symptoms underneath.
 
-     Each picture is the mascot that person uploaded, downloaded and cached
-     by the widget (DistanceWidgetProvider); the placeholder figure stands in
-     until then. Who stands on which side is a setting, the same on both
+     Each picture is that person's mascot: the original shipped picture
+     (her on the left, him on the right), or the one they uploaded, which the
+     widget downloads and caches (DistanceWidgetProvider). Who stands on which side is a setting, the same on both
      phones, and paint() puts each mood and symptom row under whoever is in
      that slot.
 
@@ -109,7 +109,7 @@
                         android:background="@drawable/widget_mascot_frame"
                         android:clipToOutline="true"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/widget_mascot_placeholder"
+                        android:src="@drawable/widget_mascot_b"
                         android:contentDescription="Her" />
 
                     <TextView
@@ -200,7 +200,7 @@
                         android:background="@drawable/widget_mascot_frame"
                         android:clipToOutline="true"
                         android:scaleType="fitCenter"
-                        android:src="@drawable/widget_mascot_placeholder"
+                        android:src="@drawable/widget_mascot_a"
                         android:contentDescription="Him" />
 
                     <TextView

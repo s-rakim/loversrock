@@ -157,20 +157,23 @@ console.log('\n=== THE DISTANCE WIDGET ===');
   check('it is drawn as you ~·~ heart ~·~ them', /@\+id\/distance_left_art/.test(layout) && /@\+id\/distance_right_art/.test(layout)
     && /widget_kiss_icon/.test(layout) && /@drawable\/widget_distance_wiggle/.test(layout));
 
-  // The pictures are the mascots each person uploaded — no preset artwork
-  // ships in the widget any more, only a placeholder figure until one loads.
+  // By default the original pictures, the SAME files the app ships; an
+  // upload replaces only its owner's.
   const nodpi = path.join(android, 'res', 'drawable-nodpi');
-  check('  no preset mascot photos ship in the widget',
-    !fs.readdirSync(nodpi).some((f) => /^widget_mascot_/.test(f)));
+  for (const [art, file] of [['a', 'me-neutral.jpg'], ['b', 'partner-neutral.jpg']]) {
+    const copy = path.join(nodpi, `widget_mascot_${art}.jpg`);
+    check(`  widget_mascot_${art}.jpg is byte-for-byte the app's ${file}`,
+      fs.existsSync(copy) && fs.readFileSync(copy).equals(fs.readFileSync(path.join(root, 'assets', 'mascot', file))));
+  }
   const arts = layout.match(/<ImageView[^>]*distance_(left|right)_art[^>]*>/g) || [];
-  check('  both slots start as the placeholder figure',
-    arts.length === 2 && arts.every((tag) => /src="@drawable\/widget_mascot_placeholder"/.test(tag))
-    && fs.existsSync(path.join(android, 'res', 'drawable', 'widget_mascot_placeholder.xml')));
+  check('  her original picture (b) starts on the left, his (a) on the right',
+    /distance_left_art"[^>]*src="@drawable\/widget_mascot_b"/s.test(layout)
+    && /distance_right_art"[^>]*src="@drawable\/widget_mascot_a"/s.test(layout) && /LEFT_ART = "b"/.test(kotlin));
   const distanceSrc = kotlin.slice(kotlin.indexOf('class DistanceWidgetProvider'));
-  check('  and paint() swaps in the downloaded mascots, each on its own side',
+  check('  and paint() puts in the uploads, falling back to the originals, each on its own side',
     /override fun fetchExtra[\s\S]*fetchMascot\(context, "me"\)[\s\S]*fetchMascot\(context, "partner"\)/.test(distanceSrc)
-    && /distance_left_art, WidgetRepository\.mascot\(context, if \(meOnLeft\) "me" else "partner"\)/.test(distanceSrc)
-    && /distance_right_art, WidgetRepository\.mascot\(context, if \(meOnLeft\) "partner" else "me"\)/.test(distanceSrc));
+    && /distance_left_art,\s*WidgetRepository\.mascot\(context, if \(meOnLeft\) "me" else "partner"\), R\.drawable\.widget_mascot_b\)/.test(distanceSrc)
+    && /distance_right_art,\s*WidgetRepository\.mascot\(context, if \(meOnLeft\) "partner" else "me"\), R\.drawable\.widget_mascot_a\)/.test(distanceSrc));
   const repoKt = fs.readFileSync(path.join(android, 'WidgetRepository.kt'), 'utf8');
   check('  downloading the small copy, only when it changed, kept small for RemoteViews',
     /\/widget\/mascot\/\$who/.test(repoKt) && /If-None-Match/.test(repoKt) && /404 ->[\s\S]*file\.delete\(\)/.test(repoKt)
@@ -200,8 +203,8 @@ console.log('\n=== THE DISTANCE WIDGET ===');
     && /distance_left_mood, if \(meOnLeft\) myMood else theirMood/.test(distanceKt)
     && /distance_right_mood, if \(meOnLeft\) theirMood else myMood/.test(distanceKt));
   check('  iOS stands them the same way round, with the downloaded mascots',
-    /DistanceMascot\(image: entry\.mascots\[meOnLeft \? "me" : "partner"\],\s*mood: meOnLeft \? s\.myMoodEmoji/.test(swift)
-    && /DistanceMascot\(image: entry\.mascots\[meOnLeft \? "partner" : "me"\],\s*mood: meOnLeft \? s\.partnerMoodEmoji/.test(swift)
+    /DistanceMascot\(image: entry\.mascots\[meOnLeft \? "me" : "partner"\],\s*original: "widget_mascot_b\.jpg",\s*mood: meOnLeft \? s\.myMoodEmoji/.test(swift)
+    && /DistanceMascot\(image: entry\.mascots\[meOnLeft \? "partner" : "me"\],\s*original: "widget_mascot_a\.jpg",\s*mood: meOnLeft \? s\.partnerMoodEmoji/.test(swift)
     && /GlanceProvider\(wantsMascots: true\)/.test(swift));
   // iOS: the same fields, the same two pictures, the same dots.
   const data = fs.readFileSync(path.join(ios, 'WidgetData.swift'), 'utf8');
@@ -209,8 +212,11 @@ console.log('\n=== THE DISTANCE WIDGET ===');
     ['myArt', 'partnerArt', 'myMoodEmoji', 'partnerMoodEmoji', 'mySymptomEmoji', 'partnerSymptomEmoji']
       .every((f) => new RegExp(`let ${f}: `).test(data)));
   const pluginSrc = fs.readFileSync(path.join(root, 'plugins', 'withIosWidgets.js'), 'utf8');
-  check('  and the iOS plugin no longer copies preset pictures that are gone',
-    !/me-neutral|partner-neutral|widget_mascot_/.test(pluginSrc) && /\/widget\/mascot\//.test(data));
+  const images = iosPlugin.default?.WIDGET_IMAGES ?? iosPlugin.WIDGET_IMAGES;
+  check('  and iOS bundles the originals it falls back to, and downloads the uploads',
+    Object.keys(images).every((name) => swift.includes(`"${name}"`))
+    && Object.values(images).every((from) => fs.existsSync(path.join(root, from)))
+    && /\/widget\/mascot\//.test(data) && pluginSrc.length > 0, images);
   check('  drawn as round dots on a sine, not a straight dash',
     /struct DistanceWiggle: Shape/.test(swift) && /lineCap: \.round, dash: \[0,/.test(swift));
   const repo = fs.readFileSync(path.join(android, 'WidgetRepository.kt'), 'utf8');

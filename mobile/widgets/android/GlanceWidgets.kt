@@ -309,10 +309,12 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
         views.setContentDescription(R.id.distance_left_art, if (meOnLeft) "You" else "Your partner")
         views.setContentDescription(R.id.distance_right_art, if (meOnLeft) "Your partner" else "You")
 
-        // The mascots each of you uploaded, as fetchExtra cached them; the
-        // placeholder figure where there is none.
-        picture(views, R.id.distance_left_art, WidgetRepository.mascot(context, if (meOnLeft) "me" else "partner"))
-        picture(views, R.id.distance_right_art, WidgetRepository.mascot(context, if (meOnLeft) "partner" else "me"))
+        // What each of you uploaded, as fetchExtra cached it; otherwise the
+        // original picture of whoever stands in that slot.
+        picture(views, R.id.distance_left_art,
+            WidgetRepository.mascot(context, if (meOnLeft) "me" else "partner"), R.drawable.widget_mascot_b)
+        picture(views, R.id.distance_right_art,
+            WidgetRepository.mascot(context, if (meOnLeft) "partner" else "me"), R.drawable.widget_mascot_a)
 
         val km = data?.distanceKm
         if (km == null) {
@@ -341,9 +343,9 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
         WidgetRepository.fetchMascot(context, "partner")
     }
 
-    private fun picture(views: RemoteViews, id: Int, bitmap: android.graphics.Bitmap?) {
+    private fun picture(views: RemoteViews, id: Int, bitmap: android.graphics.Bitmap?, original: Int) {
         if (bitmap != null) views.setImageViewBitmap(id, bitmap)
-        else views.setImageViewResource(id, R.drawable.widget_mascot_placeholder)
+        else views.setImageViewResource(id, original)
     }
 
     /** Shown when there is something to show, gone otherwise — never an empty badge. */
@@ -362,10 +364,9 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
 }
 
 /**
- * The side token that stands on the left of the distance widget; "a" stands
- * on the right. Which of you holds which is a setting (Settings → Your
- * mascot), the same on both phones, so you stand the same way round on both
- * home screens.
+ * The picture that stands on the left of the distance widget: "b", her; "a",
+ * him, is on the right. Which of you is which is set once for both phones
+ * (Settings → Your mascot), so you stand the same way round on both.
  */
 internal const val LEFT_ART = "b"
 

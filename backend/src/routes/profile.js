@@ -67,7 +67,7 @@ function present(user, nickname, mascotArt = null) {
     mascotArt,
     mascotArtChosen: MASCOT_ARTS.includes(user.mascot_art),
     // The picture they uploaded as their mascot, or null for none — then the
-    // app draws their wardrobe character instead. `key` goes through /media
+    // app shows their original shipped picture. `key` goes through /media
     // like every other picture.
     mascot: user.mascot_key
       ? {
@@ -417,7 +417,7 @@ router.put('/mascot', requireAuth, async (req, res) => {
   });
 });
 
-/** Removes MY mascot; the app goes back to drawing my wardrobe character. */
+/** Removes MY mascot; the app goes back to my original shipped picture. */
 router.delete('/mascot', requireAuth, async (req, res) => {
   const { rows } = await query(
     `UPDATE users u SET mascot_key = NULL, mascot_thumb_key = NULL, mascot_width = NULL,

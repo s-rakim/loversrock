@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Image } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -12,7 +12,6 @@ import { GlassProvider } from './components/GlassContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { LanguageProvider } from './components/LanguageContext';
 import LavaLamp from './components/LavaLamp';
-import Mascot from './components/Mascot';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification, syncPushToken } from './services/notifications';
 import LumaBar, { TAB_ROUTES } from './components/LumaBar';
@@ -44,6 +43,7 @@ import CallScreen from './app/CallScreen';
 import DiagnosticsScreen from './app/DiagnosticsScreen';
 import WardrobeScreen from './app/WardrobeScreen';
 import WidgetLookScreen from './app/WidgetLookScreen';
+import { PAIR_ART } from './assets/mascot';
 import WallpaperScreen from './app/WallpaperScreen';
 import FourInARowScreen from './app/games/FourInARowScreen';
 import TicTacToeScreen from './app/games/TicTacToeScreen';
@@ -237,10 +237,14 @@ function Root() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <LavaLamp />
-        {/* The mascot holds the loading moment rather than a bare spinner.
-            Drawn, and neutral, on purpose: nobody is signed in yet, so there
-            is no uploaded picture to show and no mood to wear. */}
-        <Mascot size={140} drawn />
+        {/* The two of you, together, hold the loading moment rather than a
+            bare spinner — the shipped picture, since nobody is signed in yet
+            to have uploaded anything. */}
+        <Image
+          source={PAIR_ART}
+          style={{ width: 220 * (600 / 990), height: 220, borderRadius: 18 }}
+          resizeMode="cover"
+        />
         <ActivityIndicator color={colors.accentPink} size="large" style={{ marginTop: 24 }} />
       </View>
     );

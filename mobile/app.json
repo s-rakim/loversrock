@@ -3,8 +3,8 @@
     "name": "loversrock",
     "slug": "loversrock",
     "scheme": "loversrock",
-    "version": "1.10.0",
-    "runtimeVersion": "7",
+    "version": "1.11.0",
+    "runtimeVersion": "8",
     "updates": {
       "url": "https://u.expo.dev/8d0ca221-948b-47fc-9e81-36c304490bde",
       "fallbackToCacheTimeout": 0,
@@ -19,7 +19,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.loversrock.app",
-      "buildNumber": "21"
+      "buildNumber": "22"
     },
     "android": {
       "package": "com.loversrock.app",
@@ -30,7 +30,7 @@
         "WRITE_EXTERNAL_STORAGE",
         "BLUETOOTH_CONNECT"
       ],
-      "versionCode": 21
+      "versionCode": 22
     },
     "plugins": [
       "./plugins/withSplashScreenColor",

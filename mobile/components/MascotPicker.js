@@ -1,14 +1,17 @@
 // "Your mascot": the picture that stands for you, everywhere the app shows
 // the two of you — the mood bar, the wardrobe, the distance widget.
 //
-// Any picture you like. It is shrunk on the phone before it is sent (nobody
+// By default, your shipped picture: the app carries one of each of you, and
+// "Which picture is you?" says which is yours (which also puts her on the
+// left of the distance widget and him on the right). Upload any picture to
+// replace your own; "Use the default" brings the shipped one back.
+//
+// An upload can be any picture you like. It is shrunk on the phone before it is sent (nobody
 // needs a 12-megapixel mascot, and the server has no image tools of its own),
 // with a second, tiny copy made for home-screen widgets. PNGs stay PNG so a
 // cut-out with a transparent background stays transparent.
-//
-// With no picture, you are drawn instead: the wardrobe character.
 import React, { useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Image, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { apiFetch } from '../services/api';
@@ -16,6 +19,7 @@ import { refreshWidgets } from '../services/widgetBridge';
 import { spacing, radius } from '../theme';
 import { useTheme } from './ThemeContext';
 import Character from './Character';
+import { DEFAULT_ART } from '../assets/mascot';
 import useMascotOwners, { refreshMascotOwners } from './useMascotOwners';
 
 // Longest side, in pixels. Plenty for a figure a few hundred points tall on
@@ -82,10 +86,10 @@ export default function MascotPicker() {
   }
 
   function remove() {
-    Alert.alert('Remove your mascot?', 'You will be drawn as your wardrobe character instead.', [
+    Alert.alert('Use the default picture?', 'Your uploaded picture is removed and your original one comes back.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Remove',
+        text: 'Use the default',
         style: 'destructive',
         onPress: async () => {
           setBusy('remove');
@@ -103,9 +107,9 @@ export default function MascotPicker() {
     ]);
   }
 
-  // 'b' stands on the left of the distance widget, 'a' on the right.
-  async function stand(side) {
-    const art = side === 'left' ? 'b' : 'a';
+  // Which shipped picture is you. It also sets the distance widget's sides:
+  // 'b' stands on the left, 'a' on the right.
+  async function claim(art) {
     if (owners.me === art || busy) return;
     setBusy('side');
     try {
@@ -119,14 +123,12 @@ export default function MascotPicker() {
     }
   }
 
-  const mySide = owners.me === 'b' ? 'left' : 'right';
-
   return (
     <View style={styles.card}>
       <Text style={font.body}>Your mascot</Text>
       <Text style={font.muted}>
-        Any picture you like stands for you in the app and on the widgets. Without one, you are drawn
-        as your wardrobe character.
+        Your picture stands for you in the app and on the widgets. Keep the original, or upload any
+        picture you like instead.
       </Text>
 
       <View style={styles.stage}>
@@ -136,7 +138,7 @@ export default function MascotPicker() {
         </View>
         <View style={styles.figure}>
           <Character who="partner" height={150} animated={false} />
-          <Text style={styles.caption}>{pictures.partner ? 'Your partner' : 'Your partner (not set)'}</Text>
+          <Text style={styles.caption}>Your partner</Text>
         </View>
       </View>
 
@@ -144,32 +146,37 @@ export default function MascotPicker() {
         <Pressable onPress={choose} style={[styles.button, styles.primary]} accessibilityRole="button">
           {busy === 'upload'
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.primaryLabel}>{pictures.me ? 'Change picture' : 'Choose a picture'}</Text>}
+            : <Text style={styles.primaryLabel}>{pictures.me ? 'Upload another' : 'Upload your own'}</Text>}
         </Pressable>
         {pictures.me && (
           <Pressable onPress={remove} style={styles.button} accessibilityRole="button">
             {busy === 'remove'
               ? <ActivityIndicator color={colors.textSecondary} />
-              : <Text style={styles.secondaryLabel}>Remove</Text>}
+              : <Text style={styles.secondaryLabel}>Use the default</Text>}
           </Pressable>
         )}
       </View>
 
-      <Text style={[font.muted, { marginTop: spacing.md }]}>On the distance widget, you stand on the</Text>
-      <View style={styles.segmentRow}>
-        {['left', 'right'].map((side) => (
-          <Pressable
-            key={side}
-            onPress={() => stand(side)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: mySide === side }}
-            style={[styles.segment, mySide === side && styles.segmentActive]}
-          >
-            <Text style={[styles.segmentLabel, mySide === side && styles.segmentLabelActive]}>
-              {side === 'left' ? 'Left' : 'Right'}
-            </Text>
-          </Pressable>
-        ))}
+      {/* Which of the two original pictures is you. One answer settles both
+          phones, and her picture stands on the left of the distance widget. */}
+      <Text style={[font.muted, { marginTop: spacing.md }]}>Which original picture is you?</Text>
+      <View style={styles.claimRow}>
+        {['a', 'b'].map((art) => {
+          const mine = owners.me === art;
+          return (
+            <Pressable
+              key={art}
+              onPress={() => claim(art)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: mine, busy: busy === 'side' }}
+              accessibilityLabel={mine ? 'This original picture is you' : 'Choose this original picture as you'}
+              style={[styles.claim, mine && styles.claimActive]}
+            >
+              <Image source={DEFAULT_ART[art].source} style={styles.claimPhoto} resizeMode="contain" />
+              <Text style={[styles.segmentLabel, mine && styles.segmentLabelActive]}>{mine ? 'You' : 'Your partner'}</Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -194,12 +201,13 @@ const makeStyles = (colors) => StyleSheet.create({
   primary: { backgroundColor: colors.accentPink, borderColor: colors.accentPink },
   primaryLabel: { color: '#fff', fontWeight: '700' },
   secondaryLabel: { color: colors.textSecondary, fontWeight: '600' },
-  segmentRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  segment: {
-    flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.pill,
-    borderWidth: 1, borderColor: colors.border,
+  claimRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xs },
+  claim: {
+    flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.md,
+    borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surfaceAlt,
   },
-  segmentActive: { backgroundColor: colors.tabBarActivePill, borderColor: colors.accentPink },
+  claimActive: { borderColor: colors.accentPink },
+  claimPhoto: { height: 110, aspectRatio: 0.4, marginBottom: spacing.xs },
   segmentLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   segmentLabelActive: { color: colors.accentPink },
 });

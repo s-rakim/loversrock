@@ -1,14 +1,14 @@
-// Which side of the distance widget each of you stands on: 'b' on the left,
-// 'a' on the right.
+// Which of the two original mascot pictures is whose: 'a' (him) or 'b' (her).
 //
-// (It began as "which of the two bundled pictures is whose". The pictures are
-// now whatever each of you uploads, but the widget still needs the two of you
-// the same way round on both phones, and this still decides that — the same
-// answer for both, worked out once on the server.)
+// The app ships one picture of each of you and the same bundle goes on both
+// phones, so "me" cannot mean a fixed file; this decides it per account, once,
+// on the server. It is also which side of the distance widget you stand on:
+// 'b' on the left, 'a' on the right. An uploaded mascot replaces the picture
+// but not the side.
 //
 // In order, the first rule that gives an answer wins:
 //
-//   1. what you picked (Settings → Your mascot → left / right)
+//   1. what you picked (Settings → Your mascot → Which original picture is you?)
 //   2. the opposite of what your partner picked
 //   3. the cycle tracker role: the person tracking their own cycle is 'b'
 //   4. the opposite of your partner's role

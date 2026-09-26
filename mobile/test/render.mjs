@@ -456,51 +456,60 @@ check(`all ${sites.length} call sites say whose character it is`,
 
 // The wardrobe cannot dress a photograph, and must not claim to.
 const wardrobe = fs.readFileSync(path.join(root, 'app', 'WardrobeScreen.js'), 'utf8');
-check('the wardrobe says so when art is in use', /hasArtFor\('me'\)/.test(wardrobe));
+check('the wardrobe says it dresses the drawn faces, not the picture',
+  /Your mascot picture is what they see/.test(wardrobe) && /drawn\s+character on the mood faces/.test(wardrobe));
 
-console.log('\n=== MASCOTS ARE UPLOADED PICTURES, NOT PRESETS ===');
-// No preset artwork ships any more: each person uploads their own picture,
-// and with none they are drawn. This drives the real store.
+console.log('\n=== MASCOTS: THE ORIGINAL PICTURES, OR YOUR OWN ===');
+// The two shipped pictures are the defaults; either of you can upload your
+// own to replace yours, and removing it brings the original back.
 const realArt = load('assets/mascot/index.js');
-check('the preset pictures are gone from the app bundle',
-  !['me-neutral.jpg', 'partner-neutral.jpg', 'pair.jpg'].some((f) => fs.existsSync(path.join(root, 'assets', 'mascot', f))));
-check('nothing uploaded means the character is drawn',
-  realArt.artFor('neutral', 'me') === null && realArt.artFor('neutral', 'partner') === null && !realArt.hasArtFor('me'));
+for (const file of ['me-neutral.jpg', 'partner-neutral.jpg', 'pair.jpg']) {
+  const onDisk = path.join(root, 'assets', 'mascot', file);
+  check(`  ${file} ships with the app`, fs.existsSync(onDisk));
+  const [w, h] = imageSize(onDisk);
+  check(`  and is a real portrait picture (${w}x${h})`, w > 100 && h > 100 && h > w, [w, h]);
+}
+check('the loading screen has the pair picture', Boolean(realArt.PAIR_ART));
+const originalA = realArt.DEFAULT_ART.a.source;
+const originalB = realArt.DEFAULT_ART.b.source;
+check('nothing uploaded: each of you is your original picture',
+  realArt.artFor('neutral', 'me') === originalA && realArt.artFor('neutral', 'partner') === originalB
+  && !realArt.hasUploadFor('me'));
+check('  with its own head crop', realArt.headFor('me').cx === 0.29 && realArt.headFor('partner').cx === 0.75);
 
 let heard = 0;
 const unsubscribe = realArt.subscribeMascotOwners(() => { heard += 1; });
+realArt.setMascotOwners('b');
+check('on her phone ("you are b"), me and partner swap originals',
+  realArt.artFor('neutral', 'me') === originalB && realArt.artFor('neutral', 'partner') === originalA);
+check('  and whatever draws a mascot is told to re-render', heard === 1, heard);
+realArt.setMascotOwners('b');
+realArt.setMascotOwners('z');
+check('  repeating the answer, or a nonsense one, changes nothing', heard === 1 && realArt.getMascotOwners().me === 'b');
+realArt.setMascotOwners('a');
+
 realArt.setMascotResolver((key) => `https://server/media/${key}?token=t`);
-realArt.setMascotPictures({
-  me: { key: 'mascots/u1/me.png', width: 400, height: 1000 },
-  partner: { key: 'mascots/u2/her.jpg', width: 800, height: 800 },
-});
+realArt.setMascotPictures({ me: { key: 'mascots/u1/me.png', width: 400, height: 1000 }, partner: null });
 const mine = realArt.artFor('happy', 'me');
-check('an upload becomes an image source through /media', mine?.uri === 'https://server/media/mascots/u1/me.png?token=t', mine);
-check('  carrying its size, so the frame is right before it loads', mine?.width === 400 && mine?.height === 1000, mine);
-check('  whatever the mood', realArt.artFor('sad', 'me')?.uri === mine.uri);
-check("  and the partner's is theirs, not mine", realArt.artFor('neutral', 'partner')?.uri.includes('her.jpg'));
-check('whatever draws a mascot is told to re-render', heard >= 2, heard);
-check('a tall picture is cropped to the head near the top', realArt.headFor('me').cy < 0.3 && realArt.headFor('me').h < 1);
-check('a square one is shown whole', realArt.headFor('partner').h === 1);
+check('an upload replaces your original, through /media', mine?.uri === 'https://server/media/mascots/u1/me.png?token=t', mine);
+check('  carrying its size, so the frame is right before it loads', mine?.width === 400 && mine?.height === 1000);
+check('  and only yours: your partner keeps theirs', realArt.artFor('neutral', 'partner') === originalB);
+check('  a tall upload is cropped to the head near the top', realArt.headFor('me').cx === 0.5 && realArt.headFor('me').cy < 0.3);
+realArt.setMascotPictures({ me: { key: 'mascots/u1/me.png', width: 400, height: 1000 }, partner: { key: 'mascots/u2/sq.jpg', width: 800, height: 800 } });
+check('  a square one is shown whole', realArt.headFor('partner').h === 1);
 
 realArt.setMascotResolver(() => null);
-check('with no token yet there is no URL, so it draws instead of showing a broken image', realArt.artFor('neutral', 'me') === null);
+check('before the token is loaded, the original shows instead of a broken image',
+  realArt.artFor('neutral', 'me') === originalA && realArt.headFor('me').cx === 0.29);
 realArt.setMascotResolver((key) => `u/${key}`);
 
 const before = heard;
-realArt.setMascotPictures({ me: { key: 'mascots/u1/me.png', width: 400, height: 1000 }, partner: { key: 'mascots/u2/her.jpg', width: 800, height: 800 } });
+realArt.setMascotPictures({ me: { key: 'mascots/u1/me.png', width: 400, height: 1000 }, partner: { key: 'mascots/u2/sq.jpg', width: 800, height: 800 } });
 check('the same pictures again change nothing', heard === before, heard - before);
-realArt.setMascotPictures({ me: null, partner: { key: 'mascots/u2/her.jpg', width: 800, height: 800 } });
-check('removing mine goes back to drawing me', realArt.artFor('neutral', 'me') === null && realArt.artFor('neutral', 'partner') !== null);
+realArt.setMascotPictures({ me: null, partner: null });
+check('"Use the default" brings your original back', realArt.artFor('neutral', 'me') === originalA);
 realArt.setMascotPictures({ me: { key: 42 }, partner: 'nonsense' });
-check('garbage from the server is treated as no picture', !realArt.hasArtFor('me') && !realArt.hasArtFor('partner'));
-
-// Which side each of you stands on in the distance widget.
-realArt.setMascotOwners('b');
-check('told "you are b", you stand on the left', realArt.mascotArtOf('me') === 'b' && realArt.mascotArtOf('partner') === 'a');
-realArt.setMascotOwners('z');
-check('a nonsense side changes nothing', realArt.getMascotOwners().me === 'b');
-realArt.setMascotOwners('a');
+check('garbage from the server is treated as no upload', !realArt.hasUploadFor('me') && !realArt.hasUploadFor('partner'));
 unsubscribe();
 
 

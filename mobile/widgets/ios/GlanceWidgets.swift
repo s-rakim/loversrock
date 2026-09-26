@@ -751,6 +751,8 @@ private struct DistanceWiggle: Shape {
 /// with your mood tucked into a corner and today's symptoms underneath.
 private struct DistanceMascot: View {
     let image: Data?
+    /// The original picture for this slot, used until an upload arrives.
+    let original: String
     let mood: String?
     let symptoms: [String]
     let moodOnTrailingEdge: Bool
@@ -781,10 +783,11 @@ private struct DistanceMascot: View {
         .frame(width: 60)
     }
 
-    /// The mascot they uploaded, as the provider downloaded it; a plain
-    /// standing figure until there is one.
+    /// The mascot they uploaded, as the provider downloaded it; otherwise the
+    /// original picture bundled into the extension by plugins/withIosWidgets.js.
     private var picture: Image {
         if let image, let uiImage = UIImage(data: image) { return Image(uiImage: uiImage) }
+        if let uiImage = UIImage(named: original) { return Image(uiImage: uiImage) }
         return Image(systemName: "figure.stand")
     }
 }
@@ -834,9 +837,10 @@ struct DistanceView: View {
                         .foregroundColor(.glText)
                 }
                 HStack(alignment: .center, spacing: 6) {
-                    // Whoever holds side b stands on the left, on both phones;
-                    // each row follows whoever is in the slot.
+                    // Her (b) on the left, him (a) on the right, on both
+                    // phones; each row follows whoever is in the slot.
                     DistanceMascot(image: entry.mascots[meOnLeft ? "me" : "partner"],
+                                   original: "widget_mascot_b.jpg",
                                    mood: meOnLeft ? s.myMoodEmoji : s.partnerMoodEmoji,
                                    symptoms: (meOnLeft ? s.mySymptomEmoji : s.partnerSymptomEmoji) ?? [],
                                    moodOnTrailingEdge: true)
@@ -862,6 +866,7 @@ struct DistanceView: View {
                     }
                     .frame(maxWidth: .infinity)
                     DistanceMascot(image: entry.mascots[meOnLeft ? "partner" : "me"],
+                                   original: "widget_mascot_a.jpg",
                                    mood: meOnLeft ? s.partnerMoodEmoji : s.myMoodEmoji,
                                    symptoms: (meOnLeft ? s.partnerSymptomEmoji : s.mySymptomEmoji) ?? [],
                                    moodOnTrailingEdge: false)

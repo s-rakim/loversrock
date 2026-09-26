@@ -18,7 +18,6 @@ import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton } from '../components/Motion';
 import Character, { SKINS, HAIR_COLORS, GARMENT_COLORS } from '../components/Character';
-import { hasArtFor } from '../assets/mascot';
 import usePartnerMood from '../components/usePartnerMood';
 
 const SLOTS = [
@@ -100,13 +99,13 @@ export default function WardrobeScreen() {
         {/* The real renderer, wearing your current mood — so you can see
             exactly what they see. */}
         <Character avatar={avatar} mood={mine?.mood} who="me" height={230} />
-        {/* An uploaded mascot is used as supplied. Drawing a hoodie over a
-            picture of a real person would look exactly as bad as it sounds,
-            so when there IS one the wardrobe stops claiming it applies. */}
+        {/* Everyone has a picture now — the shipped one or their own — and
+            it is used as supplied. Drawing a hoodie over a picture of a real
+            person would look exactly as bad as it sounds, so the wardrobe
+            says plainly what it does dress. */}
         <Text style={[font.muted, styles.stageNote]}>
-          {hasArtFor('me')
-            ? 'Your uploaded mascot is what they see (Settings → Your mascot). The wardrobe dresses the drawn character you get without one.'
-            : 'This is what they see on their phone.'}
+          Your mascot picture is what they see (Settings → Your mascot). The wardrobe dresses the drawn
+          character on the mood faces.
         </Text>
       </View>
 
