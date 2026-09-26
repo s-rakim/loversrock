@@ -66,18 +66,38 @@ export default function CanvasScreen({ navigation, route }) {
         ];
         forceRender((n) => n + 1);
       },
-      onPanResponderRelease: () => {
-        if (currentStroke.current.length > 0) {
-          const { color: c, width: w, tool: t } = styleRef.current;
-          setStrokes((prev) => [...prev, { points: currentStroke.current, color: c, width: w, tool: t }]);
-          // A new stroke discards the redo stack, as every editor does.
-          setUndone([]);
-        }
-        currentStroke.current = [];
-        forceRender((n) => n + 1);
-      },
+      // Nothing else on the screen gets to take a stroke away mid-line.
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderRelease: () => commitStroke(),
+      // If the system takes the gesture anyway (a notification shade, an
+      // incoming call), keep what was drawn rather than dropping it.
+      onPanResponderTerminate: () => commitStroke(),
     })
   ).current;
+
+  /**
+   * Keep the stroke that was just drawn.
+   *
+   * The points are copied into a local BEFORE setStrokes. This used to build
+   * the stroke inside the updater — `setStrokes((prev) => [...prev,
+   * { points: currentStroke.current }])` — but React runs an updater later,
+   * during the next render, and by then the line below had already reset
+   * currentStroke.current to []. Every stroke was kept with no points at all,
+   * so the line vanished the moment a finger lifted and nothing ever stayed
+   * on the canvas.
+   */
+  function commitStroke() {
+    const points = currentStroke.current;
+    currentStroke.current = [];
+    if (points.length > 0) {
+      const { color: c, width: w, tool: t } = styleRef.current;
+      const stroke = { points, color: c, width: w, tool: t };
+      setStrokes((prev) => [...prev, stroke]);
+      // A new stroke discards the redo stack, as every editor does.
+      setUndone([]);
+    }
+    forceRender((n) => n + 1);
+  }
 
   const live = currentStroke.current.length > 0
     ? { points: currentStroke.current, color, width, tool }
@@ -186,7 +206,10 @@ export default function CanvasScreen({ navigation, route }) {
   return (
     <View style={styles.container}>
       <View style={[styles.canvas, { backgroundColor: canvasColor }]} {...panResponder.panHandlers}>
-        <Svg style={StyleSheet.absoluteFill}>
+        {/* pointerEvents none: the canvas View must be the touch target.
+            If a finger lands on an SVG path, locationX/Y are measured from
+            that path instead, and the stroke jumps across the canvas. */}
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           {strokes.map((stroke, i) => (
             <StrokePath key={i} stroke={stroke} index={i} canvasColor={canvasColor} />
           ))}

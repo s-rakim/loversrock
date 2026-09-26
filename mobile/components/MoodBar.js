@@ -15,6 +15,7 @@ import Character from './Character';
 import useAvatars from './useAvatars';
 import usePartnerMood from './usePartnerMood';
 import useNudges from './useNudges';
+import { isUnpaired } from '../services/api';
 
 const LABELS = {
   happy: 'Happy', loved: 'Loved', calm: 'Calm', tired: 'Tired', stressed: 'Stressed',
@@ -58,6 +59,8 @@ export default function MoodBar({ partnerName }) {
   const [pickingNudge, setPickingNudge] = useState(false);
   const [draftNote, setDraftNote] = useState('');
   const [saving, setSaving] = useState(false);
+  // Why the last tap did not save, said in the sheet where the tap happened.
+  const [pickError, setPickError] = useState(null);
 
   // A name when there is one. Without one this used to fall back to 'They',
   // used as if it were a name: "No mood from They yet", "They sees this".
@@ -68,10 +71,19 @@ export default function MoodBar({ partnerName }) {
 
   async function choose(next) {
     setSaving(true);
+    setPickError(null);
     try {
       await setMyMood(next, draftNote.trim() || null);
       setPicking(false);
       setDraftNote('');
+    } catch (err) {
+      // There was no catch here, so a refused save vanished: the sheet sat
+      // open, the tap did nothing visible, and the moods looked like
+      // decoration. Before pairing the server always refuses — a mood is
+      // something you send to someone — so say that, in the sheet.
+      setPickError(isUnpaired(err)
+        ? 'Your mood goes to your partner, so it sends once you are paired.'
+        : `Could not save that: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -120,7 +132,7 @@ export default function MoodBar({ partnerName }) {
         )}
 
         <View style={styles.actionRow}>
-          <MorphButton onPress={() => setPicking(true)} style={styles.setButton}>
+          <MorphButton onPress={() => { setPickError(null); setPicking(true); }} style={styles.setButton}>
             <Ionicons
               name={mine ? ICONS[mine.mood] : 'add'}
               size={14}
@@ -186,6 +198,12 @@ export default function MoodBar({ partnerName }) {
         <Pressable style={styles.backdrop} onPress={() => setPicking(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={font.h2}>How are you?</Text>
+            {pickError ? (
+              <View style={styles.pickError}>
+                <Ionicons name="information-circle" size={16} color={colors.accentPink} />
+                <Text style={[font.body, { flex: 1, fontSize: 13 }]}>{pickError}</Text>
+              </View>
+            ) : null}
             <Text style={[font.muted, { marginTop: 2 }]}>
               {Who} sees this on your mascot.
             </Text>
@@ -271,6 +289,11 @@ const makeStyles = (colors) =>
     },
     setText: { color: colors.accent, fontWeight: '700', fontSize: 13 },
 
+    pickError: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+      marginTop: spacing.sm, padding: spacing.sm,
+      borderRadius: radius.md, backgroundColor: colors.accentSoft,
+    },
     backdrop: {
       flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
       alignItems: 'center', justifyContent: 'center', padding: spacing.lg,

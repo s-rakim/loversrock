@@ -152,5 +152,95 @@ check('Doodle only fits when asked', /fit = false/.test(source), 'fit should def
 const gallery = fs.readFileSync(path.join(root, 'app', 'CanvasGalleryScreen.js'), 'utf8');
 check('but the gallery does ask for it', /<Doodle[\s\S]{0,300}?\bfit\b/.test(gallery));
 
+console.log('\n=== A STROKE STAYS ON THE CANVAS WHEN THE FINGER LIFTS ===');
+// The canvas kept every stroke with NO points: it built the stroke inside a
+// setStrokes updater that read currentStroke.current, and React runs updaters
+// later — after the next line had already reset the ref to []. The line
+// vanished on lift and nothing ever stayed.
+//
+// This drives the real CanvasScreen gesture handlers with a React stand-in
+// that defers updaters exactly as React does, so it fails on that code.
+{
+  const src = fs.readFileSync(path.join(root, 'app', 'CanvasScreen.js'), 'utf8');
+  const out = babel.transformSync(src, {
+    filename: 'CanvasScreen.js',
+    presets: [
+      ['@babel/preset-env', { targets: { node: 'current' } }],
+      ['@babel/preset-react', { runtime: 'classic' }],
+    ],
+    babelrc: false, configFile: false,
+  }).code;
+
+  function drive() {
+    const state = [];          // hook slots, in call order
+    const queue = [];          // deferred updaters, as React queues them
+    let slot = 0;
+    let responder = null;
+    const React = {
+      createElement: () => null,
+      Fragment: 'Fragment',
+      useState(initial) {
+        const i = slot++;
+        if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
+        return [state[i], (next) => queue.push([i, next])];
+      },
+      useRef(v) { const i = slot++; if (!(i in state)) state[i] = { current: v }; return state[i]; },
+      useMemo: (f) => f(),
+      useCallback: (f) => f,
+      useEffect: () => {},
+      useLayoutEffect: () => {},
+    };
+    const flush = () => {
+      while (queue.length) {
+        const [i, next] = queue.shift();
+        state[i] = typeof next === 'function' ? next(state[i]) : next;
+      }
+    };
+    const stub = new Proxy(() => null, { get: () => stub, apply: () => stub });
+    const rn = {
+      View: 'View', Text: 'Text', ScrollView: 'ScrollView', Pressable: 'Pressable',
+      StyleSheet: { create: (x) => x, absoluteFill: {} },
+      Alert: { alert() {} },
+      PanResponder: { create: (cfg) => { responder = cfg; return { panHandlers: {} }; } },
+      Platform: { OS: 'android', select: (o) => o.android },
+    };
+    const mod = { exports: {} };
+    const req = (id) => {
+      if (id === 'react') return React;
+      if (id === 'react-native') return rn;
+      if (id.endsWith('ThemeContext')) return { useTheme: () => ({ colors: {}, font: {} }) };
+      return new Proxy({}, { get: (_t, k) => (k === '__esModule' ? true : stub) });
+    };
+    new Function('module', 'exports', 'require', out)(mod, mod.exports, req);
+    const Screen = mod.exports.default;
+    const render = () => { slot = 0; Screen({ navigation: { addListener: () => () => {}, setOptions() {} }, route: { params: {} } }); };
+
+    render();
+    const at = (x, y) => ({ nativeEvent: { locationX: x, locationY: y } });
+    responder.onPanResponderGrant(at(10, 10));
+    flush(); render();
+    for (let x = 20; x <= 60; x += 10) { responder.onPanResponderMove(at(x, 10)); flush(); render(); }
+    responder.onPanResponderRelease();
+    flush(); render();
+    // state[0] is `strokes`, the first useState in the component.
+    return state[0];
+  }
+
+  let strokes = null;
+  let error = null;
+  try { strokes = drive(); } catch (e) { error = e; }
+  check('the canvas can be driven with its real gesture handlers', !error, error && error.message);
+  check('lifting the finger keeps one stroke', Array.isArray(strokes) && strokes.length === 1, strokes);
+  check('and that stroke has the points that were drawn, not none',
+    strokes?.[0]?.points?.length === 6, strokes?.[0]?.points?.length);
+  check('in the order they were drawn',
+    strokes?.[0]?.points?.[0]?.x === 10 && strokes?.[0]?.points?.[5]?.x === 60,
+    strokes?.[0]?.points?.map((p) => p.x));
+  check('an interrupted gesture keeps its stroke too',
+    /onPanResponderTerminate: \(\) => commitStroke\(\)/.test(src));
+  check('and the SVG never steals the touch, so coordinates stay on the canvas',
+    /<Svg style=\{StyleSheet\.absoluteFill\} pointerEvents="none">/.test(src));
+}
+
 console.log(`\nDOODLE RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

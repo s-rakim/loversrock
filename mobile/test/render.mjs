@@ -625,6 +625,12 @@ console.log('\n=== THE MOOD PICKER ===');
   // 'They' was being used as a name: "No mood from They yet", "They sees this".
   check('"They" is never used as a name', !/\|\| 'They'/.test(bar) && !/\{who\} sees/.test(bar));
   check('and the picker says whose mascot it is', /sees this on your mascot/.test(bar));
+  // A refused save used to vanish — no catch — so tapping a mood before
+  // pairing did nothing at all, and the moods looked like decoration.
+  check('a refused mood save is caught, not dropped',
+    /async function choose[\s\S]*?catch \(err\)[\s\S]*?setPickError/.test(bar));
+  check('and before pairing it says why, in the sheet',
+    /isUnpaired\(err\)[\s\S]{0,120}sends once you are paired/.test(bar) && /\{pickError \?/.test(bar));
 }
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
