@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- How far apart you are: the number, and you and them either side of a
+     heart on a dotted line.
+
+     Carries the glance ids (widget_root, glance_label, glance_value,
+     glance_caption, widget_refresh) on purpose. GlanceWidgetProvider paints
+     its "set this up" and "pair first" states into those slots before this
+     widget's own paint() runs, and a layout without them would crash the
+     update with a missing-view error instead of saying what to do. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="14dp"
+    android:background="@drawable/widget_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/glance_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:textColor="@color/widget_text_muted"
+            android:text="Our distance:" />
+
+        <TextView
+            android:id="@+id/glance_value"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/widget_text"
+            android:text="—" />
+
+        <ImageView
+            android:id="@+id/widget_refresh"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@drawable/widget_refresh_icon"
+            android:contentDescription="Refresh" />
+    </LinearLayout>
+
+    <!-- Me ····♥···· M -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:id="@+id/distance_me"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:background="@drawable/widget_distance_bubble"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_text"
+            android:text="Me" />
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="4dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:layerType="software"
+            android:src="@drawable/widget_distance_dash"
+            android:scaleType="fitXY"
+            android:importantForAccessibility="no" />
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/widget_kiss_icon"
+            android:importantForAccessibility="no" />
+
+        <ImageView
+            android:layout_width="0dp"
+            android:layout_height="4dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:layerType="software"
+            android:src="@drawable/widget_distance_dash"
+            android:scaleType="fitXY"
+            android:importantForAccessibility="no" />
+
+        <TextView
+            android:id="@+id/distance_them"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:background="@drawable/widget_distance_bubble"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_text"
+            android:text="♥" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/glance_caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textSize="11sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="@color/widget_text_muted"
+        android:text="" />
+</LinearLayout>

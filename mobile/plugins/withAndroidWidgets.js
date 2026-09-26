@@ -53,21 +53,24 @@ function withWidgetManifest(config) {
     application.receiver = application.receiver || [];
 
     const receivers = [
-      { name: '.widgets.SummaryWidgetProvider', info: '@xml/widget_summary_info' },
-      { name: '.widgets.PhotoWidgetProvider', info: '@xml/widget_photo_info' },
-      { name: '.widgets.AnniversaryWidgetProvider', info: '@xml/widget_anniversary_info' },
-      { name: '.widgets.DailyQuestionWidgetProvider', info: '@xml/widget_question_info' },
-      { name: '.widgets.NextDateWidgetProvider', info: '@xml/widget_nextdate_info' },
-      { name: '.widgets.SecretMessageWidgetProvider', info: '@xml/widget_secret_info' },
-      { name: '.widgets.KissWidgetProvider', info: '@xml/widget_kiss_info' },
-      { name: '.widgets.CanvasWidgetProvider', info: '@xml/widget_canvas_info' },
+      { name: '.widgets.SummaryWidgetProvider', info: '@xml/widget_summary_info', label: '@string/widget_summary_label' },
+      { name: '.widgets.PhotoWidgetProvider', info: '@xml/widget_photo_info', label: '@string/widget_photo_label' },
+      { name: '.widgets.AnniversaryWidgetProvider', info: '@xml/widget_anniversary_info', label: '@string/widget_anniversary_label' },
+      { name: '.widgets.DailyQuestionWidgetProvider', info: '@xml/widget_question_info', label: '@string/widget_question_label' },
+      { name: '.widgets.NextDateWidgetProvider', info: '@xml/widget_nextdate_info', label: '@string/widget_nextdate_label' },
+      { name: '.widgets.SecretMessageWidgetProvider', info: '@xml/widget_secret_info', label: '@string/widget_secret_label' },
+      { name: '.widgets.KissWidgetProvider', info: '@xml/widget_kiss_info', label: '@string/widget_kiss_label' },
+      { name: '.widgets.CanvasWidgetProvider', info: '@xml/widget_canvas_info', label: '@string/widget_canvas_label' },
+      { name: '.widgets.DistanceWidgetProvider', info: '@xml/widget_distance_info', label: '@string/widget_distance_label' },
     ];
 
-    for (const { name, info } of receivers) {
+    for (const { name, info, label } of receivers) {
       if (application.receiver.some((r) => r.$?.['android:name'] === name)) continue;
 
       application.receiver.push({
-        $: { 'android:name': name, 'android:exported': 'false' },
+        // The label is the widget's name in the picker. Without it the picker
+        // falls back to the app's name, and all nine read "loversrock".
+        $: { 'android:name': name, 'android:exported': 'false', 'android:label': label },
         'intent-filter': [
           { action: [{ $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } }] },
         ],

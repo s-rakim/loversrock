@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The dotted line joining the two bubbles.
+     A drawable rather than a View, because RemoteViews cannot host a plain
+     View at all — only the handful of classes the launcher is allowed to
+     inflate, of which ImageView is one. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="line">
+    <stroke
+        android:width="2dp"
+        android:color="@color/widget_text_muted"
+        android:dashWidth="4dp"
+        android:dashGap="3dp" />
+    <size android:height="4dp" />
+</shape>

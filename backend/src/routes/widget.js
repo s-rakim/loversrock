@@ -93,6 +93,20 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 // gets a few hundred milliseconds of background execution, so it can't afford
 // to chain calls. Every field is nullable: widgets must degrade gracefully
 // rather than error.
+/**
+ * The first letter of a name, as a person would read it.
+ *
+ * Array.from rather than [0] so a name opening with an emoji or an accented
+ * letter yields the whole character instead of half a surrogate pair — and
+ * the first LETTER, skipping emoji, because a bubble with a lone butterfly in
+ * it reads as decoration, not as a person.
+ */
+function initialOf(name) {
+  if (!name) return null;
+  const letter = Array.from(String(name)).find((ch) => /\p{L}|\p{N}/u.test(ch));
+  return letter ? letter.toLocaleUpperCase() : null;
+}
+
 router.get('/summary', requireWidgetToken, async (req, res) => {
   const { rows: pairRows } = await query(
     `SELECT * FROM pairs
@@ -108,6 +122,13 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     promptAnsweredToday: false,
     nextCountdown: null,
     distanceKm: null,
+    // Why there is no number, so the distance widget can say something true
+    // instead of a bare dash: 'ok' | 'sharing_off' | 'no_location'.
+    distanceStatus: null,
+    // The letter in the partner's bubble on the distance widget — from the
+    // nickname YOU gave them if there is one, since that is how you think of
+    // them, else their own name.
+    partnerInitial: null,
     latestPhotoUrl: null,
     partnerCyclePhase: null,
     partnerNextPeriodDate: null,
@@ -168,7 +189,7 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
       [pair.id]
     ),
     query(
-      'SELECT id, last_lat, last_lng, location_sharing_enabled FROM users WHERE id = ANY($1::uuid[])',
+      'SELECT id, name, last_lat, last_lng, location_sharing_enabled FROM users WHERE id = ANY($1::uuid[])',
       [[req.userId, partnerId]]
     ),
     query('SELECT * FROM period_settings WHERE user_id = $1 AND sharing_enabled = TRUE', [partnerId]),
@@ -257,14 +278,20 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
 
   const me = locationRes.rows.find((r) => r.id === req.userId);
   const partner = locationRes.rows.find((r) => r.id === partnerId);
-  if (
-    me?.location_sharing_enabled &&
-    partner?.location_sharing_enabled &&
-    me.last_lat != null &&
-    partner.last_lat != null
-  ) {
+  if (!me?.location_sharing_enabled || !partner?.location_sharing_enabled) {
+    summary.distanceStatus = 'sharing_off';
+  } else if (me.last_lat == null || partner.last_lat == null) {
+    summary.distanceStatus = 'no_location';
+  } else {
+    summary.distanceStatus = 'ok';
     summary.distanceKm = Number(haversineKm(me.last_lat, me.last_lng, partner.last_lat, partner.last_lng).toFixed(1));
   }
+
+  const { rows: nickRows } = await query(
+    'SELECT nickname FROM pair_nicknames WHERE pair_id = $1 AND set_by_id = $2',
+    [pair.id, req.userId]
+  );
+  summary.partnerInitial = initialOf(nickRows[0]?.nickname || partner?.name);
 
   // Same privacy boundary as GET /period/partner (docs/SPEC.md #5): phase and
   // predicted date only, never raw flow/symptoms/mood/notes.

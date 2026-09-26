@@ -75,5 +75,21 @@ class WidgetBridgeModule(private val reactContext: ReactApplicationContext) :
     private fun refreshWidgets() {
         SummaryWidgetProvider.refreshAll(reactContext)
         PhotoWidgetProvider.refreshAll(reactContext)
+        // The glance widgets had a refreshAll that nothing called, so they
+        // only ever updated on the 30-minute timer or a tap. A distance widget
+        // that ignores the location the app just sent is showing the wrong
+        // number with confidence.
+        GlanceWidgetProvider.refreshAll(
+            reactContext,
+            listOf(
+                AnniversaryWidgetProvider::class.java,
+                DailyQuestionWidgetProvider::class.java,
+                NextDateWidgetProvider::class.java,
+                SecretMessageWidgetProvider::class.java,
+                KissWidgetProvider::class.java,
+                CanvasWidgetProvider::class.java,
+                DistanceWidgetProvider::class.java
+            )
+        )
     }
 }

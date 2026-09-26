@@ -47,6 +47,10 @@ object WidgetRepository {
         val countdownLabel: String?,
         val countdownDays: Int?,
         val distanceKm: Double?,
+        // Why there is no number: "ok", "sharing_off" or "no_location".
+        val distanceStatus: String?,
+        // The letter in the partner's bubble on the distance widget.
+        val partnerInitial: String?,
         val hasPhoto: Boolean,
         val partnerCyclePhase: String?,
         val partnerNextPeriodDate: String?,
@@ -340,6 +344,8 @@ object WidgetRepository {
             countdownLabel = countdown?.optString("label"),
             countdownDays = countdown?.optInt("daysRemaining"),
             distanceKm = if (json.isNull("distanceKm")) null else json.optDouble("distanceKm"),
+            distanceStatus = json.optStringOrNull("distanceStatus"),
+            partnerInitial = json.optStringOrNull("partnerInitial"),
             hasPhoto = !json.isNull("latestPhotoUrl"),
             partnerCyclePhase = if (json.isNull("partnerCyclePhase")) null else json.optString("partnerCyclePhase"),
             partnerNextPeriodDate = if (json.isNull("partnerNextPeriodDate")) null else json.optString("partnerNextPeriodDate"),

@@ -254,10 +254,17 @@ function DrawnMascot({ expression, colors, uid }) {
  * @param size      pixel size of the square it draws into.
  * @param animated  false pins it still (reduce motion, or a static header).
  */
-export default function Mascot({ mood, size = 96, animated = true, style }) {
+/*
+ * @param drawn     force the drawn face even when artwork exists. For a mood
+ *                  PICKER, where each swatch has to look different: there is
+ *                  only neutral art so far, so every mood falls back to the
+ *                  same photograph, and eleven identical photos cannot tell
+ *                  "tired" from "excited".
+ */
+export default function Mascot({ mood, size = 96, animated = true, style, drawn = false }) {
   const { colors, reduceMotion } = useTheme();
   const expression = EXPRESSIONS[mood] || EXPRESSIONS.neutral;
-  const art = artFor(mood);
+  const art = drawn ? null : artFor(mood);
   // Per-instance, because SVG gradient ids are document-global and the
   // loading screen draws two of these side by side.
   const uid = useRef(`m${Math.random().toString(36).slice(2, 8)}`).current;
@@ -290,7 +297,9 @@ export default function Mascot({ mood, size = 96, animated = true, style }) {
   return (
     <Animated.View
       pointerEvents="none"
-      style={[{ width: size, height: size, transform: [{ translateY }, { rotate }] }, style]}
+      // overflow hidden: a photograph has its own intrinsic size, and without
+      // a clip it can spill past the square it was given.
+      style={[{ width: size, height: size, overflow: 'hidden', transform: [{ translateY }, { rotate }] }, style]}
     >
       {art
         ? <Image source={art} style={StyleSheet.absoluteFill} resizeMode="contain" />

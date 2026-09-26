@@ -8,6 +8,7 @@
     android:targetCellHeight="3"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_canvas"
+    android:previewImage="@drawable/widget_preview_canvas"
     android:previewLayout="@layout/widget_canvas"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"

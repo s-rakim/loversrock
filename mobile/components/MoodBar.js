@@ -59,7 +59,12 @@ export default function MoodBar({ partnerName }) {
   const [draftNote, setDraftNote] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const who = partnerName || 'They';
+  // A name when there is one. Without one this used to fall back to 'They',
+  // used as if it were a name: "No mood from They yet", "They sees this".
+  // Two forms, because the fallback starts some sentences and sits inside
+  // others.
+  const Who = partnerName || 'Your partner';
+  const who = partnerName || 'your partner';
 
   async function choose(next) {
     setSaving(true);
@@ -94,14 +99,14 @@ export default function MoodBar({ partnerName }) {
           <Pressable onPress={nudges.markSeen} style={styles.kissBanner}>
             <Ionicons name="heart" size={13} color={colors.accentPink} />
             <Text style={styles.kissBannerText}>
-              {nudges.unseen === 1 ? `${who} kissed you` : `${nudges.unseen} kisses from ${who}`}
+              {nudges.unseen === 1 ? `${Who} kissed you` : `${nudges.unseen} kisses from ${who}`}
               {nudges.theirs ? ` · ${ago(nudges.theirs.created_at)}` : ''}
             </Text>
           </Pressable>
         )}
         {mood ? (
           <>
-            <Text style={font.h3}>{who} is feeling {LABELS[mood].toLowerCase()}</Text>
+            <Text style={font.h3}>{Who} is feeling {LABELS[mood].toLowerCase()}</Text>
             {note ? <Text style={[font.body, styles.note]}>“{note}”</Text> : null}
             <Text style={[font.muted, { fontSize: 11 }]}>{ago(updatedAt)}</Text>
           </>
@@ -182,7 +187,7 @@ export default function MoodBar({ partnerName }) {
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <Text style={font.h2}>How are you?</Text>
             <Text style={[font.muted, { marginTop: 2 }]}>
-              {who} sees this on their mascot.
+              {Who} sees this on your mascot.
             </Text>
 
             <TextInput
@@ -206,7 +211,7 @@ export default function MoodBar({ partnerName }) {
                     >
                       {/* The mascot itself is the swatch: you pick the face
                           you want them to see, not a word from a list. */}
-                      <Mascot mood={id} size={54} animated={false} />
+                      <Mascot mood={id} size={54} animated={false} drawn />
                       <Text style={[styles.cellLabel, active && { color: colors.accent, fontWeight: '700' }]}>
                         {LABELS[id]}
                       </Text>
@@ -270,8 +275,11 @@ const makeStyles = (colors) =>
       flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
       alignItems: 'center', justifyContent: 'center', padding: spacing.lg,
     },
+    // Opaque. colors.surface is a translucent card tint — 66% in dark mode —
+    // and a modal drawn in it let the whole Home screen show through, so the
+    // picker's grid sat on top of the Daily Prompt card behind it.
     sheet: {
-      width: '100%', backgroundColor: colors.surface, borderRadius: radius.card,
+      width: '100%', backgroundColor: colors.background, borderRadius: radius.card,
       padding: spacing.lg, borderWidth: 1, borderColor: colors.border,
     },
     noteInput: {

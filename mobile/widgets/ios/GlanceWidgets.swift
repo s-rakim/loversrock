@@ -456,3 +456,139 @@ struct CanvasWidget: Widget {
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
+
+
+// MARK: - Distance apart
+
+/// "1,305 km", not "1305.0 km": a decimal only while it still means something,
+/// and metres when you are practically in the same room.
+func lrFormatDistance(_ km: Double) -> String {
+    if km < 1 { return "\(Int(km * 1000)) m" }
+    if km < 10 { return String(format: "%.1f km", km) }
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.maximumFractionDigits = 0
+    let rounded = km.rounded()
+    return "\(formatter.string(from: NSNumber(value: rounded)) ?? String(Int(rounded))) km"
+}
+
+private struct DistanceDash: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        return path
+    }
+}
+
+private struct DistanceBubble: View {
+    let text: String
+    let size: CGFloat
+    var body: some View {
+        Text(text)
+            .font(.system(size: size * 0.36, weight: .bold))
+            .minimumScaleFactor(0.6)
+            .lineLimit(1)
+            .frame(width: size, height: size)
+            .background(Circle().fill(Color.primary.opacity(0.14)))
+            .overlay(Circle().stroke(Color.primary.opacity(0.35), lineWidth: 1))
+    }
+}
+
+/// Me ····♥···· M — you, them, and the line between.
+private struct DistanceLine: View {
+    let initial: String
+    let bubble: CGFloat
+    var heart: Color = .primary
+
+    var body: some View {
+        HStack(spacing: 4) {
+            DistanceBubble(text: "Me", size: bubble)
+            dash
+            Image(systemName: "heart.fill")
+                .font(.system(size: bubble * 0.45))
+                .foregroundColor(heart)
+            dash
+            DistanceBubble(text: initial, size: bubble)
+        }
+    }
+
+    private var dash: some View {
+        DistanceDash()
+            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+            .frame(height: 2)
+            .opacity(0.6)
+    }
+}
+
+struct DistanceView: View {
+    let entry: GlanceEntry
+    @Environment(\.widgetFamily) private var family
+
+    /// The number, or words somebody can act on — never a bare dash.
+    private var reading: (value: String, caption: String) {
+        let s = entry.summary
+        if let km = s.distanceKm { return (lrFormatDistance(km), "") }
+        switch s.distanceStatus {
+        case "sharing_off": return ("—", "Turn on location sharing, both of you")
+        case "no_location": return ("—", "Waiting for a location")
+        default: return ("—", "Open loversrock to refresh")
+        }
+    }
+
+    var body: some View {
+        let initial = entry.summary.partnerInitial ?? "♥"
+        if family == .accessoryRectangular {
+            // The lock-screen card this is modelled on. The system tints
+            // accessory widgets itself, so this sticks to .primary and lets
+            // it: a fixed colour here is ignored at best.
+            let ready = entry.signedIn && entry.summary.paired
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 3) {
+                    Text("Our Distance:").font(.system(size: 11))
+                    Text(ready ? reading.value : "—").font(.system(size: 12, weight: .bold))
+                }
+                DistanceLine(initial: initial, bubble: 22)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if let blocked = notReady(entry, "Our distance") {
+            blocked
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 4) {
+                    Text("Our distance:")
+                        .font(.system(size: 12))
+                        .foregroundColor(.glMuted)
+                    Text(reading.value)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.glText)
+                }
+                DistanceLine(initial: initial, bubble: 36, heart: .glAccent)
+                    .foregroundColor(.glText)
+                if !reading.caption.isEmpty {
+                    Text(reading.caption)
+                        .font(.system(size: 11))
+                        .foregroundColor(.glMuted)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(14)
+        }
+    }
+}
+
+struct DistanceWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "LoversRockDistance", provider: GlanceProvider()) { entry in
+            if #available(iOS 17.0, *) {
+                DistanceView(entry: entry).containerBackground(.background, for: .widget)
+            } else {
+                DistanceView(entry: entry)
+            }
+        }
+        .configurationDisplayName("Distance apart")
+        .description("How far apart you are, with the two of you either side of a heart.")
+        .supportedFamilies([.systemMedium, .accessoryRectangular])
+    }
+}

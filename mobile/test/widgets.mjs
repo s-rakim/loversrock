@@ -111,5 +111,65 @@ check('iOS announces a sealed note without a body',
   /sealedNoteWaiting == true/.test(swift) && /A sealed note is waiting/.test(swift));
 check('Android does the same', /sealedNoteWaiting == true/.test(kotlin) && /A sealed note is waiting/.test(kotlin));
 
+console.log('\n=== THE WIDGET PICKER SHOWS EACH WIDGET, NOT A ROBOT ===');
+// Every widget declared only previewLayout — Android 12+, and ignored even
+// there by some launchers (ColorOS). With no previewImage to fall back on, the
+// picker drew the stock Android robot for all nine and titled every one
+// "loversrock", so nobody could tell a kiss button from a calendar.
+{
+  const res = path.join(android, 'res');
+  const strings = fs.readFileSync(path.join(res, 'values', 'widget_colors.xml'), 'utf8');
+  const receivers = [...plugin.matchAll(/\{ name: '\.widgets\.(\w+)', info: '@xml\/(\w+)', label: '@string\/(\w+)' \}/g)];
+  check(`all ${providers.length} providers are registered with a name`, receivers.length === providers.length,
+    `${receivers.length} labelled receivers for ${providers.length} providers`);
+
+  for (const [, cls, info, label] of receivers) {
+    const xml = fs.readFileSync(path.join(res, 'xml', `${info}.xml`), 'utf8');
+    const preview = xml.match(/android:previewImage="@drawable\/(\w+)"/)?.[1];
+    const file = preview && ['drawable-nodpi', 'drawable'].map((d) => path.join(res, d, `${preview}.png`))
+      .find((f) => fs.existsSync(f));
+    check(`  ${cls} has a preview image that exists`, Boolean(file), preview || 'no previewImage');
+    // A PNG, not a stub: under a kilobyte would be an empty or failed render.
+    check(`  and it is a real picture`, file && fs.statSync(file).size > 1024, file && fs.statSync(file).size);
+    check(`  and a name the picker shows`, new RegExp(`<string name="${label}">[^<]+</string>`).test(strings), label);
+  }
+
+  // The previews are drawn in the widgets' own palette; a colour changed in
+  // one place and not the other would make the picker lie about the widget.
+  const gen = fs.readFileSync(path.join(android, 'tools', 'generate_previews.py'), 'utf8');
+  const hex = (name) => strings.match(new RegExp(`<color name="${name}">#FF([0-9A-F]{6})</color>`, 'i'))?.[1];
+  const rgb = (h) => [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)).join(', ');
+  for (const [py, name] of [['SURFACE', 'widget_surface'], ['BORDER', 'widget_border'],
+    ['TEXT', 'widget_text'], ['MUTED', 'widget_text_muted'], ['ACCENT', 'widget_accent']]) {
+    const want = hex(name) && rgb(hex(name));
+    check(`  preview ${py} matches ${name}`, gen.includes(`${py} = (${want})`), want);
+  }
+}
+
+console.log('\n=== THE DISTANCE WIDGET ===');
+{
+  const layout = fs.readFileSync(path.join(android, 'res', 'layout', 'widget_distance.xml'), 'utf8');
+  // The base class paints "set this up" and "pair first" into these slots
+  // before the widget's own paint() runs; without them the update crashes.
+  for (const id of ['widget_root', 'glance_label', 'glance_value', 'glance_caption', 'widget_refresh']) {
+    check(`  the layout carries @+id/${id} for the base class`, layout.includes(`@+id/${id}`));
+  }
+  check('it is drawn as Me ··· heart ··· them', /distance_me/.test(layout) && /distance_them/.test(layout)
+    && /widget_kiss_icon/.test(layout) && (layout.match(/widget_distance_dash/g) || []).length === 2);
+  // RemoteViews cannot inflate a plain View at all, only a short allowlist.
+  check('and uses no view class RemoteViews refuses', !/<View\b/.test(layout));
+  check('its caption says what to do when there is no number',
+    /Turn on location sharing/.test(kotlin) && /Waiting for a location/.test(kotlin));
+  check('iOS has it too, on the lock screen as well as the home screen',
+    /struct DistanceWidget: Widget/.test(swift) && /DistanceWidget\(\)/.test(bundle)
+    && /\.accessoryRectangular/.test(swift.slice(swift.indexOf('struct DistanceWidget'))));
+  // Nothing called GlanceWidgetProvider.refreshAll, so these only updated on
+  // the 30-minute timer — a distance widget that ignores the location the app
+  // just sent shows the wrong number with confidence.
+  const bridge = fs.readFileSync(path.join(android, 'WidgetBridgeModule.kt'), 'utf8');
+  check('the glance widgets refresh when the app pushes new data',
+    /GlanceWidgetProvider\.refreshAll/.test(bridge) && /DistanceWidgetProvider::class\.java/.test(bridge));
+}
+
 console.log(`\nWIDGET WIRING RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wide and short, like the lock-screen card it is modelled on. The
+     30-minute floor on updatePeriodMillis is the framework's; the widget
+     also refreshes whenever the app sends a new location. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="80dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_distance"
+    android:previewImage="@drawable/widget_preview_distance"
+    android:previewLayout="@layout/widget_distance"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen|keyguard"
+    android:description="@string/widget_distance_description" />

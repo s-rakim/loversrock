@@ -70,6 +70,28 @@ check('SOONEST countdown chosen, not just any', s.data.nextCountdown?.label === 
 check('countdown days remaining computed', s.data.nextCountdown?.daysRemaining === 10, s.data.nextCountdown);
 check('latest partner photo surfaced', typeof s.data.latestPhotoUrl === 'string' && s.data.latestPhotoUrl.length > 0);
 check('distance apart surfaced (London->Paris ~343km)', Math.abs(s.data.distanceKm - 343) < 5, s.data.distanceKm);
+
+// ---- The distance widget: the partner's bubble, and why there is no number.
+check('distance widget knows the number is real', s.data.distanceStatus === 'ok', s.data.distanceStatus);
+check('the partner bubble takes the initial of their name', s.data.partnerInitial === 'W', s.data.partnerInitial);
+
+// A nickname is how you think of them, so it wins over their own name — and a
+// leading emoji is skipped, because a bubble holding a butterfly reads as
+// decoration rather than as a person.
+await req('/profile/nickname', { method: 'PUT', token: A.token, body: { nickname: '✨🦋ma cherie' } });
+const nick = await req('/widget/summary', { widgetToken: WT });
+check('the nickname you gave them wins, skipping emoji to its first letter',
+  nick.data.partnerInitial === 'M', nick.data.partnerInitial);
+await req('/profile/nickname', { method: 'DELETE', token: A.token });
+
+// Sharing off on EITHER side means no number, and the widget says which fix
+// applies instead of showing a bare dash.
+await req('/location/enable', { method: 'POST', token: B.token, body: { enabled: false } });
+const off = await req('/widget/summary', { widgetToken: WT });
+check('with their sharing off there is no distance', off.data.distanceKm === null, off.data.distanceKm);
+check('and the widget is told why', off.data.distanceStatus === 'sharing_off', off.data.distanceStatus);
+await req('/location/enable', { method: 'POST', token: B.token, body: { enabled: true } });
+await req('/location/update', { method: 'POST', token: B.token, body: { lat: 48.8566, lng: 2.3522 } });
 check('updatedAt stamped so widgets can show staleness', !Number.isNaN(new Date(s.data.updatedAt).getTime()));
 
 console.log('\n=== PARTNER CYCLE PRIVACY IN THE WIDGET ===');

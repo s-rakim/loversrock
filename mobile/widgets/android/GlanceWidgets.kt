@@ -273,3 +273,58 @@ class CanvasWidgetProvider : GlanceWidgetProvider() {
         views.setTextViewText(R.id.glance_caption, ago(data?.latestDrawingAt) ?: "")
     }
 }
+
+
+/**
+ * How far apart you are, drawn the way people already draw it: you on one
+ * side, them on the other, a heart on the dotted line between.
+ *
+ * The number is the whole point, so it gets the label's line rather than a
+ * caption. When there is no number the caption says why in words somebody
+ * can act on — "turn on location sharing" is a thing to do, a dash is not.
+ */
+class DistanceWidgetProvider : GlanceWidgetProvider() {
+    override val layoutId = R.layout.widget_distance
+    override val refreshAction = "com.loversrock.app.widgets.REFRESH_DISTANCE"
+
+    override fun paint(context: Context, views: RemoteViews, data: WidgetRepository.Summary?) {
+        // Their initial, or a heart when there is no name to take one from —
+        // never a blank circle, which reads as something failed to load.
+        views.setTextViewText(R.id.distance_them, data?.partnerInitial ?: "\u2665")
+
+        val km = data?.distanceKm
+        if (km == null) {
+            views.setTextViewText(R.id.glance_value, "\u2014")
+            views.setTextViewText(
+                R.id.glance_caption,
+                when (data?.distanceStatus) {
+                    "sharing_off" -> "Turn on location sharing, both of you"
+                    "no_location" -> "Waiting for a location"
+                    else -> "Tap to refresh"
+                }
+            )
+            return
+        }
+
+        views.setTextViewText(R.id.glance_value, formatDistance(km))
+        views.setTextViewText(
+            R.id.glance_caption,
+            if (data.stale) "Last known distance" else ""
+        )
+    }
+
+    override fun onClickExtras(context: Context, views: RemoteViews, widgetId: Int) {
+        views.setOnClickPendingIntent(R.id.widget_refresh, refreshIntent(context))
+    }
+}
+
+/**
+ * Kilometres the way you would say them: "1,305 km" rather than "1305.0 km",
+ * one decimal only while it is small enough for the decimal to mean
+ * something, and metres when you are practically in the same room.
+ */
+internal fun formatDistance(km: Double): String = when {
+    km < 1.0 -> "${(km * 1000).toInt()} m"
+    km < 10.0 -> String.format(java.util.Locale.getDefault(), "%.1f km", km)
+    else -> String.format(java.util.Locale.getDefault(), "%,d km", Math.round(km))
+}

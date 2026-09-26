@@ -15,4 +15,17 @@
     <string name="widget_secret_description">A note from them — sealed ones stay sealed</string>
     <string name="widget_kiss_description">One tap to tell them you are thinking of them</string>
     <string name="widget_canvas_description">The newest drawing from the two of you</string>
+    <string name="widget_distance_description">How far apart you are, with the two of you either side of a heart</string>
+
+    <!-- The name the widget picker shows. Without these every widget was
+         titled just "loversrock", told apart only by the small print. -->
+    <string name="widget_summary_label">Us at a glance</string>
+    <string name="widget_photo_label">Their photo</string>
+    <string name="widget_anniversary_label">Together</string>
+    <string name="widget_question_label">Today\'s question</string>
+    <string name="widget_nextdate_label">Next date</string>
+    <string name="widget_secret_label">Secret note</string>
+    <string name="widget_kiss_label">Send a kiss</string>
+    <string name="widget_canvas_label">Latest drawing</string>
+    <string name="widget_distance_label">Distance apart</string>
 </resources>

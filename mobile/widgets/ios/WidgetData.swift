@@ -8,6 +8,10 @@ struct WidgetSummary: Codable {
     let promptAnsweredToday: Bool
     let nextCountdown: Countdown?
     let distanceKm: Double?
+    /// Why there is no number: "ok", "sharing_off" or "no_location".
+    let distanceStatus: String?
+    /// The letter in the partner's bubble on the distance widget.
+    let partnerInitial: String?
     let latestPhotoUrl: String?
     let partnerCyclePhase: String?
     let partnerNextPeriodDate: String?
@@ -45,6 +49,8 @@ struct WidgetSummary: Codable {
         promptAnsweredToday: false,
         nextCountdown: Countdown(label: "Anniversary", daysRemaining: 24),
         distanceKm: 8.2,
+        distanceStatus: "ok",
+        partnerInitial: "M",
         latestPhotoUrl: nil,
         partnerCyclePhase: "luteal",
         partnerNextPeriodDate: nil,
@@ -65,7 +71,8 @@ struct WidgetSummary: Codable {
 
     static let signedOut = WidgetSummary(
         paired: false, streakCount: 0, promptAnsweredToday: false, nextCountdown: nil,
-        distanceKm: nil, latestPhotoUrl: nil, partnerCyclePhase: nil, partnerNextPeriodDate: nil,
+        distanceKm: nil, distanceStatus: nil, partnerInitial: nil,
+        latestPhotoUrl: nil, partnerCyclePhase: nil, partnerNextPeriodDate: nil,
         daysTogether: nil, togetherSince: nil, partnerMood: nil, partnerMoodNote: nil,
         todaysQuestion: nil, nextDate: nil, sealedNoteWaiting: nil, latestNote: nil,
         unseenKisses: nil, lastKissFromPartnerAt: nil, lastKissSentAt: nil,

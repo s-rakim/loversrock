@@ -609,5 +609,23 @@ for (const { name, items } of sectionSets) {
     JSON.stringify(Object.keys(receivedProps || {})));
 }
 
+console.log('\n=== THE MOOD PICKER ===');
+{
+  const bar = fs.readFileSync(path.join(root, 'components', 'MoodBar.js'), 'utf8');
+  const mascot = fs.readFileSync(path.join(root, 'components', 'Mascot.js'), 'utf8');
+  // Every swatch showed the same photograph — there is only neutral art so
+  // far — so eleven moods looked identical, and it was their face while you
+  // picked yours.
+  check('the swatches are drawn faces, which differ by mood',
+    /<Mascot mood=\{id\} size=\{54\} animated=\{false\} drawn \/>/.test(bar));
+  check('and Mascot can be asked for one', /drawn = false/.test(mascot) && /drawn \? null : artFor/.test(mascot));
+  check('a photograph cannot spill past its square', /overflow: 'hidden'/.test(mascot));
+  // colors.surface is a translucent card tint; the Home screen showed through.
+  check('the sheet is opaque', /sheet: \{[^}]*backgroundColor: colors\.background/.test(bar));
+  // 'They' was being used as a name: "No mood from They yet", "They sees this".
+  check('"They" is never used as a name', !/\|\| 'They'/.test(bar) && !/\{who\} sees/.test(bar));
+  check('and the picker says whose mascot it is', /sees this on your mascot/.test(bar));
+}
+
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
