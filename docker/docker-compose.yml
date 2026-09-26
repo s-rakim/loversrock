@@ -83,7 +83,11 @@ services:
     # `&&`, not `;`: if the migration fails the server must NOT start on a
     # half-applied schema. The container exits instead, restart policy retries,
     # and the error is the first thing in `docker compose logs backend`.
-    command: sh -c "node src/config/migrate.js && node src/server.js"
+    # Then the reference lists (games, decks, challenges...) are brought up to
+    # date — see `--startup` in seed/run-seed.js. A seed failure is logged
+    # but does not stop the server: an app with an old games list beats no
+    # app at all.
+    command: sh -c "node src/config/migrate.js && (node seed/run-seed.js --startup || echo '[seed] failed - starting anyway') && node src/server.js"
     env_file:
       - ../backend/.env
     environment:

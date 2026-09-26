@@ -41,6 +41,7 @@ export default function GamesScreen({ navigation }) {
   const [matches, setMatches] = useState([]);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     const [cat, live] = await Promise.allSettled([
@@ -52,6 +53,7 @@ export default function GamesScreen({ navigation }) {
     setMatches(live.status === 'fulfilled' ? live.value.games || [] : []);
     setError(cat.status === 'rejected' ? cat.reason?.message : null);
     setRefreshing(false);
+    setLoaded(true);
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -78,6 +80,15 @@ export default function GamesScreen({ navigation }) {
       >
         <Text style={font.h1}>Arcade</Text>
         {error && <Text style={[font.muted, { marginTop: spacing.xs }]}>{error}</Text>}
+        {/* An empty list with no error means the server answered but its
+            games list was never filled — it used to be a blank page. The
+            backend now fills it on every start; this says so if it did not. */}
+        {loaded && !error && catalog.length === 0 && (
+          <Text style={[font.muted, { marginTop: spacing.sm }]}>
+            No games yet: the server's game list is empty. Restarting the backend fills it
+            (docker compose up -d --build), then pull down here to refresh.
+          </Text>
+        )}
 
         {withRecord.length > 0 && (
           <>

@@ -160,9 +160,33 @@ async function seedGamesCatalog() {
   console.log(`[seed] games_catalog: ${games.length} games`);
 }
 
+/** True when a table has no rows at all — a fresh database. */
+async function isEmpty(table) {
+  const { rows } = await query(`SELECT NOT EXISTS (SELECT 1 FROM ${table}) AS empty`);
+  return rows[0].empty;
+}
+
+/**
+ * `--startup`: what the backend container runs on every start, after the
+ * migration and before the server.
+ *
+ * The reference lists — games, question decks, follow-ups, challenges, date
+ * ideas — are the app's own catalogue, not anybody's data. Every one of them
+ * is an upsert or a skip-if-present, so they are brought up to date on every
+ * start: a game added to games_catalog.json appears after a rebuild with
+ * nothing to remember. Before this, the arcade stayed empty on any server
+ * where `npm run seed` had not been run by hand since the games list last
+ * changed.
+ *
+ * Daily prompts and quiz days are different: they are dated relative to
+ * TODAY, so re-running them on every restart would keep laying the same
+ * content onto new dates. They are only filled into an empty database.
+ */
 async function run() {
-  await seedDailyPrompts();
-  await seedQuizQuestions();
+  const startup = process.argv.includes('--startup');
+
+  if (!startup || await isEmpty('daily_prompts')) await seedDailyPrompts();
+  if (!startup || await isEmpty('quiz_questions')) await seedQuizQuestions();
   await seedDateIdeas();
   await seedQuestionDecks();
   await seedFollowUps();
