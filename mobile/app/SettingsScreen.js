@@ -31,7 +31,8 @@ export default function SettingsScreen() {
   const {
     colors, font, preference, setPreference, motionPreference, setMotionPreference, reduceMotion,
     accentName, setAccent, backgroundIntensity, setBackgroundIntensity,
-    backgroundSpeed, setBackgroundSpeed, textScale, setTextScale,
+    backgroundSpeed, setBackgroundSpeed, backgroundDefinition, setBackgroundDefinition,
+    textScale, setTextScale,
     customAccent, setCustomAccent, blobPalette, setBlobPalette, isDark,
   } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -269,6 +270,28 @@ export default function SettingsScreen() {
           <Text style={[font.muted, { marginTop: 2, fontSize: 11 }]}>
             Turns down, not up — full strength is what the text colours are
             measured against.
+          </Text>
+
+          {/* The other half of "how strong is the background": strength is
+              how much of it you see, this is where it stops. */}
+          <Text style={[font.body, { marginTop: spacing.md }]}>Edges</Text>
+          <Slider
+            minimumValue={0}
+            maximumValue={1}
+            step={0.05}
+            value={backgroundDefinition}
+            onValueChange={setBackgroundDefinition}
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.accent}
+          />
+          <View style={styles.sliderEnds}>
+            <Text style={[font.muted, { fontSize: 11 }]}>Blurred</Text>
+            <Text style={[font.muted, { fontSize: 11 }]}>Defined</Text>
+          </View>
+          <Text style={[font.muted, { marginTop: 2, fontSize: 11 }]}>
+            Where each blob stops. Left is smoke; right is lava with an actual
+            edge to it.
           </Text>
 
           <Text style={[font.body, { marginTop: spacing.md }]}>Drift</Text>
@@ -555,6 +578,7 @@ const makeStyles = (colors) =>
     marginTop: spacing.lg, marginBottom: spacing.md,
   },
   swatchLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 4 },
+  sliderEnds: { flexDirection: 'row', justifyContent: 'space-between' },
   segmentRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   segment: {
     alignItems: 'center', justifyContent: 'center',

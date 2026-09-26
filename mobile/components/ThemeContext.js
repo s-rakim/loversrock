@@ -5,6 +5,7 @@ import {
   lightColors, darkColors, makeFont, gradientForCategory,
   ACCENTS, ACCENT_NAMES, DEFAULT_ACCENT, withAccent,
   BACKGROUND_SPEEDS, MIN_BACKGROUND_INTENSITY, MAX_BACKGROUND_INTENSITY,
+  MIN_BACKGROUND_DEFINITION, MAX_BACKGROUND_DEFINITION, DEFAULT_BACKGROUND_DEFINITION,
   BLOB_PALETTES, BLOB_PALETTE_NAMES, DEFAULT_BLOB_PALETTE, withBlobs,
   withCustomAccent, isHexColor,
 } from '../theme';
@@ -15,6 +16,7 @@ const MOTION_KEY = 'loversrock_reduce_motion';
 const ACCENT_KEY = 'loversrock_accent';
 const BG_INTENSITY_KEY = 'loversrock_background_intensity';
 const BG_SPEED_KEY = 'loversrock_background_speed';
+const BG_DEFINITION_KEY = 'loversrock_background_definition';
 const TEXT_SCALE_KEY = 'loversrock_text_scale';
 const CUSTOM_ACCENT_KEY = 'loversrock_custom_accent';
 const BLOB_PALETTE_KEY = 'loversrock_blob_palette';
@@ -44,6 +46,15 @@ const ThemeContext = createContext(null);
 const clampIntensity = (value) =>
   Math.min(MAX_BACKGROUND_INTENSITY, Math.max(MIN_BACKGROUND_INTENSITY, Number(value) || 1));
 
+// Not `|| DEFAULT`: 0 is a legitimate definition — it is the softest end of
+// the slider — and `0 || x` is x, which would have made the bottom of the
+// range silently snap back to the default.
+const clampDefinition = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_BACKGROUND_DEFINITION;
+  return Math.min(MAX_BACKGROUND_DEFINITION, Math.max(MIN_BACKGROUND_DEFINITION, n));
+};
+
 export function ThemeProvider({ children }) {
   const [preference, setPreferenceState] = useState('system');
   const [systemScheme, setSystemScheme] = useState(() => Appearance.getColorScheme() || 'light');
@@ -54,6 +65,7 @@ export function ThemeProvider({ children }) {
   const [accentName, setAccentState] = useState(DEFAULT_ACCENT);
   const [backgroundIntensity, setBackgroundIntensityState] = useState(1);
   const [backgroundSpeed, setBackgroundSpeedState] = useState('gentle');
+  const [backgroundDefinition, setBackgroundDefinitionState] = useState(DEFAULT_BACKGROUND_DEFINITION);
   const [textScale, setTextScaleState] = useState('default');
   // A free-form hex overrides the named preset when set. Null means "use the
   // preset", which is why it is not simply another entry in ACCENTS.
@@ -75,8 +87,8 @@ export function ThemeProvider({ children }) {
         if (!cancelled && ['system', 'on', 'off'].includes(saved)) setMotionPreferenceState(saved);
       })
       .catch(() => {});
-    AsyncStorage.multiGet([ACCENT_KEY, BG_INTENSITY_KEY, BG_SPEED_KEY, TEXT_SCALE_KEY,
-      CUSTOM_ACCENT_KEY, BLOB_PALETTE_KEY])
+    AsyncStorage.multiGet([ACCENT_KEY, BG_INTENSITY_KEY, BG_SPEED_KEY, BG_DEFINITION_KEY,
+      TEXT_SCALE_KEY, CUSTOM_ACCENT_KEY, BLOB_PALETTE_KEY])
       .then((entries) => {
         if (cancelled) return;
         const saved = Object.fromEntries(entries);
@@ -84,6 +96,8 @@ export function ThemeProvider({ children }) {
         const intensity = Number(saved[BG_INTENSITY_KEY]);
         if (Number.isFinite(intensity)) setBackgroundIntensityState(clampIntensity(intensity));
         if (saved[BG_SPEED_KEY] in BACKGROUND_SPEEDS) setBackgroundSpeedState(saved[BG_SPEED_KEY]);
+        const definition = Number(saved[BG_DEFINITION_KEY]);
+        if (Number.isFinite(definition)) setBackgroundDefinitionState(clampDefinition(definition));
         if (TEXT_SCALES.some((t) => t.id === saved[TEXT_SCALE_KEY])) setTextScaleState(saved[TEXT_SCALE_KEY]);
         if (isHexColor(saved[CUSTOM_ACCENT_KEY])) setCustomAccentState(saved[CUSTOM_ACCENT_KEY]);
         if (BLOB_PALETTE_NAMES.includes(saved[BLOB_PALETTE_KEY])) setBlobPaletteState(saved[BLOB_PALETTE_KEY]);
@@ -144,6 +158,20 @@ export function ThemeProvider({ children }) {
   }, []);
 
   useEffect(() => () => clearTimeout(intensityWrite.current), []);
+
+  // Same debounce as the intensity slider, for the same reason: dragging a
+  // slider fires on every pixel, and each one of those is a disk write.
+  const definitionWrite = useRef(null);
+  const setBackgroundDefinition = useCallback((next) => {
+    const value = clampDefinition(next);
+    setBackgroundDefinitionState(value);
+    clearTimeout(definitionWrite.current);
+    definitionWrite.current = setTimeout(() => {
+      AsyncStorage.setItem(BG_DEFINITION_KEY, String(value)).catch(() => { /* session-only */ });
+    }, 400);
+  }, []);
+
+  useEffect(() => () => clearTimeout(definitionWrite.current), []);
 
   /** Pass a hex to pin a custom accent, or null to fall back to the preset. */
   const setCustomAccent = useCallback(async (next) => {
@@ -218,6 +246,8 @@ export function ThemeProvider({ children }) {
       setBackgroundIntensity,
       backgroundSpeed,
       setBackgroundSpeed,
+      backgroundDefinition,
+      setBackgroundDefinition,
       textScale,
       setTextScale,
       // Exposed so a screen sizing its own one-off text can keep its leading
@@ -240,7 +270,8 @@ export function ThemeProvider({ children }) {
     };
   }, [isDark, scheme, preference, setPreference, reduceMotion, motionPreference, setMotionPreference,
     hydrated, fontScale, accentName, setAccent, backgroundIntensity, setBackgroundIntensity,
-    backgroundSpeed, setBackgroundSpeed, textScale, setTextScale,
+    backgroundSpeed, setBackgroundSpeed, backgroundDefinition, setBackgroundDefinition,
+    textScale, setTextScale,
     customAccent, setCustomAccent, blobPalette, setBlobPalette]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

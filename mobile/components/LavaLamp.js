@@ -3,7 +3,8 @@ import { Animated, AppState, Easing, StyleSheet, useWindowDimensions, View } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { useTheme } from './ThemeContext';
-import { BACKGROUND_SPEEDS } from '../theme';
+import { BACKGROUND_SPEEDS, blobStops } from '../theme';
+import useGravity, { UP_DEFAULT } from './useGravity';
 
 /**
  * The animated background that sits behind every screen.
@@ -44,7 +45,7 @@ const STARS = [
   [0.95, 0.58, 0.9], [0.04, 0.62, 1.2], [0.47, 0.55, 0.8],
 ];
 
-function Blob({ spec, colour, opacity, diameter, width, height, animate, speedFactor }) {
+function Blob({ spec, colour, opacity, diameter, width, height, animate, speedFactor, stops, up }) {
   // One driver per blob, looping 0 -> 1 -> 0. Interpolating it onto both axes
   // with different ranges traces an ellipse rather than a straight line.
   const progress = useRef(new Animated.Value(0)).current;
@@ -81,13 +82,28 @@ function Blob({ spec, colour, opacity, diameter, width, height, animate, speedFa
     return () => loop.stop();
   }, [animate, progress, spec.period, speedFactor]);
 
+  // Travel is expressed against GRAVITY rather than against the screen.
+  //
+  // `up` is real-world up in screen coordinates; the perpendicular of it is
+  // the sideways wander. A blob's long axis of travel is the rise, and its
+  // short one the drift across, so turning the phone turns the whole field
+  // with it instead of leaving the lava running sideways.
+  //
+  // Held upright this reduces exactly to what it replaced: up is (0, -1), the
+  // perpendicular is (1, 0), and the ranges come out as the old
+  // driftX-across, driftY-up pair.
+  const perp = { x: -up.y, y: up.x };
+  const span = Math.max(width, height) * 0.5;
+  const vecX = (up.x * spec.driftY + perp.x * spec.driftX) * span;
+  const vecY = (up.y * spec.driftY + perp.y * spec.driftX) * span;
+
   const translateX = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [-spec.driftX * width * 0.5, spec.driftX * width * 0.5],
+    outputRange: [-vecX, vecX],
   });
   const translateY = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: [spec.driftY * height * 0.5, -spec.driftY * height * 0.5],
+    outputRange: [-vecY, vecY],
   });
 
   const id = `blob-${spec.x}-${spec.y}`;
@@ -108,9 +124,15 @@ function Blob({ spec, colour, opacity, diameter, width, height, animate, speedFa
         <Defs>
           {/* Opaque core fading to fully transparent gives the soft edge that
               a Gaussian blur would otherwise provide. */}
+          {/* Where the colour stops is the whole look, and it is now a
+              setting rather than three hardcoded numbers. Low definition
+              starts fading almost at once and reads as smoke; high holds
+              full strength nearly to the rim and reads as an actual blob.
+              The outermost stop is always transparent — a hard cut at 100%
+              has nothing to anti-alias against and shimmers as it moves. */}
           <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor={colour} stopOpacity={opacity} />
-            <Stop offset="55%" stopColor={colour} stopOpacity={opacity * 0.55} />
+            <Stop offset={`${stops.core}%`} stopColor={colour} stopOpacity={opacity} />
+            <Stop offset={`${stops.mid}%`} stopColor={colour} stopOpacity={opacity * stops.midAlpha} />
             <Stop offset="100%" stopColor={colour} stopOpacity={0} />
           </RadialGradient>
         </Defs>
@@ -121,7 +143,9 @@ function Blob({ spec, colour, opacity, diameter, width, height, animate, speedFa
 }
 
 export default function LavaLamp() {
-  const { colors, isDark, reduceMotion, backgroundIntensity, backgroundSpeed } = useTheme();
+  const {
+    colors, isDark, reduceMotion, backgroundIntensity, backgroundSpeed, backgroundDefinition,
+  } = useTheme();
   const { width, height } = useWindowDimensions();
   // Anything that is not explicitly backgrounded counts as active.
   //
@@ -143,6 +167,16 @@ export default function LavaLamp() {
   }, []);
 
   const animate = active && !reduceMotion;
+
+  // Which way the lava rises. Not polled while the field is not animating:
+  // a sensor running behind a still background is battery for nothing, and
+  // somebody who asked the OS for less movement did not ask for a background
+  // that swings when they turn over in bed.
+  const up = useGravity(animate);
+
+  // Recomputed only when the setting moves, not per blob per frame.
+  const stops = useMemo(() => blobStops(backgroundDefinition), [backgroundDefinition]);
+
   const base = Math.max(width, height);
 
   // Only ever dims. The palette's blobOpacity is the value every contrast
@@ -180,6 +214,8 @@ export default function LavaLamp() {
           height={height}
           animate={animate}
           speedFactor={speedFactor}
+          stops={stops}
+          up={animate ? up : UP_DEFAULT}
         />
       ))}
     </View>

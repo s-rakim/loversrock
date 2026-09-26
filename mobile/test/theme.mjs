@@ -24,6 +24,7 @@ const {
   lightColors, darkColors, makeFont, lineHeightFor, radius, spacing,
   ACCENT_NAMES, withAccent, MIN_BACKGROUND_INTENSITY, MAX_BACKGROUND_INTENSITY,
   BLOB_PALETTE_NAMES, withBlobs, withCustomAccent, hslToHex, glyphForAccent,
+  blobStops,
 } = module_.exports;
 
 // ---------- colour maths ----------
@@ -403,6 +404,104 @@ check('reduce motion is honoured', /reduceMotion/.test(lava));
 
 const ctx = fs.readFileSync(path.join(root, 'components', 'ThemeContext.js'), 'utf8');
 check('reduce motion follows the OS setting', /AccessibilityInfo/.test(ctx));
+
+console.log('\n=== THE BLOB EDGE IS A SETTING, NOT A HARDCODED OPINION ===');
+// The stops used to be 0/55/100% in the component, which is one person's view
+// of how blurry a lava lamp should be, with no way to disagree.
+{
+  const soft = blobStops(0);
+  const hard = blobStops(1);
+
+  check('the softest setting starts fading almost at once', soft.core === 0, soft);
+  check('and the hardest holds colour nearly to the rim', hard.core >= 70, hard);
+  check('the mid stop moves outward with it', hard.mid > soft.mid, { soft, hard });
+  check('and gets more opaque, so the edge is an edge rather than a later gradient',
+    hard.midAlpha > soft.midAlpha, { soft: soft.midAlpha, hard: hard.midAlpha });
+
+  // Monotonic, or dragging the slider would move the edge backwards somewhere
+  // in the middle.
+  let monotonic = true;
+  let previous = blobStops(0);
+  for (let d = 0.05; d <= 1.0001; d += 0.05) {
+    const here = blobStops(d);
+    if (here.core < previous.core || here.mid < previous.mid) monotonic = false;
+    previous = here;
+  }
+  check('every step of the slider moves the edge outward', monotonic);
+
+  // The rim must stay transparent at every setting: a circle this large with
+  // a hard cut at 100% has nothing to anti-alias against and shimmers while
+  // it drifts.
+  let inside = true;
+  for (let d = 0; d <= 1.0001; d += 0.1) {
+    const here = blobStops(d);
+    if (here.mid >= 100 || here.core >= here.mid) inside = false;
+  }
+  check('and the outermost stop always stays inside the rim', inside);
+
+  // 0 is a real value, not a missing one. `Number(0) || default` is the
+  // default, which would have made the bottom of the slider snap back.
+  check('zero is honoured rather than treated as unset',
+    blobStops(0).core === 0 && blobStops(undefined).core > 0,
+    { zero: blobStops(0), unset: blobStops(undefined) });
+  check('and nonsense falls back instead of producing NaN',
+    Number.isFinite(blobStops('nope').core), blobStops('nope'));
+}
+
+console.log('\n=== AND THE LAVA RISES AGAINST GRAVITY, NOT THE SCREEN ===');
+{
+  const lamp = fs.readFileSync(path.join(root, 'components', 'LavaLamp.js'), 'utf8');
+  const hook = fs.readFileSync(path.join(root, 'components', 'useGravity.js'), 'utf8');
+
+  check('the field is oriented by a gravity reading', /useGravity\(/.test(lamp));
+  check('travel is built from that direction and its perpendicular',
+    /perp = \{ x: -up\.y, y: up\.x \}/.test(lamp), lamp.match(/const perp = [^;]*/)?.[0]);
+
+  // Reducing to the old behaviour when upright is what makes this a
+  // generalisation rather than a rewrite: up is (0,-1), perpendicular is
+  // (1,0), so the ranges come out as the old across/up pair.
+  const up = { x: 0, y: -1 };
+  const perp = { x: -up.y, y: up.x };
+  const spec = { driftX: 0.18, driftY: 0.1 };
+  const span = 100;
+  const vecX = (up.x * spec.driftY + perp.x * spec.driftX) * span;
+  const vecY = (up.y * spec.driftY + perp.y * spec.driftX) * span;
+  check('held upright it reduces to the plain vertical field',
+    Math.abs(vecX - spec.driftX * span) < 1e-9 && Math.abs(vecY + spec.driftY * span) < 1e-9,
+    { vecX, vecY });
+
+  // Turned on its side, the rise has to follow.
+  const side = { x: -1, y: 0 };
+  const sidePerp = { x: -side.y, y: side.x };
+  const sideX = (side.x * spec.driftY + sidePerp.x * spec.driftX) * span;
+  const sideY = (side.y * spec.driftY + sidePerp.y * spec.driftX) * span;
+  // up = (-1, 0) puts real-up at screen-left, so the RISE lands on x and the
+  // sideways wander lands on y — the axes swap, which is the whole point.
+  check('turned sideways the rise turns with it',
+    Math.abs(sideX + spec.driftY * span) < 1e-9 && Math.abs(sideY + spec.driftX * span) < 1e-9,
+    { sideX, sideY, expected: { x: -spec.driftY * span, y: -spec.driftX * span } });
+
+  check('the sensor is off while the background is still',
+    /useGravity\(animate\)/.test(lamp));
+  check('lying flat holds the last direction rather than spinning',
+    /magnitude < 0\.15/.test(hook));
+  check('and the reading is smoothed and quantised, not fed in raw',
+    /SMOOTHING/.test(hook) && /THRESHOLD/.test(hook));
+  check('the sensor is required, not imported, so a build without it still starts',
+    /require\('expo-sensors'\)/.test(hook));
+}
+
+console.log('\n=== AND BOTH ARE REACHABLE FROM SETTINGS ===');
+{
+  const settings = fs.readFileSync(path.join(root, 'app', 'SettingsScreen.js'), 'utf8');
+  check('there is a slider for the edge', /setBackgroundDefinition/.test(settings));
+  check('labelled at both ends, so it says what it does',
+    /Blurred/.test(settings) && /Defined/.test(settings));
+  const ctx = fs.readFileSync(path.join(root, 'components', 'ThemeContext.js'), 'utf8');
+  check('the choice is remembered', /BG_DEFINITION_KEY/.test(ctx));
+  check('and the write is debounced like the other slider',
+    /definitionWrite/.test(ctx));
+}
 
 console.log(`\nTHEME RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

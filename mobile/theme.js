@@ -281,6 +281,50 @@ export const BACKGROUND_SPEEDS = {
 export const MIN_BACKGROUND_INTENSITY = 0.3;
 export const MAX_BACKGROUND_INTENSITY = 1;
 
+/**
+ * How hard-edged the blobs are, 0 to 1.
+ *
+ * Two different knobs that both sound like "how strong is the background":
+ * INTENSITY is how much of it you see, DEFINITION is where it stops. A blob
+ * is a radial gradient from an opaque middle to a transparent rim, and moving
+ * where that falloff begins is the whole effect — at 0 the colour starts
+ * fading almost immediately and the field reads as smoke, at 1 it holds full
+ * strength nearly to the edge and reads as a lamp with actual blobs in it.
+ *
+ * It exists because this was the one thing about the background nobody could
+ * change: the stops were hardcoded at 0/55/100%, which is one designer's
+ * opinion about how blurry a lava lamp should be.
+ */
+export const MIN_BACKGROUND_DEFINITION = 0;
+export const MAX_BACKGROUND_DEFINITION = 1;
+export const DEFAULT_BACKGROUND_DEFINITION = 0.25;
+
+/**
+ * The gradient stops for a blob at a given definition.
+ *
+ * Returns the two inner offsets as percentages; the rim is always fully
+ * transparent at 100%, which is what gives the soft edge in the first place.
+ * Kept here rather than in the component so the numbers can be tested without
+ * rendering anything.
+ *
+ * At 0:  core 0%, mid 40% — a wide, early falloff. Smoke.
+ * At 1:  core 78%, mid 94% — colour to the brim, then a short hard rim. A
+ *        real edge, but never a jagged one: SVG has no anti-aliasing to spare
+ *        on a circle this large, and a stop at exactly 100% shimmers as it
+ *        moves.
+ */
+export function blobStops(definition = DEFAULT_BACKGROUND_DEFINITION) {
+  const d = Math.min(1, Math.max(0, Number(definition) || 0));
+  return {
+    core: Math.round(78 * d),
+    mid: Math.round(40 + 54 * d),
+    // How much of the original softness survives in the middle stop. At full
+    // definition the mid stop is nearly as opaque as the core, which is what
+    // stops the "edge" being a gradient that merely starts later.
+    midAlpha: 0.55 + 0.4 * d,
+  };
+}
+
 /** Applies an accent preset onto a base palette. */
 export function withAccent(colors, accentName, isDark) {
   const preset = ACCENTS[accentName] || ACCENTS[DEFAULT_ACCENT];
