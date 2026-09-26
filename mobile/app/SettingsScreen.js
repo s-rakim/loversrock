@@ -21,6 +21,7 @@ import ServerAddress from '../components/ServerAddress';
 import NicknameCard from '../components/NicknameCard';
 import MascotPicker from '../components/MascotPicker';
 import RemindersCard from '../components/RemindersCard';
+import PushCheckCard from '../components/PushCheckCard';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import ConnectionCard from '../components/ConnectionCard';
@@ -411,6 +412,7 @@ export default function SettingsScreen() {
 
       <FadeInUp delay={55}>
         <RemindersCard />
+        <PushCheckCard />
       </FadeInUp>
 
       <FadeInUp delay={60}>

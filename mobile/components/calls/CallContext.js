@@ -353,7 +353,9 @@ export function CallProvider({ children }) {
       getSocket()?.emit('call:answer', { callId: call.id, sdp: answer.sdp, type: answer.type });
       setCall((c) => ({ ...c, phase: 'connecting' }));
     } catch (err) {
-      setError(err.message);
+      // A 404 here means the caller gave up (or their call failed) before
+      // this phone picked up: the call is over, not broken.
+      setError(err.status === 404 ? 'That call already ended before you picked up.' : err.message);
       setCall(IDLE);
       teardown();
     }

@@ -4,7 +4,8 @@ import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
-import { getActivePairForUser } from '../models/pairs.js';
+import { getActivePairForUser, getUserDeviceTokens } from '../models/pairs.js';
+import { pushStatus, sendNotification, CHANNELS } from '../config/firebase.js';
 
 const router = asyncRouter();
 
@@ -115,6 +116,34 @@ router.post('/fcm-token', requireAuth, async (req, res) => {
   );
 
   res.status(204).end();
+});
+
+/**
+ * Settings > Notifications > "Send a test". Push has two halves, the phone's
+ * token and the server's Firebase key, and either one missing looks exactly
+ * the same from the outside: nothing arrives. This says which.
+ */
+router.post('/push-test', requireAuth, async (req, res) => {
+  const server = pushStatus();
+  const tokens = await getUserDeviceTokens(req.userId);
+  const out = { serverConfigured: server.configured, serverReason: server.reason, devices: tokens.length, sent: 0, failed: 0, error: null };
+  if (!server.configured || tokens.length === 0) return res.json(out);
+
+  try {
+    const result = await sendNotification(
+      tokens,
+      { title: 'Test notification', body: 'Notifications are working.' },
+      { type: 'test' },
+      { channel: CHANNELS.partner, priority: 'high' }
+    );
+    out.sent = result.successCount || 0;
+    out.failed = result.failureCount || 0;
+    const firstError = result.responses?.find((r) => !r.success)?.error;
+    if (firstError) out.error = firstError.code || firstError.message;
+  } catch (err) {
+    out.error = err.message;
+  }
+  res.json(out);
 });
 
 function generateInviteCode() {

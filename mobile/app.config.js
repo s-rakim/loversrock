@@ -30,9 +30,16 @@ const asset = (name) => {
 // FCM needs google-services.json from the Firebase project. Declared only when
 // the file is present: naming a missing one fails the build, and without it
 // getDevicePushTokenAsync() simply returns no token and push stays off.
-const googleServices = fs.existsSync(path.join(__dirname, 'google-services.json'))
-  ? './google-services.json'
-  : null;
+//
+// The file is gitignored, and EAS Build uploads only what git would, so a
+// copy sitting in mobile/ never reaches the build machine. On EAS it comes in
+// as a file environment variable instead: GOOGLE_SERVICES_JSON holds the path
+// EAS wrote it to (docs/NOTIFICATIONS.md). The local file still works for a
+// local build.
+const googleServices = [
+  process.env.GOOGLE_SERVICES_JSON,
+  fs.existsSync(path.join(__dirname, 'google-services.json')) ? './google-services.json' : null,
+].find((file) => file && fs.existsSync(path.resolve(__dirname, file))) || null;
 
 const icon = asset('icon.png');
 // Android crops the adaptive foreground to a mask; fall back to the plain

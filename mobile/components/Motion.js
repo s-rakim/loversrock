@@ -125,16 +125,15 @@ export function ProgressDot({ active, size = 8 }) {
     outputRange: [colors.border, colors.accent],
   });
 
+  // Two views, one per driver: the scale runs natively, the colour cannot
+  // (colours interpolate on the JS side), and a single view's style with both
+  // is moved to native as a whole, after which the colour animation throws.
   return (
-    <Animated.View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor,
-        transform: [{ scale }],
-      }}
-    />
+    <Animated.View style={{ width: size, height: size, transform: [{ scale }] }}>
+      <Animated.View
+        style={{ width: size, height: size, borderRadius: size / 2, backgroundColor }}
+      />
+    </Animated.View>
   );
 }
 

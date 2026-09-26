@@ -2,6 +2,8 @@ import admin from 'firebase-admin';
 import { query } from './db.js';
 
 let app = null;
+// Why initialising failed, so it is reported once rather than on every send.
+let lastSetupError = null;
 
 /**
  * Android channel per notification kind. The channel decides importance, so a
@@ -47,6 +49,7 @@ async function pruneDeadTokens(tokens, responses) {
 // deployments (there is no self-hostable equivalent of platform push).
 function getApp() {
   if (app) return app;
+  if (lastSetupError) return null;
 
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) {
@@ -56,11 +59,28 @@ function getApp() {
     return null;
   }
 
-  const serviceAccount = JSON.parse(raw);
-  app = admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  // A service account pasted across several lines, or with its quotes
+  // mangled by a shell, is the usual way this goes wrong. Say so once and run
+  // without push, rather than throwing on every send.
+  try {
+    app = admin.initializeApp({
+      credential: admin.credential.cert(JSON.parse(raw)),
+    });
+  } catch (err) {
+    lastSetupError = `FIREBASE_SERVICE_ACCOUNT_JSON is not a usable service account: ${err.message}`;
+    console.error(`[firebase] ${lastSetupError}`);
+    return null;
+  }
   return app;
+}
+
+/** Whether the server can send pushes at all, and if not, why. */
+export function pushStatus() {
+  if (getApp()) return { configured: true, reason: null };
+  return {
+    configured: false,
+    reason: lastSetupError || 'FIREBASE_SERVICE_ACCOUNT_JSON is not set in backend/.env',
+  };
 }
 
 export async function sendToTokens(tokens, { notification, data, channel, priority, collapseKey } = {}) {
