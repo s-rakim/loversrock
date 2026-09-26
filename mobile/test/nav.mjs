@@ -364,5 +364,59 @@ for (const f of walk(path.join(root, 'app'))) {
 }
 check('no first load can still raise a bare "Error" dialog', bare.length === 0, bare.join(', '));
 
+console.log('\n=== THE CYCLE TRACKER KNOWS WHICH SIDE YOU ARE ON ===');
+// The tracker is the one asymmetric part of this app: one person keeps a
+// health diary, the other is shown the parts of it chosen for them. It used
+// to show everybody the same tabs, including the partner's read-only view,
+// so the person tracking their own cycle could land on a screen where
+// nothing could be changed and reasonably call the page a placeholder.
+const home = read('app', 'cycle', 'CycleHomeScreen.js');
+const ctx = read('components', 'cycle', 'CycleContext.js');
+const login = read('app', 'LoginScreen.js');
+const picker = read('app', 'cycle', 'CyclePickRoleScreen.js');
+
+check('sign-up asks which side you are on', /cycleRole/.test(login) && /ROLES/.test(login));
+check('and sends the answer with the account', /name, email, password, cycleRole/.test(login));
+
+check('the cycle context carries the role', /role, setRole/.test(ctx));
+check('read from the profile, not guessed', /me\?\.cycleRole/.test(ctx));
+
+check('the two sides get different tabs',
+  /OWNER_TABS/.test(home) && /PARTNER_TABS/.test(home));
+// The partner has no diary of their own, so a log button would open a sheet
+// that writes to nothing.
+check('only the owner gets the add button', /owner && \(/.test(home));
+check('and the partner does not get the daily log or the analysis',
+  !/PARTNER_TABS[\s\S]*?analysis[\s\S]*?\];/.test(home));
+
+// Defaulting is the one thing that must not happen: it either hands the
+// person tracking a read-only screen, or points someone else's health record
+// at the wrong account.
+check('an account that has not chosen is asked, not defaulted',
+  /!loading && !role/.test(home) && /CyclePickRoleScreen/.test(home));
+check('the picker writes the choice to the account',
+  /cycleRole: key/.test(picker));
+
+// Hardcoding the first tab was a live bug in waiting: the partner's set has
+// no 'today', so a hardcoded default would render an empty screen.
+check('the starting tab comes from the set that applies',
+  /tabs\[0\]\.key/.test(home), home.match(/const active = [^;]*/)?.[0]);
+
+// A choice made at sign-up has to be reversible without a new account.
+const settings = read('app', 'SettingsScreen.js');
+check('Settings can switch sides', /changeCycleRole/.test(settings));
+check('and says which side you are on now', /You track your own cycle/.test(settings));
+
+// The server is the authority on what the role may be.
+const authRoute = fs.readFileSync(path.join(root, '..', 'backend', 'src', 'routes', 'auth.js'), 'utf8');
+const profileRoute = fs.readFileSync(path.join(root, '..', 'backend', 'src', 'routes', 'profile.js'), 'utf8');
+check('the server validates the role on sign-up', /CYCLE_ROLES\.includes/.test(authRoute));
+check('and on a later change', /CYCLE_ROLES\.includes/.test(profileRoute));
+const roleSchema = fs.readFileSync(path.join(root, '..', 'backend', 'src', 'config', 'schema.sql'), 'utf8');
+check('and the column itself only accepts those two',
+  /cycle_role[\s\S]{0,120}CHECK \(cycle_role IN \('owner', 'partner'\)\)/.test(roleSchema));
+check('and is nullable, so an existing account is asked rather than assumed',
+  !/cycle_role TEXT NOT NULL/.test(roleSchema));
+
 console.log(`\nNAV RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

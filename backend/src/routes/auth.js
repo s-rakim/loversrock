@@ -8,6 +8,21 @@ import { getActivePairForUser } from '../models/pairs.js';
 
 const router = asyncRouter();
 
+/**
+ * Which side of the cycle tracker an account is on.
+ *
+ *   owner    tracks their own cycle and edits all of it
+ *   partner  sees what the owner chose to share, and only that
+ *
+ * Picked at sign-up, because nothing else in an account says which somebody
+ * is, and guessing wrong is not a cosmetic mistake in either direction: it
+ * either hands the person tracking a screen they cannot write to, or points
+ * someone else's health data at the wrong account. Null when not yet chosen,
+ * which is how accounts made before this existed get asked rather than
+ * assumed into a role.
+ */
+const CYCLE_ROLES = ['owner', 'partner'];
+
 function issueTokens(userId) {
   const accessToken = jwt.sign({ sub: userId }, process.env.JWT_ACCESS_SECRET, {
     expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
@@ -19,9 +34,12 @@ function issueTokens(userId) {
 }
 
 router.post('/signup', async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, cycleRole } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'name, email, password are required' });
+  }
+  if (cycleRole !== undefined && cycleRole !== null && !CYCLE_ROLES.includes(cycleRole)) {
+    return res.status(400).json({ error: `cycleRole must be one of ${CYCLE_ROLES.join(', ')}` });
   }
 
   const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
@@ -31,14 +49,17 @@ router.post('/signup', async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 12);
   const { rows } = await query(
-    `INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3)
-     RETURNING id, name, email, avatar_url, created_at`,
-    [name, email.toLowerCase(), passwordHash]
+    `INSERT INTO users (name, email, password_hash, cycle_role) VALUES ($1, $2, $3, $4)
+     RETURNING id, name, email, avatar_url, cycle_role, created_at`,
+    [name, email.toLowerCase(), passwordHash, cycleRole ?? null]
   );
 
   const user = rows[0];
   const tokens = issueTokens(user.id);
-  res.status(201).json({ user, ...tokens });
+  // camelCase out, like every other endpoint: the app should never have to
+  // know the column is called cycle_role.
+  const { cycle_role: role, ...rest } = user;
+  res.status(201).json({ user: { ...rest, cycleRole: role || null }, ...tokens });
 });
 
 router.post('/login', async (req, res) => {
@@ -54,7 +75,15 @@ router.post('/login', async (req, res) => {
 
   const tokens = issueTokens(user.id);
   res.json({
-    user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatar_url },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatarUrl: user.avatar_url,
+      // So the app knows on the first screen after sign-in whether it still
+      // has to ask, rather than after a round trip to /profile.
+      cycleRole: user.cycle_role || null,
+    },
     ...tokens,
   });
 });

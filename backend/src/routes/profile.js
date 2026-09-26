@@ -10,6 +10,17 @@ const MAX_NICKNAME_LENGTH = 30;
 const THEME_PREFERENCES = ['system', 'light', 'dark'];
 
 /**
+ * Which side of the cycle tracker somebody is on.
+ *
+ *   owner    tracks their own cycle, edits all of it
+ *   partner  sees what the owner chose to share, and only that
+ *
+ * The two are not symmetric and must not be treated as a display toggle: the
+ * partner view is a privacy boundary, not a skin.
+ */
+const CYCLE_ROLES = ['owner', 'partner'];
+
+/**
  * Nicknames are free text typed by one partner and rendered to the other, so
  * they get trimmed and bounded here rather than trusted. Control characters
  * are rejected outright: a newline inside a nickname breaks every single-line
@@ -43,6 +54,10 @@ function present(user, nickname) {
     // Resolved server-side so no screen has to re-implement the fallback.
     displayName: nickname || user.name,
     themePreference: user.theme_preference || 'system',
+    // Which side of the cycle tracker they are on: 'owner', 'partner', or
+    // null when they have not chosen yet. Null is what makes the app ask
+    // rather than assume, so it is passed through as-is.
+    cycleRole: user.cycle_role || null,
     // Null for the partner by construction — see the query in GET /.
     chatWallpaper: user.chat_wallpaper || null,
     // The public half of their encryption key. Public by design: it is what
@@ -76,6 +91,7 @@ router.get('/', requireAuth, async (req, res) => {
   // anyone who is not the person asking.
   const { rows: users } = await query(
     `SELECT id, name, avatar_url, theme_preference, public_key, public_key_set_at,
+            cycle_role,
             CASE WHEN id = $2 THEN chat_wallpaper ELSE NULL END AS chat_wallpaper
      FROM users WHERE id = ANY($1::uuid[])`,
     [partnerId ? [req.userId, partnerId] : [req.userId], req.userId]
@@ -183,7 +199,16 @@ router.put('/together-since', requireAuth, requirePair, async (req, res) => {
  * `userId` — a client can only ever write its own row.
  */
 router.patch('/preferences', requireAuth, async (req, res) => {
-  const { themePreference, chatWallpaper } = req.body || {};
+  const { themePreference, chatWallpaper, cycleRole } = req.body || {};
+
+  if (cycleRole !== undefined) {
+    // null is a legitimate value: it clears the choice and makes the app ask
+    // again, which is what "switch mode" needs before it knows the answer.
+    if (cycleRole !== null && !CYCLE_ROLES.includes(cycleRole)) {
+      return res.status(400).json({ error: `cycleRole must be one of ${CYCLE_ROLES.join(', ')}, or null` });
+    }
+    await query('UPDATE users SET cycle_role = $1 WHERE id = $2', [cycleRole, req.userId]);
+  }
 
   if (themePreference !== undefined) {
     if (!THEME_PREFERENCES.includes(themePreference)) {

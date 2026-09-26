@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, Switch, ScrollView } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useNavigation } from '@react-navigation/native';
@@ -41,6 +41,45 @@ export default function SettingsScreen() {
   } = useLanguage();
   const navigation = useNavigation();
   const [lockScreenOn, setLockScreenOn] = useState(false);
+  const [cycleRole, setCycleRole] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/profile')
+      .then((d) => { if (!cancelled) setCycleRole(d?.me?.cycleRole ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  /**
+   * Switch sides, or clear the choice so the tracker asks again.
+   *
+   * Confirmed rather than toggled straight through: for the person tracking,
+   * switching to partner mode makes their own record read-only on their own
+   * phone, which is a surprising thing to do by a mis-tap.
+   */
+  function changeCycleRole() {
+    const next = cycleRole === 'owner' ? 'partner' : 'owner';
+    const label = next === 'owner' ? 'track your own cycle' : 'see your partner’s shared view';
+    Alert.alert(
+      'Cycle tracker mode',
+      `Switch so you ${label}? Nothing you have logged is deleted — this only changes which side of the tracker you see.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Switch',
+          onPress: async () => {
+            try {
+              await apiFetch('/profile/preferences', { method: 'PATCH', body: { cycleRole: next } });
+              setCycleRole(next);
+            } catch (err) {
+              Alert.alert('Could not switch', err.message);
+            }
+          },
+        },
+      ]
+    );
+  }
 
   function toggleLockScreen(value) {
     setLockScreenOn(value);
@@ -423,6 +462,26 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={font.body}>Your character</Text>
             <Text style={font.muted}>Skin, hair and a wardrobe. They see what you put on.</Text>
+          </View>
+        </MorphButton>
+      </FadeInUp>
+
+      {/* The cycle tracker is the one asymmetric part of the app, so the
+          choice made at sign-up has to be changeable without making a new
+          account — somebody who picked wrong is otherwise stuck looking at
+          a read-only screen forever. */}
+      <FadeInUp delay={70}>
+        <MorphButton onPress={changeCycleRole} style={styles.actionRow}>
+          <Icon name="water-outline" chip chipColor={colors.surfaceAlt} />
+          <View style={{ flex: 1 }}>
+            <Text style={font.body}>Cycle tracker mode</Text>
+            <Text style={font.muted}>
+              {cycleRole === 'owner'
+                ? 'You track your own cycle. Tap to switch to partner mode.'
+                : cycleRole === 'partner'
+                  ? 'You see what your partner shares. Tap to switch to tracking your own.'
+                  : 'Not set yet. Tap to choose.'}
+            </Text>
           </View>
         </MorphButton>
       </FadeInUp>

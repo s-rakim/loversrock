@@ -20,20 +20,40 @@ import CycleTodayScreen from './CycleTodayScreen';
 import CycleCalendarScreen from './CycleCalendarScreen';
 import CycleAnalysisScreen from './CycleAnalysisScreen';
 import PartnerCycleScreen from './PartnerCycleScreen';
+import CyclePickRoleScreen from './CyclePickRoleScreen';
 
-const TABS = [
+// The tabs differ by role, because the two sides are not the same product.
+//
+// The owner gets their own record, all of it editable, plus a Partner tab
+// that previews what the other phone can see — useful precisely because it
+// is the thing they are deciding about.
+//
+// The partner gets the shared view and the calendar reading from it. They do
+// not get the daily log or the analysis: those are the owner's diary, and a
+// tab that opens someone else's health record is not a tab.
+const OWNER_TABS = [
   { key: 'today', label: 'Today', icon: 'flower' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar' },
-  { key: 'partner', label: 'Partner', icon: 'heart' },
+  { key: 'partner', label: 'Shared', icon: 'heart' },
   { key: 'analysis', label: 'Analysis', icon: 'stats-chart' },
+];
+
+const PARTNER_TABS = [
+  { key: 'partner', label: 'Today', icon: 'heart' },
+  { key: 'calendar', label: 'Calendar', icon: 'calendar' },
 ];
 
 function Shell({ navigation }) {
   const { colors, font } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { loading, error } = useCycle();
-  const [tab, setTab] = useState('today');
+  const { loading, error, role } = useCycle();
+  const tabs = role === 'partner' ? PARTNER_TABS : OWNER_TABS;
+  const [tab, setTab] = useState(null);
+
+  // The first tab of whichever set applies, rather than a hardcoded 'today':
+  // the partner's set has no 'today', so hardcoding it rendered nothing.
+  const active = tab && tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
 
   if (loading) {
     return (
@@ -42,6 +62,13 @@ function Shell({ navigation }) {
         <Text style={[font.muted, { marginTop: spacing.sm }]}>Loading your cycle…</Text>
       </View>
     );
+  }
+
+  // Nobody has said which side of this they are on yet, so ask. Defaulting
+  // would mean either a read-only screen for the person tracking, or someone
+  // else's health record for the partner.
+  if (!loading && !role) {
+    return <CyclePickRoleScreen />;
   }
 
   if (error) {
@@ -57,16 +84,19 @@ function Shell({ navigation }) {
   }
 
   // The bar splits around the raised add button, exactly like the reference.
-  const left = TABS.slice(0, 2);
-  const right = TABS.slice(2);
+  // The partner has no add button — there is nothing for them to log — so
+  // their two tabs sit side by side instead of straddling a gap.
+  const owner = role !== 'partner';
+  const left = owner ? tabs.slice(0, 2) : tabs;
+  const right = owner ? tabs.slice(2) : [];
 
   return (
     <View style={styles.root}>
-      <CrossFade activeKey={tab}>
+      <CrossFade activeKey={active}>
         {(shown) => (
           <View style={{ flex: 1 }}>
             {shown === 'today' && <CycleTodayScreen navigation={navigation} onGoToTab={setTab} />}
-            {shown === 'calendar' && <CycleCalendarScreen navigation={navigation} />}
+            {shown === 'calendar' && <CycleCalendarScreen navigation={navigation} readOnly={!owner} />}
             {shown === 'partner' && <PartnerCycleScreen navigation={navigation} />}
             {shown === 'analysis' && <CycleAnalysisScreen navigation={navigation} />}
           </View>
@@ -75,18 +105,20 @@ function Shell({ navigation }) {
 
       <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         {left.map((t) => (
-          <TabButton key={t.key} tab={t} active={tab === t.key} onPress={() => setTab(t.key)} />
+          <TabButton key={t.key} tab={t} active={active === t.key} onPress={() => setTab(t.key)} />
         ))}
 
-        <MorphButton
-          onPress={() => navigation.navigate('CycleDailyLog', { date: todayDateString() })}
-          style={styles.fab}
-        >
-          <Ionicons name="add" size={30} color="#fff" />
-        </MorphButton>
+        {owner && (
+          <MorphButton
+            onPress={() => navigation.navigate('CycleDailyLog', { date: todayDateString() })}
+            style={styles.fab}
+          >
+            <Ionicons name="add" size={30} color="#fff" />
+          </MorphButton>
+        )}
 
         {right.map((t) => (
-          <TabButton key={t.key} tab={t} active={tab === t.key} onPress={() => setTab(t.key)} />
+          <TabButton key={t.key} tab={t} active={active === t.key} onPress={() => setTab(t.key)} />
         ))}
       </View>
     </View>

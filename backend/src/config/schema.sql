@@ -19,6 +19,22 @@ CREATE TABLE IF NOT EXISTS users (
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS theme_preference TEXT NOT NULL DEFAULT 'system';
 
+-- Which side of the cycle tracker this person is on.
+--
+--   'owner'    they track their own cycle, and can edit all of it
+--   'partner'  they see what their partner chose to share, read only
+--
+-- Chosen at sign-in rather than inferred, because there is nothing in an
+-- account that reliably says which one somebody is, and guessing wrong means
+-- either handing someone a read-only screen they cannot log into, or showing
+-- private health data to the wrong person. Changeable later from Settings.
+--
+-- Nullable on purpose: an account created before this existed has not chosen,
+-- and the app asks rather than assuming. NOT NULL with a default would have
+-- silently made every existing account an owner.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cycle_role TEXT
+  CHECK (cycle_role IN ('owner', 'partner'));
+
 CREATE TABLE IF NOT EXISTS user_devices (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

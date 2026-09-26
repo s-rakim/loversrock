@@ -29,6 +29,10 @@ export function CycleProvider({ children }) {
   const [settings, setSettings] = useState(null);
   const [sharing, setSharing] = useState(null);
   const [partner, setPartner] = useState(null);
+  // 'owner' | 'partner' | null. Null means this account has not chosen yet,
+  // which the screens answer by asking rather than by picking one — see
+  // CycleHomeScreen.
+  const [role, setRole] = useState(null);
   const [predictions, setPredictions] = useState(null);
   const [analysis, setAnalysis] = useState({ cyclesLogged: 0, analysisUnlocked: false });
   const [loading, setLoading] = useState(true);
@@ -42,8 +46,14 @@ export function CycleProvider({ children }) {
       apiFetch('/period/sharing'),
       apiFetch('/period/partner'),
       apiFetch('/period/predictions'),
+      // Which side of the tracker this account is on. It lives on the profile
+      // rather than in period settings because it is an account-level fact:
+      // the partner has no period settings of their own to keep it in.
+      apiFetch('/profile'),
     ]);
-    const [cal, cyc, set, shr, part, pred] = results;
+    const [cal, cyc, set, shr, part, pred, prof] = results;
+
+    if (prof.status === 'fulfilled') setRole(prof.value?.me?.cycleRole ?? null);
 
     if (cal.status === 'fulfilled') setCalendar(cal.value);
     if (cyc.status === 'fulfilled') setCycles(cyc.value.cycles || []);
@@ -125,11 +135,12 @@ export function CycleProvider({ children }) {
   const value = useMemo(
     () => ({
       month, setMonth, calendar, cycles, openCycle, settings, sharing, partner,
+      role, setRole,
       predictions: predictions || calendar?.predictions || null,
       analysis, loading, error, periodDates, logsByDate,
       refresh, saveLog, getLog, startPeriod, endPeriod, updateSettings, updateSharing,
     }),
-    [month, calendar, cycles, openCycle, settings, sharing, partner, predictions, analysis,
+    [month, calendar, cycles, openCycle, settings, sharing, partner, role, predictions, analysis,
      loading, error, periodDates, logsByDate, refresh, saveLog, getLog, startPeriod, endPeriod,
      updateSettings, updateSharing]
   );
