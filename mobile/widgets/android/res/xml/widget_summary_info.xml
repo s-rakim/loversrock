@@ -11,5 +11,5 @@
     android:previewImage="@drawable/widget_preview_summary"
     android:previewLayout="@layout/widget_summary"
     android:resizeMode="horizontal|vertical"
-    android:widgetCategory="home_screen"
+    android:widgetCategory="home_screen|keyguard"
     android:description="@string/widget_summary_description" />

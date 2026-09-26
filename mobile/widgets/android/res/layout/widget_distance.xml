@@ -4,9 +4,11 @@
      each of you as an emoji — a mood in the corner of each picture, today's
      symptoms underneath.
 
-     The pictures keep their places on BOTH phones: her (picture b) on the
-     left, him (picture a) on the right. paint() puts each mood and symptom
-     row under whichever of you is in that slot.
+     Each picture is the mascot that person uploaded, downloaded and cached
+     by the widget (DistanceWidgetProvider); the placeholder figure stands in
+     until then. Who stands on which side is a setting, the same on both
+     phones, and paint() puts each mood and symptom row under whoever is in
+     that slot.
 
      Carries the glance ids (widget_root, glance_label, glance_value,
      glance_caption, widget_refresh) on purpose. GlanceWidgetProvider paints
@@ -90,7 +92,7 @@
                     android:background="@drawable/widget_mascot_frame"
                     android:clipToOutline="true"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/widget_mascot_b"
+                    android:src="@drawable/widget_mascot_placeholder"
                     android:contentDescription="Her" />
 
                 <TextView
@@ -181,7 +183,7 @@
                     android:background="@drawable/widget_mascot_frame"
                     android:clipToOutline="true"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/widget_mascot_a"
+                    android:src="@drawable/widget_mascot_placeholder"
                     android:contentDescription="Him" />
 
                 <TextView

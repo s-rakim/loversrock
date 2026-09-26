@@ -135,6 +135,11 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     // is you and which is them ('a' | 'b'). Always different from each other.
     myArt: null,
     partnerArt: null,
+    // When each uploaded mascot last changed, or null when there is none.
+    // The widget downloads the pictures from GET /widget/mascot/:who and uses
+    // this to know it is time to fetch again.
+    myMascotAt: null,
+    partnerMascotAt: null,
     // Each of you as an emoji, under your mascot: the mood you picked on the
     // mood bar, and up to three of today's logged symptoms. Only symptoms
     // with an emoji in models/widgetEmoji.js ever appear — anything intimate
@@ -209,7 +214,8 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
       [pair.id]
     ),
     query(
-      `SELECT id, name, last_lat, last_lng, location_sharing_enabled, mascot_art, cycle_role
+      `SELECT id, name, last_lat, last_lng, location_sharing_enabled, mascot_art, cycle_role,
+              mascot_thumb_key, mascot_updated_at
          FROM users WHERE id = ANY($1::uuid[])`,
       [[req.userId, partnerId]]
     ),
@@ -328,6 +334,10 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
   );
   summary.myArt = art.mine;
   summary.partnerArt = art.theirs;
+  const mascotAt = (u) => (u?.mascot_thumb_key && u.mascot_updated_at
+    ? new Date(u.mascot_updated_at).toISOString() : null);
+  summary.myMascotAt = mascotAt(me);
+  summary.partnerMascotAt = mascotAt(partner);
 
   summary.myMoodEmoji = moodEmoji(myMoodRes.rows[0]?.mood);
   summary.partnerMoodEmoji = moodEmoji(moodRes.rows[0]?.mood);
@@ -514,6 +524,53 @@ router.post('/kiss/seen', requireWidgetToken, async (req, res) => {
 // Widgets can't send an Authorization header through the image loader on
 // either platform, so the photo is fetched with the widget token in the query
 // string instead. Same read-only credential, same revocation.
+/**
+ * One of the two mascots, as the small copy made for widgets.
+ *
+ * `who` is relative to the token's owner: 'me' or 'partner'. The widget
+ * token already reads everything on the summary, and these are pictures the
+ * two of you show each other in the app, so nothing new is exposed.
+ *
+ * An ETag from when it last changed lets a widget ask "still the same?" and
+ * get a 304 instead of the picture on every half-hourly refresh.
+ */
+router.get('/mascot/:who', requireWidgetToken, async (req, res) => {
+  const { who } = req.params;
+  if (who !== 'me' && who !== 'partner') return res.status(400).json({ error: "who must be 'me' or 'partner'" });
+
+  let userId = req.userId;
+  if (who === 'partner') {
+    const { rows: pairRows } = await query(
+      `SELECT user_a_id, user_b_id FROM pairs
+        WHERE (user_a_id = $1 OR user_b_id = $1) AND unlinked_at IS NULL AND user_b_id IS NOT NULL
+        ORDER BY created_at DESC LIMIT 1`,
+      [req.userId]
+    );
+    if (!pairRows[0]) return res.status(404).json({ error: 'Not paired' });
+    userId = pairRows[0].user_a_id === req.userId ? pairRows[0].user_b_id : pairRows[0].user_a_id;
+  }
+
+  const { rows } = await query(
+    'SELECT mascot_thumb_key, mascot_updated_at FROM users WHERE id = $1', [userId]
+  );
+  const key = rows[0]?.mascot_thumb_key;
+  if (!key) return res.status(404).json({ error: 'No mascot' });
+
+  const etag = `"${new Date(rows[0].mascot_updated_at).getTime()}"`;
+  res.setHeader('ETag', etag);
+  res.setHeader('Cache-Control', 'no-cache');
+  if (req.get('If-None-Match') === etag) return res.status(304).end();
+
+  const extension = (key.split('.').pop() || '').toLowerCase();
+  res.setHeader('Content-Type', extension === 'png' ? 'image/png' : extension === 'webp' ? 'image/webp' : 'image/jpeg');
+  const stream = await getObjectStream(key);
+  stream.on('error', () => {
+    if (res.headersSent) res.destroy();
+    else res.status(404).end();
+  });
+  stream.pipe(res);
+});
+
 router.get('/photo', async (req, res, next) => {
   const raw = req.query.token;
   if (!raw) return res.status(401).json({ error: 'Missing widget token' });

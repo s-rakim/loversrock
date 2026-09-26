@@ -249,6 +249,14 @@ const reactStub = {
 // drawn character is never reached. These two load it with the art switched
 // OFF, because the drawing is still what a person with no art of their own
 // gets and it still has to be right.
+// The hook that fills the mascot store talks to the server and the widget
+// bridge; the components under test only need it to hand back the store.
+const hookStub = {
+  __esModule: true,
+  default: () => ({ owners: { me: 'a', partner: 'b' }, pictures: { me: null, partner: null } }),
+  refreshMascotOwners: () => Promise.resolve(),
+};
+
 const noArt = {
   ART_SETS: {}, PAIR_ART: null,
   artFor: () => null, hasArtFor: () => false, HAS_ART: false,
@@ -260,10 +268,10 @@ const noArt = {
 const Character = load('components/Character.js', {
   react: reactStub,
   './ThemeContext': themeStub,
-  '../assets/mascot': noArt,
+  '../assets/mascot': noArt, './useMascotOwners': hookStub,
 }).default;
 const CharacterMod = load('components/Character.js', {
-  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt,
+  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt, './useMascotOwners': hookStub,
 });
 
 /** Every fill/stroke the figure paints with, flattened out of the tree. */
@@ -287,7 +295,7 @@ const BOTTOMS = ['jeans', 'trousers', 'skirt', 'shorts', 'cargo', 'joggers'];
 const SHOES = ['sneakers', 'boots', 'slides', 'barefoot'];
 const ACCESSORIES = ['none', 'glasses', 'earrings', 'cap', 'beanie', 'chain', 'headphones'];
 const MOODS = Object.keys(load('components/Mascot.js', {
-  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt,
+  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt, './useMascotOwners': hookStub,
 }).EXPRESSIONS);
 
 const bad = [];
@@ -342,7 +350,7 @@ check('and none still pass size', !callSites.some((t) => /\ssize=/.test(t)), cal
 
 console.log('\n=== THE MASCOT IS LIT, AND TWO OF THEM DO NOT COLLIDE ===');
 const Mascot = load('components/Mascot.js', {
-  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt,
+  react: reactStub, './ThemeContext': themeStub, '../assets/mascot': noArt, './useMascotOwners': hookStub,
 }).default;
 
 /** Every prop object in the rendered tree. */
@@ -411,7 +419,7 @@ const artStub = {
 const CharacterArt = load('components/Character.js', {
   react: reactStub,
   './ThemeContext': themeStub,
-  '../assets/mascot': artStub,
+  '../assets/mascot': artStub, './useMascotOwners': hookStub,
 }).default;
 
 const withArt = attrs(React.createElement(CharacterArt, { avatar: {}, mood: 'happy', who: 'me', height: 120 }));
@@ -450,50 +458,50 @@ check(`all ${sites.length} call sites say whose character it is`,
 const wardrobe = fs.readFileSync(path.join(root, 'app', 'WardrobeScreen.js'), 'utf8');
 check('the wardrobe says so when art is in use', /hasArtFor\('me'\)/.test(wardrobe));
 
-console.log('\n=== THE REAL ARTWORK IS IN THE BUILD ===');
-// The mechanism working against a stub proves nothing about the files being
-// there. This checks the actual manifest and the actual images.
+console.log('\n=== MASCOTS ARE UPLOADED PICTURES, NOT PRESETS ===');
+// No preset artwork ships any more: each person uploads their own picture,
+// and with none they are drawn. This drives the real store.
 const realArt = load('assets/mascot/index.js');
-check('both people have art', realArt.hasArtFor('me') && realArt.hasArtFor('partner'));
-check('and the pair image exists for the loading screen', Boolean(realArt.PAIR_ART));
-for (const [who, file] of [['me', 'me-neutral.jpg'], ['partner', 'partner-neutral.jpg']]) {
-  const onDisk = path.join(root, 'assets', 'mascot', file);
-  check(`  ${file} is on disk`, fs.existsSync(onDisk));
-  const [w, h] = imageSize(onDisk);
-  check(`  and is a real image (${w}x${h})`, w > 100 && h > 100, [w, h]);
-  // Portrait. A landscape crop in a height-driven box is somebody's head and
-  // nothing else.
-  check('  and portrait, as a standing figure should be', h > w, [w, h]);
-  check(`  ${who} resolves to it`, realArt.artFor('neutral', who) !== null);
-}
-// Any mood falls back to that person's neutral rather than to nothing.
-for (const mood of MOODS) {
-  check(`  ${mood} falls back rather than returning nothing`,
-    realArt.artFor(mood, 'me') !== null && realArt.artFor(mood, 'partner') !== null, mood);
-}
-// Same bundle on both phones: "me" is whichever picture the server says, so
-// on her phone me and partner must swap — the bug was that they never did.
-const heads = () => [realArt.headFor('me').cx, realArt.headFor('partner').cx];
-const onHis = { me: realArt.artFor('neutral', 'me'), partner: realArt.artFor('neutral', 'partner'), heads: heads() };
-check('the two people get different pictures', onHis.me !== onHis.partner);
+check('the preset pictures are gone from the app bundle',
+  !['me-neutral.jpg', 'partner-neutral.jpg', 'pair.jpg'].some((f) => fs.existsSync(path.join(root, 'assets', 'mascot', f))));
+check('nothing uploaded means the character is drawn',
+  realArt.artFor('neutral', 'me') === null && realArt.artFor('neutral', 'partner') === null && !realArt.hasArtFor('me'));
+
 let heard = 0;
 const unsubscribe = realArt.subscribeMascotOwners(() => { heard += 1; });
+realArt.setMascotResolver((key) => `https://server/media/${key}?token=t`);
+realArt.setMascotPictures({
+  me: { key: 'mascots/u1/me.png', width: 400, height: 1000 },
+  partner: { key: 'mascots/u2/her.jpg', width: 800, height: 800 },
+});
+const mine = realArt.artFor('happy', 'me');
+check('an upload becomes an image source through /media', mine?.uri === 'https://server/media/mascots/u1/me.png?token=t', mine);
+check('  carrying its size, so the frame is right before it loads', mine?.width === 400 && mine?.height === 1000, mine);
+check('  whatever the mood', realArt.artFor('sad', 'me')?.uri === mine.uri);
+check("  and the partner's is theirs, not mine", realArt.artFor('neutral', 'partner')?.uri.includes('her.jpg'));
+check('whatever draws a mascot is told to re-render', heard >= 2, heard);
+check('a tall picture is cropped to the head near the top', realArt.headFor('me').cy < 0.3 && realArt.headFor('me').h < 1);
+check('a square one is shown whole', realArt.headFor('partner').h === 1);
+
+realArt.setMascotResolver(() => null);
+check('with no token yet there is no URL, so it draws instead of showing a broken image', realArt.artFor('neutral', 'me') === null);
+realArt.setMascotResolver((key) => `u/${key}`);
+
+const before = heard;
+realArt.setMascotPictures({ me: { key: 'mascots/u1/me.png', width: 400, height: 1000 }, partner: { key: 'mascots/u2/her.jpg', width: 800, height: 800 } });
+check('the same pictures again change nothing', heard === before, heard - before);
+realArt.setMascotPictures({ me: null, partner: { key: 'mascots/u2/her.jpg', width: 800, height: 800 } });
+check('removing mine goes back to drawing me', realArt.artFor('neutral', 'me') === null && realArt.artFor('neutral', 'partner') !== null);
+realArt.setMascotPictures({ me: { key: 42 }, partner: 'nonsense' });
+check('garbage from the server is treated as no picture', !realArt.hasArtFor('me') && !realArt.hasArtFor('partner'));
+
+// Which side each of you stands on in the distance widget.
 realArt.setMascotOwners('b');
-check('told "you are b", me and partner swap pictures',
-  realArt.artFor('neutral', 'me') === onHis.partner && realArt.artFor('neutral', 'partner') === onHis.me);
-check('and the head crops follow their pictures', JSON.stringify(heads()) === JSON.stringify([...onHis.heads].reverse()), heads());
-check('and whatever draws a mascot is told to re-render', heard === 1, heard);
-realArt.setMascotOwners('b');
+check('told "you are b", you stand on the left', realArt.mascotArtOf('me') === 'b' && realArt.mascotArtOf('partner') === 'a');
 realArt.setMascotOwners('z');
-check('repeating the answer, or a nonsense one, changes nothing', heard === 1 && realArt.getMascotOwners().me === 'b', heard);
+check('a nonsense side changes nothing', realArt.getMascotOwners().me === 'b');
 realArt.setMascotOwners('a');
 unsubscribe();
-
-// A bundle is downloaded over a phone network. Three photographs should not
-// be a megabyte of it.
-const bytes = ['me-neutral.jpg', 'partner-neutral.jpg', 'pair.jpg']
-  .reduce((n, f) => n + fs.statSync(path.join(root, 'assets', 'mascot', f)).size, 0);
-check(`all three together are ${Math.round(bytes / 1024)}KB, not a megabyte`, bytes < 400 * 1024, bytes);
 
 
 console.log('\n=== THE SECTION BAR, WHICH THE BUILD SERVER FOUND MISSING ===');

@@ -48,42 +48,6 @@ const ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
 // imports React and would not compile inside an extension.
 const APP_TARGET_SOURCES = new Set(['WidgetBridge.swift']);
 
-// Pictures the extension draws, copied in under the names the Swift loads
-// them by. The SAME files the app bundles for the mascots, so the widget can
-// never show an older picture of somebody than the app does.
-const WIDGET_IMAGES = {
-  'widget_mascot_a.jpg': 'assets/mascot/me-neutral.jpg',
-  'widget_mascot_b.jpg': 'assets/mascot/partner-neutral.jpg',
-};
-
-/**
- * Adds files already copied into the extension folder to its Resources phase.
- *
- * By hand rather than through xcode's addResourceFile, which assumes a
- * top-level "Resources" group and throws on an Expo project, which has none.
- */
-function addWidgetResources(project, targetUuid, groupUuid, files) {
-  const PbxFile = require('xcode/lib/pbxFile');
-  for (const name of files) {
-    // xcode does not know .jpg and would write `lastKnownFileType = unknown`
-    // plus literal `undefined`s for the fields it could not fill.
-    const file = new PbxFile(name, { target: targetUuid, lastKnownFileType: 'image.jpeg' });
-    for (const key of Object.keys(file)) if (file[key] === undefined) delete file[key];
-    if (project.hasFile(file.path)) continue;
-    file.uuid = project.generateUuid();
-    file.fileRef = project.generateUuid();
-    file.target = targetUuid;
-    project.addToPbxBuildFileSection(file);
-    project.addToPbxResourcesBuildPhase(file);
-    project.addToPbxFileReferenceSection(file);
-    project.addToPbxGroup(file, groupUuid);
-    // The reference writer copies every field whether set or not, and an
-    // `explicitFileType = undefined` would override the jpeg type above.
-    const ref = project.pbxFileReferenceSection()[file.fileRef];
-    for (const key of Object.keys(ref)) if (ref[key] === undefined) delete ref[key];
-  }
-}
-
 /** Every Swift file in widgets/ios that belongs to the extension target. */
 function extensionSources(dir) {
   return fs
@@ -112,9 +76,6 @@ function withWidgetSources(config) {
       // looking in the gallery on a device.
       for (const file of extensionSources(source)) {
         fs.copyFileSync(path.join(source, file), path.join(targetDir, file));
-      }
-      for (const [name, from] of Object.entries(WIDGET_IMAGES)) {
-        fs.copyFileSync(path.join(projectRoot, from), path.join(targetDir, name));
       }
       fs.writeFileSync(path.join(targetDir, 'Info.plist'), INFO_PLIST);
       fs.writeFileSync(path.join(targetDir, `${TARGET_NAME}.entitlements`), ENTITLEMENTS);
@@ -173,7 +134,6 @@ function withWidgetTarget(config) {
 
     project.addSourceFile('WidgetData.swift', { target: target.uuid }, group.uuid);
     project.addSourceFile('LoversRockWidgets.swift', { target: target.uuid }, group.uuid);
-    addWidgetResources(project, target.uuid, group.uuid, Object.keys(WIDGET_IMAGES));
 
     // The bridge compiles into the app target. A group key is required here:
     // without one, xcode's addSourceFile falls through to addPluginFile, which
@@ -228,5 +188,4 @@ module.exports = function withIosWidgets(config) {
 // new widget being written, committed, and silently left out of the build.
 module.exports.extensionSources = extensionSources;
 module.exports.APP_TARGET_SOURCES = APP_TARGET_SOURCES;
-module.exports.WIDGET_IMAGES = WIDGET_IMAGES;
-module.exports.addWidgetResources = addWidgetResources;
+

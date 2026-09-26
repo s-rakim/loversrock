@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, Image } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -13,7 +13,6 @@ import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { LanguageProvider } from './components/LanguageContext';
 import LavaLamp from './components/LavaLamp';
 import Mascot from './components/Mascot';
-import { PAIR_ART } from './assets/mascot';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification, syncPushToken } from './services/notifications';
 import LumaBar, { TAB_ROUTES } from './components/LumaBar';
@@ -238,28 +237,9 @@ function Root() {
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <LavaLamp />
         {/* The mascot holds the loading moment rather than a bare spinner.
-            Neutral here on purpose — the partner's mood is not known until
-            after sign-in, and guessing one would be a lie for half a second.
-
-            The pair artwork, if there is any, is shown as supplied: the two
-            of you leaning on each other is a single picture, and there is no
-            arrangement of two cut-outs that reproduces it. */}
-        {PAIR_ART
-          ? (
-            <Image
-              source={PAIR_ART}
-              // The pair image is portrait, so a square box would letterbox
-              // it. Sized from the asset itself and rounded to match the
-              // character frames.
-              style={{
-                width: 220 * (600 / 990),
-                height: 220,
-                borderRadius: 18,
-              }}
-              resizeMode="cover"
-            />
-          )
-          : <Mascot size={140} />}
+            Drawn, and neutral, on purpose: nobody is signed in yet, so there
+            is no uploaded picture to show and no mood to wear. */}
+        <Mascot size={140} drawn />
         <ActivityIndicator color={colors.accentPink} size="large" style={{ marginTop: 24 }} />
       </View>
     );

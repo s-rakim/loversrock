@@ -295,7 +295,7 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
     override val refreshAction = "com.loversrock.app.widgets.REFRESH_DISTANCE"
 
     override fun paint(context: Context, views: RemoteViews, data: WidgetRepository.Summary?) {
-        // Her picture is on the left. If that is you, your row goes left.
+        // Whoever holds the left side stands there, with their row under them.
         val meOnLeft = (data?.myArt ?: "a") == LEFT_ART
         val myMood = data?.myMoodEmoji
         val theirMood = data?.partnerMoodEmoji
@@ -308,6 +308,11 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
         emoji(views, R.id.distance_right_symptoms, if (meOnLeft) theirs else mine)
         views.setContentDescription(R.id.distance_left_art, if (meOnLeft) "You" else "Your partner")
         views.setContentDescription(R.id.distance_right_art, if (meOnLeft) "Your partner" else "You")
+
+        // The mascots each of you uploaded, as fetchExtra cached them; the
+        // placeholder figure where there is none.
+        picture(views, R.id.distance_left_art, WidgetRepository.mascot(context, if (meOnLeft) "me" else "partner"))
+        picture(views, R.id.distance_right_art, WidgetRepository.mascot(context, if (meOnLeft) "partner" else "me"))
 
         val km = data?.distanceKm
         if (km == null) {
@@ -330,6 +335,17 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
         )
     }
 
+    /** Brings both mascot pictures up to date before paint() runs. */
+    override fun fetchExtra(context: Context) {
+        WidgetRepository.fetchMascot(context, "me")
+        WidgetRepository.fetchMascot(context, "partner")
+    }
+
+    private fun picture(views: RemoteViews, id: Int, bitmap: android.graphics.Bitmap?) {
+        if (bitmap != null) views.setImageViewBitmap(id, bitmap)
+        else views.setImageViewResource(id, R.drawable.widget_mascot_placeholder)
+    }
+
     /** Shown when there is something to show, gone otherwise — never an empty badge. */
     private fun emoji(views: RemoteViews, id: Int, text: String?) {
         if (text.isNullOrEmpty()) {
@@ -346,9 +362,10 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
 }
 
 /**
- * The picture that stands on the left of the distance widget: "b", her. He
- * ("a") is on the right. Fixed, not per phone — it is the same two people on
- * both home screens, and they stand the same way round on both.
+ * The side token that stands on the left of the distance widget; "a" stands
+ * on the right. Which of you holds which is a setting (Settings → Your
+ * mascot), the same on both phones, so you stand the same way round on both
+ * home screens.
  */
 internal const val LEFT_ART = "b"
 

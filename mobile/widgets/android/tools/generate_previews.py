@@ -23,7 +23,8 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__))
 RES = os.path.join(HERE, '..', 'res')
 OUT = os.path.join(RES, 'drawable-nodpi')
-PAIR_ART = os.path.join(HERE, '..', '..', '..', 'assets', 'mascot', 'pair.jpg')
+# Only an illustration for the locket's preview; it is not in the app.
+PAIR_ART = os.path.join(HERE, 'preview-art', 'pair.jpg')
 
 # The widget palette, kept in step with widget_colors.xml by test/widgets.mjs.
 SURFACE = (255, 255, 255)
@@ -200,7 +201,6 @@ def canvas():
     return finish(img, 'canvas')
 
 
-MASCOTS = os.path.join(HERE, '..', 'res', 'drawable-nodpi')
 EMOJI_FONT = '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf'
 
 
@@ -233,6 +233,18 @@ def wiggle(d, s, x0, x1, cy):
                     d.ellipse([(x - r) * s, (py - r) * s, (x + r) * s, (py + r) * s], fill=ACCENT)
 
 
+def figure(d, s, cx, top, height):
+    """The placeholder standing figure from widget_mascot_placeholder.xml."""
+    k = height / 100
+    fill = (*MUTED, 115)
+    d.ellipse([(cx - 10 * k) * s, (top + 4 * k) * s, (cx + 10 * k) * s, (top + 24 * k) * s], fill=fill)
+    d.rounded_rectangle([(cx - 16 * k) * s, (top + 30 * k) * s, (cx + 16 * k) * s, (top + 64 * k) * s],
+                        radius=5 * k * s, fill=fill)
+    for dx in (-8, 4):
+        d.rounded_rectangle([(cx + dx * k) * s, (top + 60 * k) * s, (cx + (dx + 4) * k + 4 * k) * s,
+                             (top + 99 * k) * s], radius=4 * k * s, fill=fill)
+
+
 def distance():
     img, d, s = card(4, 2)
     w, h = 4 * CELL, 2 * CELL
@@ -240,21 +252,20 @@ def distance():
     lw = d.textlength('Our distance:', font=font(18 * s)) / s
     d.text(((PAD + lw + 8) * s, 19 * s), '1,305 km', font=font(22 * s, True), fill=TEXT)
 
-    # The two of you, head to toe, in rounded frames.
+    # The two of you, head to toe, in rounded frames. Everyone's mascot is
+    # their own uploaded picture, so the picker shows the placeholder figure
+    # the widget draws before one arrives rather than anybody in particular.
     top, bottom = 58, h - 46
     col = 78
     boxes = []
-    # Her (b) on the left, him (a) on the right — as the layout places them.
-    for x0, art in ((PAD, 'b'), (w - PAD - col, 'a')):
-        pic = Image.open(os.path.join(MASCOTS, f'widget_mascot_{art}.jpg')).convert('RGBA')
-        ph = (bottom - top) * s
-        pw = int(pic.width * ph / pic.height)
-        pic = pic.resize((pw, ph), Image.LANCZOS)
-        mask = Image.new('L', pic.size, 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, pw - 1, ph - 1], radius=14 * s, fill=255)
-        px = int((x0 + col / 2) * s - pw / 2)
-        img.paste(pic, (px, top * s), mask)
-        boxes.append((px / s, pw / s))
+    for x0 in (PAD, w - PAD - col):
+        ph = bottom - top
+        pw = ph * 0.42
+        px = x0 + col / 2 - pw / 2
+        d.rounded_rectangle([px * s, top * s, (px + pw) * s, bottom * s], radius=14 * s,
+                            fill=(255, 255, 255, 64))
+        figure(d, s, px + pw / 2, top + 8, ph - 16)
+        boxes.append((px, pw))
 
     cy = (top + bottom) / 2 - 10
     wiggle(d, s, boxes[0][0] + boxes[0][1] + 8, boxes[1][0] - 8, cy)

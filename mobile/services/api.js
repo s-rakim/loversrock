@@ -121,6 +121,9 @@ export async function pingServer() {
 // live token is mirrored here every time it is read or written.
 let cachedAccessToken = null;
 
+/** Whether a token is in memory yet — mediaUrl() is only usable once it is. */
+export const hasCachedAccessToken = () => Boolean(cachedAccessToken);
+
 export async function getAccessToken() {
   if (cachedAccessToken) return cachedAccessToken;
   cachedAccessToken = await SecureStore.getItemAsync(ACCESS_KEY);

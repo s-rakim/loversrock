@@ -11,5 +11,5 @@
     android:previewImage="@drawable/widget_preview_nextdate"
     android:previewLayout="@layout/widget_glance"
     android:resizeMode="horizontal|vertical"
-    android:widgetCategory="home_screen"
+    android:widgetCategory="home_screen|keyguard"
     android:description="@string/widget_nextdate_description" />

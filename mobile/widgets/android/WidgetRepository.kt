@@ -173,6 +173,85 @@ object WidgetRepository {
         }
     }
 
+    // ------------------------------------------------------------ mascots
+
+    /**
+     * Longest side of a mascot as the widget keeps it. Two of them share the
+     * distance widget's ~1MB RemoteViews budget with everything else on it,
+     * so they are held small: 220px is still sharp at the size they show.
+     */
+    private const val MASCOT_MAX_PX = 220
+
+    private fun mascotFile(context: Context, who: String) = java.io.File(context.filesDir, "mascot_$who.png")
+
+    /**
+     * Brings one mascot ("me" or "partner") up to date on disk.
+     *
+     * Sends the ETag of the copy it already has, so an unchanged picture is a
+     * 304 and costs nothing on the half-hourly refresh. A 404 means they have
+     * no mascot (or removed it), so the copy is deleted and the placeholder
+     * shows. Anything else — offline, a server error — keeps what is there.
+     * Blocking: callers are already off the main thread.
+     */
+    fun fetchMascot(context: Context, who: String) {
+        val (apiUrl, token) = credentials(context) ?: return
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val etagKey = "mascotEtag_$who"
+        val file = mascotFile(context, who)
+        var connection: HttpURLConnection? = null
+        try {
+            connection = (URL("$apiUrl/widget/mascot/$who").openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                setRequestProperty("X-Widget-Token", token)
+                if (file.exists()) prefs.getString(etagKey, null)?.let { setRequestProperty("If-None-Match", it) }
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+            }
+            when (connection.responseCode) {
+                304 -> return
+                404 -> {
+                    file.delete()
+                    prefs.edit().remove(etagKey).apply()
+                }
+                200 -> {
+                    val bytes = connection.inputStream.use { it.readBytes() }
+                    val bitmap = decodeBounded(bytes, MASCOT_MAX_PX) ?: return
+                    file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    prefs.edit().putString(etagKey, connection.getHeaderField("ETag")).apply()
+                }
+            }
+        } catch (e: Exception) {
+            // Keep whatever is cached.
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    /** The cached mascot for "me" or "partner", or null for the placeholder. */
+    fun mascot(context: Context, who: String): Bitmap? {
+        val file = mascotFile(context, who)
+        return if (file.exists()) BitmapFactory.decodeFile(file.path) else null
+    }
+
+    /** Decodes no bigger than needed, then scales so the longest side is maxPx. */
+    private fun decodeBounded(bytes: ByteArray, maxPx: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxPx) sample *= 2
+        val decoded = BitmapFactory.decodeByteArray(
+            bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }
+        ) ?: return null
+        val longest = maxOf(decoded.width, decoded.height)
+        if (longest <= maxPx) return decoded
+        val scale = maxPx.toFloat() / longest
+        return Bitmap.createScaledBitmap(
+            decoded, (decoded.width * scale).toInt().coerceAtLeast(1),
+            (decoded.height * scale).toInt().coerceAtLeast(1), true
+        )
+    }
+
     /**
      * Sends a kiss. The one write a widget can perform.
      *

@@ -1,67 +1,171 @@
-// "Which picture is you?"
+// "Your mascot": the picture that stands for you, everywhere the app shows
+// the two of you — the mood bar, the wardrobe, the distance widget.
 //
-// The app ships one picture of each of you, and the same app goes on both
-// phones, so each phone has to be told which one is its owner. The server
-// guesses until somebody answers (the person tracking their own cycle is
-// usually the right guess), and one answer settles both phones: picking
-// yours makes the other one your partner's, on their phone too.
+// Any picture you like. It is shrunk on the phone before it is sent (nobody
+// needs a 12-megapixel mascot, and the server has no image tools of its own),
+// with a second, tiny copy made for home-screen widgets. PNGs stay PNG so a
+// cut-out with a transparent background stays transparent.
+//
+// With no picture, you are drawn instead: the wardrobe character.
 import React, { useMemo, useState } from 'react';
-import { View, Text, Image, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { apiFetch } from '../services/api';
 import { refreshWidgets } from '../services/widgetBridge';
-import { ART_SETS } from '../assets/mascot';
 import { spacing, radius } from '../theme';
 import { useTheme } from './ThemeContext';
-import useMascotOwners, { adoptMascotArt } from './useMascotOwners';
+import Character from './Character';
+import useMascotOwners, { refreshMascotOwners } from './useMascotOwners';
 
-const CHOICES = ['a', 'b'];
+// Longest side, in pixels. Plenty for a figure a few hundred points tall on
+// the densest screen; the thumbnail is what a widget can carry.
+const FULL = 1080;
+const THUMB = 256;
+
+function resizeFor(asset, limit) {
+  const { width, height } = asset;
+  if (!width || !height || Math.max(width, height) <= limit) return [];
+  return [{ resize: width >= height ? { width: limit } : { height: limit } }];
+}
+
+async function prepare(asset) {
+  const png = /png/i.test(asset.mimeType || '') || /\.png$/i.test(asset.uri);
+  const format = png ? SaveFormat.PNG : SaveFormat.JPEG;
+  const mime = png ? 'image/png' : 'image/jpeg';
+  const full = await manipulateAsync(asset.uri, resizeFor(asset, FULL), { compress: 0.82, format, base64: true });
+  const thumb = await manipulateAsync(asset.uri, resizeFor(asset, THUMB), { compress: 0.85, format, base64: true });
+  return {
+    image: `data:${mime};base64,${full.base64}`,
+    thumb: `data:${mime};base64,${thumb.base64}`,
+    width: Math.round(full.width),
+    height: Math.round(full.height),
+  };
+}
 
 export default function MascotPicker() {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const owners = useMascotOwners();
-  const [saving, setSaving] = useState(null);
+  const { owners, pictures } = useMascotOwners();
+  const [busy, setBusy] = useState(null);   // 'upload' | 'remove' | 'side'
 
-  async function pick(art) {
-    if (art === owners.me || saving) return;
-    setSaving(art);
+  async function choose() {
+    if (busy) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Photos', 'Allow access to your photos to choose a mascot.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      // Free crop, so you can cut yourself out of a bigger photo.
+      allowsEditing: true,
+      quality: 1,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setBusy('upload');
+    try {
+      const body = await prepare(result.assets[0]);
+      await apiFetch('/profile/mascot', { method: 'PUT', body });
+      await refreshMascotOwners();
+      refreshWidgets();
+    } catch (err) {
+      Alert.alert('Could not set your mascot', err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function remove() {
+    Alert.alert('Remove your mascot?', 'You will be drawn as your wardrobe character instead.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setBusy('remove');
+          try {
+            await apiFetch('/profile/mascot', { method: 'DELETE' });
+            await refreshMascotOwners();
+            refreshWidgets();
+          } catch (err) {
+            Alert.alert('Could not remove it', err.message);
+          } finally {
+            setBusy(null);
+          }
+        },
+      },
+    ]);
+  }
+
+  // 'b' stands on the left of the distance widget, 'a' on the right.
+  async function stand(side) {
+    const art = side === 'left' ? 'b' : 'a';
+    if (owners.me === art || busy) return;
+    setBusy('side');
     try {
       await apiFetch('/profile/preferences', { method: 'PATCH', body: { mascotArt: art } });
-      adoptMascotArt(art);
-      // The distance widget draws both of you; it should swap too.
+      await refreshMascotOwners();
       refreshWidgets();
     } catch (err) {
       Alert.alert('Could not save', err.message);
     } finally {
-      setSaving(null);
+      setBusy(null);
     }
   }
 
+  const mySide = owners.me === 'b' ? 'left' : 'right';
+
   return (
     <View style={styles.card}>
-      <Text style={font.body}>Which picture is you?</Text>
+      <Text style={font.body}>Your mascot</Text>
       <Text style={font.muted}>
-        The other one becomes your partner, on both phones and on the distance widget.
+        Any picture you like stands for you in the app and on the widgets. Without one, you are drawn
+        as your wardrobe character.
       </Text>
-      <View style={styles.row}>
-        {CHOICES.map((art) => {
-          const active = owners.me === art;
-          return (
-            <Pressable
-              key={art}
-              onPress={() => pick(art)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active, busy: saving === art }}
-              accessibilityLabel={active ? 'This picture is you' : 'Choose this picture as you'}
-              style={[styles.option, active && styles.optionActive, saving === art && { opacity: 0.5 }]}
-            >
-              <Image source={ART_SETS[art].neutral} style={styles.photo} resizeMode="contain" />
-              <Text style={[styles.label, active && styles.labelActive]}>
-                {active ? 'You' : 'Your partner'}
-              </Text>
-            </Pressable>
-          );
-        })}
+
+      <View style={styles.stage}>
+        <View style={styles.figure}>
+          <Character who="me" height={150} animated={false} />
+          <Text style={styles.caption}>You</Text>
+        </View>
+        <View style={styles.figure}>
+          <Character who="partner" height={150} animated={false} />
+          <Text style={styles.caption}>{pictures.partner ? 'Your partner' : 'Your partner (not set)'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.buttons}>
+        <Pressable onPress={choose} style={[styles.button, styles.primary]} accessibilityRole="button">
+          {busy === 'upload'
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.primaryLabel}>{pictures.me ? 'Change picture' : 'Choose a picture'}</Text>}
+        </Pressable>
+        {pictures.me && (
+          <Pressable onPress={remove} style={styles.button} accessibilityRole="button">
+            {busy === 'remove'
+              ? <ActivityIndicator color={colors.textSecondary} />
+              : <Text style={styles.secondaryLabel}>Remove</Text>}
+          </Pressable>
+        )}
+      </View>
+
+      <Text style={[font.muted, { marginTop: spacing.md }]}>On the distance widget, you stand on the</Text>
+      <View style={styles.segmentRow}>
+        {['left', 'right'].map((side) => (
+          <Pressable
+            key={side}
+            onPress={() => stand(side)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: mySide === side }}
+            style={[styles.segment, mySide === side && styles.segmentActive]}
+          >
+            <Text style={[styles.segmentLabel, mySide === side && styles.segmentLabelActive]}>
+              {side === 'left' ? 'Left' : 'Right'}
+            </Text>
+          </Pressable>
+        ))}
       </View>
     </View>
   );
@@ -72,14 +176,26 @@ const makeStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
     borderWidth: 1, borderColor: colors.border, marginBottom: spacing.sm, gap: 4,
   },
-  row: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
-  option: {
-    flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.md,
-    borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surfaceAlt,
+  stage: {
+    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end',
+    marginTop: spacing.md, minHeight: 170,
   },
-  optionActive: { borderColor: colors.accentPink },
-  // Head to toe, the way the widget shows them.
-  photo: { height: 150, aspectRatio: 0.4 },
-  label: { marginTop: spacing.xs, fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-  labelActive: { color: colors.accentPink },
+  figure: { alignItems: 'center' },
+  caption: { marginTop: spacing.xs, fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
+  buttons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  button: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 44,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border,
+  },
+  primary: { backgroundColor: colors.accentPink, borderColor: colors.accentPink },
+  primaryLabel: { color: '#fff', fontWeight: '700' },
+  secondaryLabel: { color: colors.textSecondary, fontWeight: '600' },
+  segmentRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  segment: {
+    flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  segmentActive: { backgroundColor: colors.tabBarActivePill, borderColor: colors.accentPink },
+  segmentLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
+  segmentLabelActive: { color: colors.accentPink },
 });

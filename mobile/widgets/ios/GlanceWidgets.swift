@@ -96,13 +96,20 @@ struct GlanceEntry: TimelineEntry {
     let summary: WidgetSummary
     let signedIn: Bool
     let drawing: WidgetDrawing?
+    /// The uploaded mascots, "me" and "partner", for the distance widget.
+    var mascots: [String: Data] = [:]
 }
 
 struct GlanceProvider: TimelineProvider {
     /// Only the canvas widget needs strokes; everything else skips the call.
     let wantsDrawing: Bool
+    /// Only the distance widget draws the two mascots.
+    let wantsMascots: Bool
 
-    init(wantsDrawing: Bool = false) { self.wantsDrawing = wantsDrawing }
+    init(wantsDrawing: Bool = false, wantsMascots: Bool = false) {
+        self.wantsDrawing = wantsDrawing
+        self.wantsMascots = wantsMascots
+    }
 
     func placeholder(in context: Context) -> GlanceEntry {
         GlanceEntry(date: Date(), summary: .placeholder, signedIn: true, drawing: nil)
@@ -118,7 +125,8 @@ struct GlanceProvider: TimelineProvider {
             date: Date(),
             summary: WidgetDataLoader.cached ?? .signedOut,
             signedIn: WidgetDataLoader.credentials != nil,
-            drawing: wantsDrawing ? WidgetDataLoader.cachedDrawing : nil
+            drawing: wantsDrawing ? WidgetDataLoader.cachedDrawing : nil,
+            mascots: wantsMascots ? WidgetDataLoader.cachedMascots : [:]
         ))
     }
 
@@ -127,7 +135,9 @@ struct GlanceProvider: TimelineProvider {
             let signedIn = WidgetDataLoader.credentials != nil
             let summary = await WidgetDataLoader.fetch() ?? WidgetDataLoader.cached ?? .signedOut
             let drawing = wantsDrawing ? await WidgetDataLoader.fetchDrawing() : nil
-            let entry = GlanceEntry(date: Date(), summary: summary, signedIn: signedIn, drawing: drawing)
+            let mascots = wantsMascots ? await WidgetDataLoader.fetchMascots() : [:]
+            let entry = GlanceEntry(date: Date(), summary: summary, signedIn: signedIn,
+                                    drawing: drawing, mascots: mascots)
             let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date())
                 ?? Date().addingTimeInterval(1800)
             completion(Timeline(entries: [entry], policy: .after(next)))
@@ -575,7 +585,7 @@ private struct DistanceWiggle: Shape {
 /// One of you, head to toe: the full picture scaled to fit, never cropped,
 /// with your mood tucked into a corner and today's symptoms underneath.
 private struct DistanceMascot: View {
-    let art: String
+    let image: Data?
     let mood: String?
     let symptoms: [String]
     let moodOnTrailingEdge: Bool
@@ -606,13 +616,11 @@ private struct DistanceMascot: View {
         .frame(width: 60)
     }
 
-    /// The copy of the app's own picture, bundled into the extension by
-    /// plugins/withIosWidgets.js. A missing file draws nothing rather than
-    /// crashing the widget.
+    /// The mascot they uploaded, as the provider downloaded it; a plain
+    /// standing figure until there is one.
     private var picture: Image {
-        let name = art == "b" ? "widget_mascot_b.jpg" : "widget_mascot_a.jpg"
-        if let image = UIImage(named: name) { return Image(uiImage: image) }
-        return Image(systemName: "person.fill")
+        if let image, let uiImage = UIImage(data: image) { return Image(uiImage: uiImage) }
+        return Image(systemName: "figure.stand")
     }
 }
 
@@ -661,9 +669,10 @@ struct DistanceView: View {
                         .foregroundColor(.glText)
                 }
                 HStack(alignment: .center, spacing: 6) {
-                    // Her (picture b) on the left, him (a) on the right, on
-                    // both phones; each row follows whoever is in the slot.
-                    DistanceMascot(art: "b", mood: meOnLeft ? s.myMoodEmoji : s.partnerMoodEmoji,
+                    // Whoever holds side b stands on the left, on both phones;
+                    // each row follows whoever is in the slot.
+                    DistanceMascot(image: entry.mascots[meOnLeft ? "me" : "partner"],
+                                   mood: meOnLeft ? s.myMoodEmoji : s.partnerMoodEmoji,
                                    symptoms: (meOnLeft ? s.mySymptomEmoji : s.partnerSymptomEmoji) ?? [],
                                    moodOnTrailingEdge: true)
                     VStack(spacing: 6) {
@@ -687,7 +696,8 @@ struct DistanceView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    DistanceMascot(art: "a", mood: meOnLeft ? s.partnerMoodEmoji : s.myMoodEmoji,
+                    DistanceMascot(image: entry.mascots[meOnLeft ? "partner" : "me"],
+                                   mood: meOnLeft ? s.partnerMoodEmoji : s.myMoodEmoji,
                                    symptoms: (meOnLeft ? s.partnerSymptomEmoji : s.mySymptomEmoji) ?? [],
                                    moodOnTrailingEdge: false)
                 }
@@ -701,7 +711,7 @@ struct DistanceView: View {
 
 struct DistanceWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "LoversRockDistance", provider: GlanceProvider()) { entry in
+        StaticConfiguration(kind: "LoversRockDistance", provider: GlanceProvider(wantsMascots: true)) { entry in
             DistanceView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("Distance apart")

@@ -3,6 +3,7 @@ import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { MASCOT_ARTS, resolveMascotArt } from '../models/mascotArt.js';
 import { getActivePairForUser, otherUserId } from '../models/pairs.js';
+import { uploadBase64Image, deleteObject } from '../config/storage.js';
 
 const router = asyncRouter();
 
@@ -65,6 +66,17 @@ function present(user, nickname, mascotArt = null) {
     // mascotArtChosen says whether it was picked or inferred.
     mascotArt,
     mascotArtChosen: MASCOT_ARTS.includes(user.mascot_art),
+    // The picture they uploaded as their mascot, or null for none — then the
+    // app draws their wardrobe character instead. `key` goes through /media
+    // like every other picture.
+    mascot: user.mascot_key
+      ? {
+        key: user.mascot_key,
+        width: user.mascot_width,
+        height: user.mascot_height,
+        updatedAt: user.mascot_updated_at,
+      }
+      : null,
     // Null for the partner by construction — see the query in GET /.
     chatWallpaper: user.chat_wallpaper || null,
     // The public half of their encryption key. Public by design: it is what
@@ -99,6 +111,7 @@ router.get('/', requireAuth, async (req, res) => {
   const { rows: users } = await query(
     `SELECT id, name, avatar_url, theme_preference, public_key, public_key_set_at,
             cycle_role, mascot_art,
+            mascot_key, mascot_width, mascot_height, mascot_updated_at,
             CASE WHEN id = $2 THEN chat_wallpaper ELSE NULL END AS chat_wallpaper
      FROM users WHERE id = ANY($1::uuid[])`,
     [partnerId ? [req.userId, partnerId] : [req.userId], req.userId]
@@ -326,6 +339,96 @@ router.delete('/nickname', requireAuth, requirePair, async (req, res) => {
     nickname: null,
   });
 
+  res.status(204).end();
+});
+
+// ------------------------------------------------------------------ mascot
+
+// A decoded picture this big is not a mascot, it is a camera original that
+// skipped the app's resize — refused rather than stored and served forever.
+const MAX_MASCOT_BYTES = 6 * 1024 * 1024;
+const MAX_THUMB_BYTES = 400 * 1024;
+
+function decodedBytes(dataUrl) {
+  const comma = typeof dataUrl === 'string' ? dataUrl.indexOf(',') : -1;
+  return comma < 0 ? 0 : Math.floor(((dataUrl.length - comma - 1) * 3) / 4);
+}
+
+const dimension = (n) => Number.isInteger(n) && n > 0 && n <= 10000;
+
+/** Tells the other phone to reload both mascots. */
+async function announceMascot(req) {
+  const pair = await getActivePairForUser(req.userId);
+  if (pair) req.app.get('io')?.to(`pair:${pair.id}`).emit('mascot:changed', { userId: req.userId });
+}
+
+async function removeStored(keys) {
+  await Promise.all(keys.filter(Boolean).map((k) => deleteObject(k).catch(() => {})));
+}
+
+/**
+ * Sets MY mascot: { image, thumb, width, height }, both images as base64
+ * data URLs. Only ever my own row — the user comes from the token.
+ *
+ * The app sends the thumbnail itself (it already has the image decoded to
+ * resize it), so the server needs no image library to make one.
+ */
+router.put('/mascot', requireAuth, async (req, res) => {
+  const { image, thumb, width, height } = req.body || {};
+  if (typeof image !== 'string' || typeof thumb !== 'string') {
+    return res.status(400).json({ error: 'image and thumb (base64 data URLs) are required' });
+  }
+  if (!dimension(width) || !dimension(height)) {
+    return res.status(400).json({ error: 'width and height must be positive whole numbers' });
+  }
+  if (decodedBytes(image) > MAX_MASCOT_BYTES) {
+    return res.status(413).json({ error: 'That picture is too large - pick a smaller one' });
+  }
+  if (decodedBytes(thumb) > MAX_THUMB_BYTES) {
+    return res.status(413).json({ error: 'thumb is too large' });
+  }
+
+  const prefix = `mascots/${req.userId}`;
+  const key = await uploadBase64Image(image, { prefix });
+  let thumbKey;
+  try {
+    thumbKey = await uploadBase64Image(thumb, { prefix });
+  } catch (err) {
+    await removeStored([key]);
+    throw err;
+  }
+
+  const { rows: before } = await query(
+    'SELECT mascot_key, mascot_thumb_key FROM users WHERE id = $1', [req.userId]
+  );
+  const { rows } = await query(
+    `UPDATE users SET mascot_key = $1, mascot_thumb_key = $2, mascot_width = $3,
+            mascot_height = $4, mascot_updated_at = now()
+      WHERE id = $5
+      RETURNING mascot_key, mascot_width, mascot_height, mascot_updated_at`,
+    [key, thumbKey, width, height, req.userId]
+  );
+  await removeStored([before[0]?.mascot_key, before[0]?.mascot_thumb_key]);
+  await announceMascot(req);
+
+  const row = rows[0];
+  res.json({
+    mascot: { key: row.mascot_key, width: row.mascot_width, height: row.mascot_height, updatedAt: row.mascot_updated_at },
+  });
+});
+
+/** Removes MY mascot; the app goes back to drawing my wardrobe character. */
+router.delete('/mascot', requireAuth, async (req, res) => {
+  const { rows } = await query(
+    `UPDATE users u SET mascot_key = NULL, mascot_thumb_key = NULL, mascot_width = NULL,
+            mascot_height = NULL, mascot_updated_at = now()
+       FROM (SELECT mascot_key, mascot_thumb_key FROM users WHERE id = $1) old
+      WHERE u.id = $1
+      RETURNING old.mascot_key, old.mascot_thumb_key`,
+    [req.userId]
+  );
+  await removeStored([rows[0]?.mascot_key, rows[0]?.mascot_thumb_key]);
+  await announceMascot(req);
   res.status(204).end();
 });
 

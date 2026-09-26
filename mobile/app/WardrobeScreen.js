@@ -100,12 +100,12 @@ export default function WardrobeScreen() {
         {/* The real renderer, wearing your current mood — so you can see
             exactly what they see. */}
         <Character avatar={avatar} mood={mine?.mood} who="me" height={230} />
-        {/* Artwork is used as supplied. Drawing a hoodie over a picture of a
-            real person would look exactly as bad as it sounds, so when there
-            IS art the wardrobe stops claiming it applies. */}
+        {/* An uploaded mascot is used as supplied. Drawing a hoodie over a
+            picture of a real person would look exactly as bad as it sounds,
+            so when there IS one the wardrobe stops claiming it applies. */}
         <Text style={[font.muted, styles.stageNote]}>
           {hasArtFor('me')
-            ? 'Your artwork is what they see. The wardrobe dresses the drawn character.'
+            ? 'Your uploaded mascot is what they see (Settings → Your mascot). The wardrobe dresses the drawn character you get without one.'
             : 'This is what they see on their phone.'}
         </Text>
       </View>

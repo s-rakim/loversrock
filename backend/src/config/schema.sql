@@ -889,3 +889,14 @@ ALTER TABLE games_catalog DROP COLUMN IF EXISTS is_implemented;
 -- here never shows the same picture on both sides.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_art TEXT
   CHECK (mascot_art IN ('a', 'b'));
+
+-- Each person's own mascot: a picture they upload, replacing the preset
+-- artwork the app used to ship. Two copies: the picture itself for the app,
+-- and a small one for home-screen widgets, which cannot afford a full-size
+-- image (Android's RemoteViews has a ~1MB ceiling for everything on it). The
+-- size is kept so the app can frame it before the image has loaded.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_key TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_thumb_key TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_width INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_height INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_updated_at TIMESTAMPTZ;

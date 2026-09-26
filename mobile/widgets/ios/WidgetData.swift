@@ -213,6 +213,48 @@ enum WidgetDataLoader {
         return json["sent"] as? Bool ?? false
     }
 
+    // MARK: mascots
+
+    /// The two uploaded mascots as last downloaded, keyed "me" and "partner".
+    static var cachedMascots: [String: Data] {
+        var out: [String: Data] = [:]
+        for who in ["me", "partner"] {
+            if let data = defaults?.data(forKey: "mascot_\(who)") { out[who] = data }
+        }
+        return out
+    }
+
+    /// Brings both mascots up to date. The server's small copy, so a widget's
+    /// memory budget is never at risk; an unchanged one is a 304, a removed
+    /// one a 404 that clears the cache, and a failure keeps what was there.
+    static func fetchMascots() async -> [String: Data] {
+        guard let creds = credentials else { return cachedMascots }
+        for who in ["me", "partner"] {
+            guard let url = URL(string: "\(creds.apiUrl)/widget/mascot/\(who)") else { continue }
+            var request = URLRequest(url: url)
+            request.setValue(creds.token, forHTTPHeaderField: "X-Widget-Token")
+            if defaults?.data(forKey: "mascot_\(who)") != nil,
+               let etag = defaults?.string(forKey: "mascotEtag_\(who)") {
+                request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+            }
+            request.timeoutInterval = 10
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse
+            else { continue }
+            switch http.statusCode {
+            case 200:
+                defaults?.set(data, forKey: "mascot_\(who)")
+                defaults?.set(http.value(forHTTPHeaderField: "ETag"), forKey: "mascotEtag_\(who)")
+            case 404:
+                defaults?.removeObject(forKey: "mascot_\(who)")
+                defaults?.removeObject(forKey: "mascotEtag_\(who)")
+            default:
+                break
+            }
+        }
+        return cachedMascots
+    }
+
     static func fetchPhoto() async -> Data? {
         guard let creds = credentials,
               let url = URL(string: "\(creds.apiUrl)/widget/photo?token=\(creds.token)")
