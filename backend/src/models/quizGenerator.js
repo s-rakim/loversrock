@@ -17,7 +17,6 @@
 // says reaches the app until validateQuestions() has checked it: the right
 // number of choices, a trivia answer that is one of its choices, no repeats of
 // a question already in the bank. Anything that fails is dropped, not fixed.
-import Anthropic from '@anthropic-ai/sdk';
 import { query } from '../config/db.js';
 
 export const QUIZ_TYPES = ['trivia', 'guess_partner', 'this_or_that'];
@@ -116,6 +115,10 @@ const SCHEMA = {
 // --------------------------------------------------------------- providers
 
 async function askAnthropic(config, count, avoid) {
+  // Loaded only when Claude is actually the chosen provider, so a missing or
+  // broken install of the SDK can cost the quiz its fresh questions but never
+  // stop the server starting: this module is imported by the nightly jobs.
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const client = new Anthropic({
     apiKey: config.apiKey,
     ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),

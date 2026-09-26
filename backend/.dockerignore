@@ -10,7 +10,7 @@ npm-debug.log*
 .env
 .env.local
 
-# Test fixtures/state; the compose bind mount still exposes test/ at runtime.
+# Test state written by the local S3 stand-in; never part of an image.
 test/.s3-data
 
 .git

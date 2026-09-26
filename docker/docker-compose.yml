@@ -111,9 +111,13 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    volumes:
-      - ../backend:/app
-      - /app/node_modules
+    # No volumes: the backend runs the code and packages baked into its
+    # image. It used to mount ../backend over /app with node_modules in an
+    # anonymous volume — and Docker keeps an anonymous volume across
+    # rebuilds, so the first new dependency (@anthropic-ai/sdk) was installed
+    # in the image and then hidden behind the old node_modules, and the
+    # backend crash-looped on "Cannot find package". Updating is
+    # `docker compose up -d --build`, which rebuilds the image anyway.
 
 volumes:
   pgdata:
