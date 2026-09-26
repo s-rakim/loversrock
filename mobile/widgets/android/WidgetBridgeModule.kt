@@ -57,6 +57,18 @@ class WidgetBridgeModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(true)
     }
 
+    /** The translucency slider in Settings: percent opaque, 20–100. */
+    @ReactMethod
+    fun setWidgetOpacity(percent: Int, promise: Promise) {
+        try {
+            GlassStyle.setOpacity(reactContext, percent)
+            refreshWidgets()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("WIDGET_OPACITY_FAILED", e)
+        }
+    }
+
     @ReactMethod
     fun setLockScreenEnabled(enabled: Boolean, promise: Promise) {
         prefs().edit().putBoolean("lockScreenEnabled", enabled).apply()

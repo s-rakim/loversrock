@@ -22,11 +22,18 @@ private extension Color {
 /// shade lighter at the top, a sheen over the upper half, and a bright rim
 /// following the widget's own corner shape.
 struct LRGlass: View {
+    /// Percent opaque from the Settings slider (WidgetBridge.setWidgetOpacity),
+    /// 70 until it is moved — the same default as Android.
+    private var opacity: Double {
+        let stored = UserDefaults(suiteName: WidgetDataLoader.appGroup)?.object(forKey: "glassOpacity") as? Int
+        return Double(max(0, min(100, stored ?? 70))) / 100
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(red: 0.894, green: 0.902, blue: 0.918).opacity(0.84),
-                         Color(red: 0.682, green: 0.698, blue: 0.729).opacity(0.76)],
+                colors: [Color(red: 0.894, green: 0.902, blue: 0.918).opacity(min(1, opacity + 0.03)),
+                         Color(red: 0.682, green: 0.698, blue: 0.729).opacity(max(0, opacity - 0.03))],
                 startPoint: .top, endPoint: .bottom)
             LinearGradient(
                 colors: [Color.white.opacity(0.45), Color.white.opacity(0)],

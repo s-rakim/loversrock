@@ -13,11 +13,10 @@
          A launcher will not blur the wallpaper behind an app's widget, and an
          app cannot read the wallpaper to blur a copy itself, so the glass is
          built from what it can do: a translucent grey body the wallpaper
-         shows through (about 70% — any clearer and text stops being
-         readable over a busy wallpaper, with no blur to calm it), a bright
-         sheen across the top, and a light rim. -->
-    <color name="widget_glass_top">#C0E4E6EA</color>
-    <color name="widget_glass_bottom">#B0AEB2BA</color>
+         shows through, a bright sheen across the top, and a light rim. How
+         see-through the body is is a setting (20–100%, default 70%), so its
+         colours live in the generated drawable/widget_glass_NN.xml files,
+         not here — see tools/generate_glass.py. -->
     <color name="widget_glass_sheen">#73FFFFFF</color>
     <color name="widget_glass_rim">#B3FFFFFF</color>
     <color name="widget_glass_chip">#CCFFFFFF</color>

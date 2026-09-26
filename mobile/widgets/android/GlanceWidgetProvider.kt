@@ -85,6 +85,7 @@ abstract class GlanceWidgetProvider : AppWidgetProvider() {
         data: WidgetRepository.Summary?
     ) {
         val views = RemoteViews(context.packageName, layoutId)
+        GlassStyle.apply(context, views, R.id.widget_root)
 
         // Three states before the widget has anything to say, and each needs
         // to tell the person what to DO about it rather than showing a dash.

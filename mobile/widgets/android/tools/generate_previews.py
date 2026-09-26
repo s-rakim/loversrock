@@ -33,10 +33,11 @@ MUTED = (85, 90, 98)
 ACCENT = (232, 96, 122)
 BLUSH = (243, 184, 196)
 
-# widget_glass_top / widget_glass_bottom (ARGB there, RGBA here) and the
-# sheen's peak alpha.
-GLASS_TOP = (228, 230, 234, 0xC0)
-GLASS_BOTTOM = (174, 178, 186, 0xB0)
+# The glass at its default level, as tools/generate_glass.py draws it (the
+# picker shows the default; the Settings slider changes it on the phone),
+# and the sheen's peak alpha.
+GLASS_TOP = (228, 230, 234, round(255 * 0.73))
+GLASS_BOTTOM = (174, 178, 186, round(255 * 0.67))
 GLASS_SHEEN = 0x73 / 255
 
 CELL = 150        # px per launcher cell in the preview; a preview is scaled to fit anyway

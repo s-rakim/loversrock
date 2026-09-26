@@ -13,6 +13,10 @@ RCT_EXTERN_METHOD(clearCredentials:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(refresh:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(setWidgetOpacity:(nonnull NSNumber *)percent
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(setLockScreenEnabled:(BOOL)enabled
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

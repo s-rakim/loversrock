@@ -43,6 +43,19 @@ class WidgetBridge: NSObject {
         resolve(true)
     }
 
+    /// The translucency slider in Settings: percent opaque, 20–100. Read by
+    /// LRGlass in the extension through the shared App Group.
+    @objc(setWidgetOpacity:resolver:rejecter:)
+    func setWidgetOpacity(
+        _ percent: NSNumber,
+        resolver resolve: RCTPromiseResolveBlock,
+        rejecter reject: RCTPromiseRejectBlock
+    ) {
+        defaults?.set(max(0, min(100, percent.intValue)), forKey: "glassOpacity")
+        WidgetCenter.shared.reloadAllTimelines()
+        resolve(nil)
+    }
+
     /// iOS has real lock screen widgets, so there is no notification fallback
     /// to toggle here — this exists only so the JS API is identical on both
     /// platforms.

@@ -60,6 +60,7 @@ class SummaryWidgetProvider : AppWidgetProvider() {
 
     private fun render(context: Context, manager: AppWidgetManager, widgetId: Int, data: WidgetRepository.Summary?) {
         val views = RemoteViews(context.packageName, R.layout.widget_summary)
+        GlassStyle.apply(context, views, R.id.widget_root)
 
         if (WidgetRepository.credentials(context) == null) {
             views.setTextViewText(R.id.widget_headline, "Open loversrock")
