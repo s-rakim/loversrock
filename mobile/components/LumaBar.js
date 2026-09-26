@@ -63,6 +63,36 @@ export const TAB_ROUTES = Object.keys(TAB_META);
 
 const GLOW = 64;
 
+// The bar's own height: the 44px tab slots, the row's vertical padding and
+// the pill's border. Kept in step with the styles below by the nav test.
+const BAR_HEIGHT = 44 + 8 * 2 + 2;
+const BAR_GAP = 12;
+
+/**
+ * How much of the bottom of the screen the floating bar covers.
+ *
+ * The bar floats OVER the screens rather than taking layout space from them,
+ * so every screen that scrolls or pins something to its bottom edge has to
+ * leave this much room itself. Screens used to guess — `paddingBottom: 140`
+ * here, 32 there — and the cycle tracker guessed 32, which put its last card
+ * and its own inner tab bar underneath this one.
+ *
+ * Derived from the real safe-area inset, because the bar sits above it: on a
+ * phone with a gesture strip the inset is ~34px, with three-button navigation
+ * it can be 48, and a constant is wrong on one of them.
+ */
+export function useBarClearance() {
+  const insets = useSafeAreaInsets();
+  const bottom = Math.max(insets.bottom, spacing.sm);
+  return {
+    // Where something floating above the bar should sit.
+    above: bottom + BAR_HEIGHT + BAR_GAP,
+    // What a scrolling screen should pad its content by, so the last row can
+    // be scrolled clear of the bar rather than resting behind it.
+    content: bottom + BAR_HEIGHT + BAR_GAP * 2,
+  };
+}
+
 /** The soft light under the active tab, built without a blur filter. */
 function Glow({ colors }) {
   return (

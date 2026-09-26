@@ -35,7 +35,8 @@
     "test:checkins": "node test/checkins.mjs",
     "test:feed": "node test/feed.mjs",
     "test:seed": "node test/seed.mjs",
-    "test:cycle-role": "node test/cycleRole.mjs"
+    "test:cycle-role": "node test/cycleRole.mjs",
+    "test:partner-calendar": "node test/partnerCalendar.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

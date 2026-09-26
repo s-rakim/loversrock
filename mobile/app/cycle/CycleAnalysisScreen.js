@@ -7,6 +7,7 @@ import { spacing, radius } from '../../theme';
 import { useTheme } from '../../components/ThemeContext';
 import { Stagger, MorphButton, GrowBar } from '../../components/Motion';
 import { useCycle, todayDateString } from '../../components/cycle/CycleContext';
+import { useCycleContentPadding } from '../../components/cycle/layout';
 
 function prettyDate(date) {
   if (!date) return '—';
@@ -22,6 +23,8 @@ function daysBetween(from, to) {
 }
 
 export default function CycleAnalysisScreen({ navigation }) {
+  // Clears the floating add button and the app's tab bar; see cycle/layout.
+  const bottomPad = useCycleContentPadding();
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { settings, cycles, analysis, logsByDate, saveLog, updateSettings } = useCycle();
@@ -61,7 +64,7 @@ export default function CycleAnalysisScreen({ navigation }) {
   const completed = cycles.filter((c) => c.end_date);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
       <Stagger delayStep={55}>
         <View style={styles.card}>
           <Text style={font.h2}>Cycle analysis</Text>

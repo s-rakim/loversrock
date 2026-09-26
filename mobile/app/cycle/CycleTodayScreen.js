@@ -12,6 +12,7 @@ import { Stagger, MorphButton } from '../../components/Motion';
 import PhaseBar from '../../components/cycle/PhaseBar';
 import { useCycle, todayDateString } from '../../components/cycle/CycleContext';
 import { PHASE_META, SYMPTOMS_BY_ID, MOODS_BY_ID } from '../../data/cycleCatalog';
+import { useCycleContentPadding } from '../../components/cycle/layout';
 
 function prettyDate(date) {
   if (!date) return '—';
@@ -21,6 +22,8 @@ function prettyDate(date) {
 }
 
 export default function CycleTodayScreen({ navigation }) {
+  // Clears the floating add button and the app's tab bar; see cycle/layout.
+  const bottomPad = useCycleContentPadding();
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const {
@@ -44,7 +47,7 @@ export default function CycleTodayScreen({ navigation }) {
   const recent = cycles.slice(0, 4);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
       <Stagger delayStep={55}>
         {/* The reference app leads with this when there is nothing to predict
             from; once a period is running it becomes the "end it" action. */}

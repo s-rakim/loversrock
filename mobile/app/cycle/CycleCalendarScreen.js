@@ -12,6 +12,7 @@ import { useTheme } from '../../components/ThemeContext';
 import { Stagger, MorphButton, Pop } from '../../components/Motion';
 import { useCycle, shiftMonth, todayDateString } from '../../components/cycle/CycleContext';
 import { SYMPTOMS_BY_ID, MOODS_BY_ID } from '../../data/cycleCatalog';
+import { useCycleContentPadding } from '../../components/cycle/layout';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -44,10 +45,19 @@ function prettyDate(date) {
   });
 }
 
-export default function CycleCalendarScreen({ navigation }) {
+// `readOnly` is the partner's calendar: their partner's month, drawn from
+// what was shared with them, with nothing that writes. It used to be accepted
+// by nobody — the shell passed it and this ignored it — so the partner saw
+// their OWN empty month with an Edit button on every day.
+export default function CycleCalendarScreen({ navigation, readOnly = false }) {
+  // Clears the floating add button and the app's tab bar; see cycle/layout.
+  const bottomPad = useCycleContentPadding();
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { month, setMonth, predictions, periodDates, logsByDate, cycles } = useCycle();
+  const cycle = useCycle();
+  const { month, setMonth } = cycle;
+  // Same four fields either way, so everything below draws both months.
+  const { predictions, periodDates, logsByDate, cycles } = readOnly ? cycle.partnerView : cycle;
   const [selected, setSelected] = useState(todayDateString());
 
   const grid = buildMonthGrid(month);
@@ -71,8 +81,20 @@ export default function CycleCalendarScreen({ navigation }) {
 
   const selectedLog = logsByDate[selected];
 
+  if (readOnly && !cycle.partnerView.sharingEnabled) {
+    return (
+      <View style={styles.notShared}>
+        <Ionicons name="lock-closed-outline" size={36} color={colors.textSecondary} />
+        <Text style={[font.h2, { marginTop: spacing.sm, textAlign: 'center' }]}>Not shared yet</Text>
+        <Text style={[font.muted, { marginTop: spacing.xs, textAlign: 'center' }]}>
+          Their calendar appears here once they turn on sharing — and only the parts they choose.
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
       <Stagger delayStep={50}>
         <View style={styles.header}>
           <MorphButton onPress={() => setMonth(shiftMonth(month, -1))} style={styles.arrow}>
@@ -143,13 +165,15 @@ export default function CycleCalendarScreen({ navigation }) {
               {prettyDate(selected)}
               {selected === today ? ' · Today' : ''}
             </Text>
-            <MorphButton
-              onPress={() => navigation.navigate('CycleDailyLog', { date: selected })}
-              style={styles.editPill}
-            >
-              <Ionicons name="create-outline" size={15} color="#fff" />
-              <Text style={styles.editPillText}>Edit</Text>
-            </MorphButton>
+            {!readOnly && (
+              <MorphButton
+                onPress={() => navigation.navigate('CycleDailyLog', { date: selected })}
+                style={styles.editPill}
+              >
+                <Ionicons name="create-outline" size={15} color="#fff" />
+                <Text style={styles.editPillText}>Edit</Text>
+              </MorphButton>
+            )}
           </View>
 
           {selectedLog ? (
@@ -174,6 +198,10 @@ export default function CycleCalendarScreen({ navigation }) {
                 <Text style={[font.muted, { marginTop: 2 }]}>Has a note</Text>
               )}
             </View>
+          ) : readOnly ? (
+            // "Nothing logged" would be a claim about their day; all this
+            // phone knows is that nothing was SHARED for it.
+            <Text style={[font.muted, { marginTop: spacing.sm }]}>Nothing shared for this day.</Text>
           ) : (
             <Pressable
               onPress={() => navigation.navigate('CycleDailyLog', { date: selected })}
@@ -203,6 +231,7 @@ const makeStyles = (colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.lg, paddingBottom: spacing.xl },
+    notShared: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
     header: {
       flexDirection: 'row', alignItems: 'center',
       justifyContent: 'space-between', marginBottom: spacing.md,

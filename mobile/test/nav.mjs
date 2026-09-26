@@ -418,5 +418,54 @@ check('and the column itself only accepts those two',
 check('and is nullable, so an existing account is asked rather than assumed',
   !/cycle_role TEXT NOT NULL/.test(roleSchema));
 
+console.log('\n=== ONLY ONE BAR OWNS THE BOTTOM OF THE SCREEN ===');
+// The cycle tracker drew its own Today/Calendar bar along the bottom edge,
+// where the app's floating bar already lives. The two overlapped: "Today"
+// landed on Play, "Calendar" on Quiz, and neither was reliably tappable.
+{
+  const shell = read('app', 'cycle', 'CycleHomeScreen.js');
+  check('the cycle tabs use the same top bar as Photos and Play',
+    /<SectionBar items=\{tabs\}/.test(shell));
+  check('and nothing in the shell is pinned to the bottom edge as a bar',
+    !/styles\.bar\b/.test(shell) && !/borderTopWidth/.test(shell));
+  check('the add button floats above the main bar, at its measured height',
+    /bottom: clearance\.above/.test(shell));
+  check('its size is shared with the screens that have to clear it',
+    /FAB_SIZE/.test(shell) && /FAB_SIZE/.test(read('components', 'cycle', 'layout.js')));
+
+  // Each scrolling cycle screen used to pad by a flat 32px.
+  for (const f of ['CycleTodayScreen', 'CycleCalendarScreen', 'PartnerCycleScreen', 'CycleAnalysisScreen']) {
+    check(`  ${f} scrolls its last row clear of both`,
+      /paddingBottom: bottomPad/.test(read('app', 'cycle', `${f}.js`)));
+  }
+
+  // The clearance is only as good as the height it assumes. Tie the constant
+  // to the styles it describes, so changing one without the other fails here
+  // rather than as content hidden behind the bar.
+  const tabHeight = Number(bar.match(/tab: \{[\s\S]*?height: (\d+)/)?.[1]);
+  const rowPad = bar.match(/row: \{[\s\S]*?paddingVertical: spacing\.(\w+)/)?.[1];
+  const border = Number(bar.match(/pill: \{[\s\S]*?borderWidth: (\d+)/)?.[1]);
+  const declared = bar.match(/const BAR_HEIGHT = ([^;]+);/)?.[1];
+  check('the bar height the clearance uses matches the bar’s own styles',
+    tabHeight === 44 && rowPad === 'sm' && border === 1 && declared === '44 + 8 * 2 + 2',
+    { tabHeight, rowPad, border, declared });
+}
+
+console.log('\n=== THE PARTNER’S CALENDAR IS THEIR PARTNER’S, AND CANNOT WRITE ===');
+{
+  const cal = read('app', 'cycle', 'CycleCalendarScreen.js');
+  const ctx2 = read('components', 'cycle', 'CycleContext.js');
+  // The shell passed readOnly and the screen's signature dropped it, so the
+  // partner saw their own empty month with Edit on every day.
+  check('the calendar actually accepts readOnly', /function CycleCalendarScreen\(\{ navigation, readOnly/.test(cal));
+  check('and draws the partner’s month from it', /readOnly \? cycle\.partnerView : cycle/.test(cal));
+  check('the Edit button is gone when read-only', /\{!readOnly && \(\s*<MorphButton/.test(cal));
+  check('and so is the add-a-note link', /\) : readOnly \? \(/.test(cal));
+  check('the partner month comes from the sharing-gated endpoint',
+    /\/period\/partner\/calendar\?month=/.test(ctx2));
+  check('and goes through the same derivation as your own',
+    /periodDatesOf\(partnerCalendar\)/.test(ctx2) && /periodDatesOf\(calendar\)/.test(ctx2));
+}
+
 console.log(`\nNAV RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

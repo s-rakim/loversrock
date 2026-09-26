@@ -365,6 +365,98 @@ router.patch('/sharing', async (req, res) => {
  * default (docs/SPEC.md #5, amended). sharing_enabled is the master switch:
  * with it off, nothing is returned whatever the individual flags say.
  */
+/**
+ * The partner's month, as the partner is allowed to see it.
+ *
+ * Same shape as GET /calendar so the app draws both with one screen — but
+ * built from what the owner chose to share, field by field, on the SERVER.
+ * The app never receives something it then has to remember to hide: a field
+ * that is not shared is not in the response.
+ *
+ *   share_phase off     no cycles, no predictions — nothing to colour in
+ *   share_flow          flow per day
+ *   share_symptoms      symptoms per day
+ *   share_mood          moods per day
+ *   share_sex_drive     the level, and only a yes/no that activity was
+ *                       logged — never the intercourse record itself
+ *   share_notes         only THAT a note exists; the text never leaves here
+ *
+ * Before this existed the partner's Calendar tab read GET /calendar, which is
+ * the caller's OWN cycle: an empty month, with buttons offering to log into it.
+ */
+router.get('/partner/calendar', requirePair, async (req, res) => {
+  const month = req.query.month;
+  if (!/^\d{4}-\d{2}$/.test(month || '')) {
+    return res.status(400).json({ error: 'month must be formatted YYYY-MM' });
+  }
+
+  const { rows } = await query('SELECT * FROM period_settings WHERE user_id = $1', [req.partnerId]);
+  const partnerSettings = rows[0];
+  if (!partnerSettings || !partnerSettings.sharing_enabled) {
+    return res.json({ month, sharingEnabled: false, cycles: [], logs: [], predictions: null });
+  }
+
+  const { rows: sharingRows } = await query('SELECT * FROM period_sharing WHERE user_id = $1', [req.partnerId]);
+  // No row means the defaults: phase only — the same rule GET /partner uses.
+  const sharing = sharingRows[0] || { share_phase: true };
+
+  let cycles = [];
+  let predictions = null;
+  if (sharing.share_phase) {
+    const { rows: cycleRows } = await query(
+      'SELECT start_date, end_date FROM period_cycles WHERE user_id = $1 ORDER BY start_date',
+      [req.partnerId]
+    );
+    cycles = cycleRows.map((c) => ({ startDate: c.start_date, endDate: c.end_date }));
+    const last = cycleRows[cycleRows.length - 1];
+    if (last) {
+      predictions = computePredictions({
+        lastCycleStart: last.start_date,
+        settings: {
+          averageCycleLength: partnerSettings.average_cycle_length,
+          averagePeriodLength: partnerSettings.average_period_length,
+          lutealPhaseLength: partnerSettings.luteal_phase_length,
+        },
+        today: toDateString(new Date()),
+      });
+    }
+  }
+
+  const anyDaily = sharing.share_flow || sharing.share_symptoms || sharing.share_mood
+    || sharing.share_sex_drive || sharing.share_notes;
+  let logs = [];
+  if (anyDaily) {
+    const { rows: logRows } = await query(
+      `SELECT * FROM period_daily_logs WHERE user_id = $1 AND to_char(log_date, 'YYYY-MM') = $2`,
+      [req.partnerId, month]
+    );
+    logs = logRows.map((l) => {
+      const day = { date: l.log_date };
+      if (sharing.share_flow) day.flow = l.flow;
+      if (sharing.share_symptoms) day.symptoms = l.symptoms || [];
+      if (sharing.share_mood) {
+        day.moods = l.moods || (l.mood ? [l.mood] : []);
+        day.mood = l.mood;
+      }
+      if (sharing.share_sex_drive) {
+        day.sexDrive = l.sex_drive;
+        day.hasIntercourse = Boolean(l.intercourse);
+      }
+      if (sharing.share_notes) day.hasNotes = Boolean(l.notes);
+      return day;
+    });
+  }
+
+  res.json({
+    month,
+    sharingEnabled: true,
+    shared: Object.fromEntries(SHARING_CATEGORIES.map((key) => [key, Boolean(sharing[key])])),
+    cycles,
+    logs,
+    predictions,
+  });
+});
+
 router.get('/partner', requirePair, async (req, res) => {
   const { rows } = await query('SELECT * FROM period_settings WHERE user_id = $1', [req.partnerId]);
   const partnerSettings = rows[0];

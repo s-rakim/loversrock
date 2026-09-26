@@ -1,20 +1,34 @@
 // The cycle tracker shell.
 //
-// The reference app puts the whole tracker behind its own bottom bar —
-// Today · Calendar · (+) · Partner · Analysis — rather than mixing it into
-// the app's main tabs, and this does the same. It is deliberately not a
-// nested navigator: the app's floating glass tab bar already owns the bottom
-// of the screen on the main tabs, and stacking a second navigator's bar on
-// top of it fought for the same space. A plain state switch through
-// <CrossFade> also gives the tab change a glide instead of a cut.
+// The reference app puts the whole tracker behind its own tab bar — Today ·
+// Calendar · (+) · Partner · Analysis — and this keeps those sections, but not
+// where the reference puts them.
+//
+// It used to sit at the BOTTOM, which is where the app's own floating bar
+// already lives. The two drew on top of each other: "Today" landed on the
+// Play button, "Calendar" on Quiz, and neither was reliably tappable. Photos
+// and Play solved the same problem by putting their inner navigation at the
+// top, and this now does the same, with the same component, so the three
+// sections behave as one system instead of three.
+//
+// The add button could not come with it — a raised + in the middle of a top
+// bar reads as nothing — so it floats in the corner above the main bar, where
+// a thumb finds it, and only for the person who has something to log.
+//
+// Still deliberately not a nested navigator: a plain state switch through
+// <CrossFade> gives the tab change a glide instead of a cut, and the log
+// sheets are already a stack of their own one level up.
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { spacing, radius } from '../../theme';
+import { spacing } from '../../theme';
 import { useTheme } from '../../components/ThemeContext';
-import { CrossFade, MorphButton, Pop } from '../../components/Motion';
+import { CrossFade, MorphButton } from '../../components/Motion';
+import { SectionBar } from '../../components/SectionBar';
+import { useBarClearance } from '../../components/LumaBar';
 import { useCycle, todayDateString } from '../../components/cycle/CycleContext';
+import { FAB_SIZE } from '../../components/cycle/layout';
 
 import CycleTodayScreen from './CycleTodayScreen';
 import CycleCalendarScreen from './CycleCalendarScreen';
@@ -46,6 +60,7 @@ const PARTNER_TABS = [
 function Shell({ navigation }) {
   const { colors, font } = useTheme();
   const insets = useSafeAreaInsets();
+  const clearance = useBarClearance();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { loading, error, role } = useCycle();
   const tabs = role === 'partner' ? PARTNER_TABS : OWNER_TABS;
@@ -54,6 +69,10 @@ function Shell({ navigation }) {
   // The first tab of whichever set applies, rather than a hardcoded 'today':
   // the partner's set has no 'today', so hardcoding it rendered nothing.
   const active = tab && tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
+
+  // The bar below covers the notch, so what renders under it is told the top
+  // is already handled — same arrangement as withSectionBar.
+  const inner = useMemo(() => ({ ...insets, top: 0 }), [insets]);
 
   if (loading) {
     return (
@@ -83,67 +102,41 @@ function Shell({ navigation }) {
     );
   }
 
-  // The bar splits around the raised add button, exactly like the reference.
-  // The partner has no add button — there is nothing for them to log — so
-  // their two tabs sit side by side instead of straddling a gap.
+  // The partner has no add button: there is nothing for them to log.
   const owner = role !== 'partner';
-  const left = owner ? tabs.slice(0, 2) : tabs;
-  const right = owner ? tabs.slice(2) : [];
 
   return (
-    <View style={styles.root}>
-      <CrossFade activeKey={active}>
-        {(shown) => (
-          <View style={{ flex: 1 }}>
-            {shown === 'today' && <CycleTodayScreen navigation={navigation} onGoToTab={setTab} />}
-            {shown === 'calendar' && <CycleCalendarScreen navigation={navigation} readOnly={!owner} />}
-            {shown === 'partner' && <PartnerCycleScreen navigation={navigation} />}
-            {shown === 'analysis' && <CycleAnalysisScreen navigation={navigation} />}
-          </View>
-        )}
-      </CrossFade>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <SectionBar items={tabs} active={active} onSelect={setTab} />
 
-      <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
-        {left.map((t) => (
-          <TabButton key={t.key} tab={t} active={active === t.key} onPress={() => setTab(t.key)} />
-        ))}
+      <SafeAreaInsetsContext.Provider value={inner}>
+        <CrossFade activeKey={active}>
+          {(shown) => (
+            <View style={{ flex: 1 }}>
+              {shown === 'today' && (
+                <CycleTodayScreen navigation={navigation} onGoToTab={setTab} />
+              )}
+              {shown === 'calendar' && (
+                <CycleCalendarScreen navigation={navigation} readOnly={!owner} />
+              )}
+              {shown === 'partner' && <PartnerCycleScreen navigation={navigation} />}
+              {shown === 'analysis' && <CycleAnalysisScreen navigation={navigation} />}
+            </View>
+          )}
+        </CrossFade>
+      </SafeAreaInsetsContext.Provider>
 
-        {owner && (
-          <MorphButton
-            onPress={() => navigation.navigate('CycleDailyLog', { date: todayDateString() })}
-            style={styles.fab}
-          >
-            <Ionicons name="add" size={30} color="#fff" />
-          </MorphButton>
-        )}
-
-        {right.map((t) => (
-          <TabButton key={t.key} tab={t} active={active === t.key} onPress={() => setTab(t.key)} />
-        ))}
-      </View>
+      {owner && (
+        <MorphButton
+          onPress={() => navigation.navigate('CycleDailyLog', { date: todayDateString() })}
+          accessibilityRole="button"
+          accessibilityLabel="Log today"
+          style={[styles.fab, { bottom: clearance.above }]}
+        >
+          <Ionicons name="add" size={30} color="#fff" />
+        </MorphButton>
+      )}
     </View>
-  );
-}
-
-function TabButton({ tab, active, onPress }) {
-  const { colors, font } = useTheme();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-
-  return (
-    <Pressable onPress={onPress} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: active }}>
-      <Pop active={active}>
-        <View style={[styles.tabPill, active && { backgroundColor: colors.tabBarActivePill }]}>
-          <Ionicons
-            name={active ? tab.icon : `${tab.icon}-outline`}
-            size={20}
-            color={active ? colors.accentPink : colors.textSecondary}
-          />
-        </View>
-      </Pop>
-      <Text style={[font.muted, styles.tabLabel, active && { color: colors.textPrimary, fontWeight: '600' }]}>
-        {tab.label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -158,27 +151,14 @@ const makeStyles = (colors) =>
       flex: 1, backgroundColor: 'transparent',
       alignItems: 'center', justifyContent: 'center', padding: spacing.lg,
     },
-    bar: {
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      justifyContent: 'space-around',
-      paddingTop: spacing.sm,
-      backgroundColor: colors.surface,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    tab: { alignItems: 'center', flex: 1 },
-    tabPill: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: 4,
-      borderRadius: radius.pill,
-    },
-    tabLabel: { fontSize: 11, marginTop: 2 },
+    // Absolute, so it floats over the scrolling content rather than taking a
+    // strip of the screen; `bottom` is set from the main bar's real height.
     fab: {
-      width: 58, height: 58, borderRadius: 29,
+      position: 'absolute',
+      right: spacing.lg,
+      width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
       alignItems: 'center', justifyContent: 'center',
       backgroundColor: colors.accentPink,
-      marginBottom: spacing.sm,
       shadowColor: colors.accentPink,
       shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
       elevation: 6,

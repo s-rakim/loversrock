@@ -20,6 +20,7 @@ import PhaseBar from '../../components/cycle/PhaseBar';
 import { useCycle } from '../../components/cycle/CycleContext';
 import { apiFetch } from '../../services/api';
 import { PHASE_META, SYMPTOMS_BY_ID, MOODS_BY_ID, SEX_DRIVE_LEVELS } from '../../data/cycleCatalog';
+import { useCycleContentPadding } from '../../components/cycle/layout';
 
 function prettyDate(date) {
   if (!date) return null;
@@ -69,6 +70,8 @@ function ChanceCurve({ cycleDay, cycleLength, ovulationDay, color }) {
 }
 
 export default function PartnerCycleScreen() {
+  // Clears the floating add button and the app's tab bar; see cycle/layout.
+  const bottomPad = useCycleContentPadding();
   const { colors, font, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { partner, settings } = useCycle();
@@ -121,7 +124,7 @@ export default function PartnerCycleScreen() {
   const headlineMood = today.moment || today.moods?.[0] || null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
       <Stagger delayStep={60}>
         <View style={styles.hero}>
           <Text style={[font.muted, { textAlign: 'center' }]}>{name}'s cycle</Text>
