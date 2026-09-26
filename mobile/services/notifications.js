@@ -184,23 +184,34 @@ export const SCREEN_FOR_TYPE = {
   prompt: 'DailyPrompt',
   quiz: 'Quiz',
   partner_update: 'Home',
-  game_invite: 'Play',
-  game_turn: 'Play',
+  game_invite: { tab: 'Play', screen: 'Arcade' },
+  game_turn: { tab: 'Play', screen: 'Arcade' },
   // One entry, not two: this object had `call` twice, so the first was dead
   // and the second silently won. It happened to be the right one, which is
   // why nothing ever looked wrong.
   call: 'Call',
   period_reminder: 'Cycle',
   water: 'Cycle',
-  memory: 'Photos',
-  message: 'Photos',
+  // Three of these live inside a section rather than being a tab of their
+  // own, and naming only the tab lands you on that section's FIRST screen.
+  // A tapped message opened the camera; a game invite opened the drawings
+  // shelf. Both looked exactly like a button that does nothing, because
+  // arriving somewhere adjacent is indistinguishable from not arriving.
+  memory: { tab: 'Photos', screen: 'Wall' },
+  message: { tab: 'Photos', screen: 'Messages' },
 };
 
 export function routeForNotification(response) {
   const data = response?.notification?.request?.content?.data || {};
-  const screen = data.screen || SCREEN_FOR_TYPE[data.type];
-  if (!screen) return null;
-  return { screen, params: data.params ? safeParse(data.params) : undefined };
+  const target = data.screen || SCREEN_FOR_TYPE[data.type];
+  if (!target) return null;
+
+  const params = data.params ? safeParse(data.params) : undefined;
+
+  // A plain string is a tab or a root stack screen. An object names a screen
+  // INSIDE a section, and the caller has to nest the navigation to reach it.
+  if (typeof target === 'string') return { screen: target, params };
+  return { screen: target.tab, inner: target.screen, params };
 }
 
 function safeParse(value) {

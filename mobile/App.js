@@ -177,7 +177,14 @@ function Root() {
       const route = routeForNotification(response);
       if (!route || !navigationRef.isReady()) return;
       if (tabs.has(route.screen)) {
-        navigationRef.navigate('MainTabs', { screen: route.screen, params: route.params });
+        // A section tab needs the screen inside it named too, or the tap
+        // lands on whatever that section happens to open first.
+        navigationRef.navigate('MainTabs', {
+          screen: route.screen,
+          params: route.inner
+            ? { screen: route.inner, params: route.params }
+            : route.params,
+        });
       } else {
         navigationRef.navigate(route.screen, route.params);
       }

@@ -107,10 +107,51 @@ console.log('\n=== NOTIFICATION TARGETS TOO ===');
 // the only symptom is a tap that does not work.
 const notifications = read('services', 'notifications.js');
 const block = notifications.slice(notifications.indexOf('SCREEN_FOR_TYPE'));
-const routes = [...block.slice(0, block.indexOf('};')).matchAll(/:\s*'(\w+)'/g)].map((m) => m[1]);
-check(`${routes.length} notification types map to a screen`, routes.length >= 8, routes);
+const table = block.slice(0, block.indexOf('};'));
+
+// Two shapes: `type: 'Screen'` for a tab or root screen, and
+// `type: { tab: 'X', screen: 'Y' }` for a screen inside a section.
+const flat = [...table.matchAll(/^\s*(\w+):\s*'(\w+)'/gm)].map((m) => ({ type: m[1], screen: m[2] }));
+const nested = [...table.matchAll(/^\s*(\w+):\s*\{\s*tab:\s*'(\w+)',\s*screen:\s*'(\w+)'\s*\}/gm)]
+  .map((m) => ({ type: m[1], tab: m[2], screen: m[3] }));
+const routes = [...flat.map((r) => r.screen), ...nested.map((r) => r.tab)];
+
+check(`${flat.length + nested.length} notification types map to a screen`,
+  flat.length + nested.length >= 8, { flat: flat.length, nested: nested.length });
 const unknownRoutes = routes.filter((r) => !known.has(r) && r !== 'Call');
 check('and every one of them is a real route', unknownRoutes.length === 0, unknownRoutes);
+
+// The section screens, read off each section file, so a nested target that
+// names a screen the section does not have is caught here rather than as a
+// tap that lands on the wrong thing.
+const sectionScreens = {};
+for (const [tab, file] of [['Photos', 'PhotoSectionScreen.js'], ['Play', 'PlaySectionScreen.js']]) {
+  const src = read('app', file);
+  sectionScreens[tab] = [...src.matchAll(/<Stack\.Screen name="(\w+)"/g)].map((m) => m[1]);
+}
+for (const r of nested) {
+  check(`  ${r.type} → ${r.tab}/${r.screen}, which that section has`,
+    (sectionScreens[r.tab] || []).includes(r.screen),
+    `${r.tab} has ${(sectionScreens[r.tab] || []).join(', ')}`);
+}
+
+// Naming only the tab lands on whatever that section opens FIRST, which is
+// why these three have to be nested rather than flat.
+for (const [type, tab, first] of [
+  ['message', 'Photos', 'the camera'],
+  ['memory', 'Photos', 'the camera'],
+  ['game_invite', 'Play', 'the drawings shelf'],
+  ['game_turn', 'Play', 'the drawings shelf'],
+]) {
+  check(`  ${type} does not stop at the ${tab} tab, which would open ${first}`,
+    nested.some((r) => r.type === type), table.match(new RegExp(`${type}:.*`))?.[0]);
+}
+
+// And the app has to actually nest the navigation, or the inner name is
+// carried all the way there and then dropped.
+check('App.js passes the inner screen through when there is one',
+  /route\.inner/.test(app) && /screen: route\.inner/.test(app),
+  'App.js should nest params for a section target');
 
 // The tab/stack split is decided at runtime from this list, and a second
 // hardcoded copy of it is how one notification quietly stops working.
@@ -159,8 +200,8 @@ check('and says when it is not, or every later message is swallowed',
 
 // A tap has to land somewhere that exists — asserted against the real route
 // table above.
-check('a message notification opens the photo section, where the thread lives',
-  /message: 'Photos'/.test(notif));
+check('a message notification opens the thread itself, not the section',
+  /message:\s*\{\s*tab:\s*'Photos',\s*screen:\s*'Messages'\s*\}/.test(notif));
 check('a call notification opens the call', /call: 'Call'/.test(notif));
 
 console.log('\n=== NOTHING IS BUILT ON THE SERVER AND UNREACHABLE IN THE APP ===');
