@@ -17,6 +17,50 @@ private extension Color {
     static let glMuted = Color(red: 0.55, green: 0.50, blue: 0.47)    // #8C7F79
 }
 
+/// Grey liquid glass: the background of every loversrock widget, matching the
+/// Android widgets' drawable/widget_background.xml. A translucent grey body a
+/// shade lighter at the top, a sheen over the upper half, and a bright rim
+/// following the widget's own corner shape.
+struct LRGlass: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(red: 0.894, green: 0.902, blue: 0.918).opacity(0.84),
+                         Color(red: 0.682, green: 0.698, blue: 0.729).opacity(0.76)],
+                startPoint: .top, endPoint: .bottom)
+            LinearGradient(
+                colors: [Color.white.opacity(0.45), Color.white.opacity(0)],
+                startPoint: .top, endPoint: UnitPoint(x: 0.5, y: 0.45))
+            ContainerRelativeShape()
+                .strokeBorder(Color.white.opacity(0.7), lineWidth: 1)
+        }
+    }
+}
+
+/// The glass behind a widget: as the container background on iOS 17+, where
+/// WidgetKit requires one (and drops it itself on the lock screen), and as a
+/// plain background before that — except on the lock screen, where a grey box
+/// behind a tinted accessory widget would just look broken.
+private struct LRGlassBackground: ViewModifier {
+    @Environment(\.widgetFamily) private var family
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.containerBackground(for: .widget) { LRGlass() }
+        } else if family == .accessoryRectangular || family == .accessoryCircular
+                    || family == .accessoryInline {
+            content
+        } else {
+            content.background(LRGlass())
+        }
+    }
+}
+
+extension View {
+    func lrGlassBackground() -> some View { modifier(LRGlassBackground()) }
+}
+
 /// "4m ago", in the fewest characters that are still honest.
 func lrAgo(_ iso: String?) -> String? {
     guard let iso, !iso.isEmpty else { return nil }
@@ -143,11 +187,7 @@ struct AnniversaryView: View {
 struct AnniversaryWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockAnniversary", provider: GlanceProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                AnniversaryView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                AnniversaryView(entry: entry)
-            }
+            AnniversaryView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("Together")
         .description("Days together, and the next milestone.")
@@ -179,11 +219,7 @@ struct QuestionView: View {
 struct QuestionWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockQuestion", provider: GlanceProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                QuestionView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                QuestionView(entry: entry)
-            }
+            QuestionView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("Today's question")
         .description("So you think about it during the day, not at 11pm.")
@@ -213,11 +249,7 @@ struct NextDateView: View {
 struct NextDateWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockNextDate", provider: GlanceProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                NextDateView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                NextDateView(entry: entry)
-            }
+            NextDateView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("Next date")
         .description("What you have planned, and how soon.")
@@ -248,11 +280,7 @@ struct SecretMessageView: View {
 struct SecretMessageWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockSecret", provider: GlanceProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                SecretMessageView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                SecretMessageView(entry: entry)
-            }
+            SecretMessageView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("From them")
         .description("Their latest note. Sealed ones stay sealed.")
@@ -317,11 +345,7 @@ struct KissView: View {
 struct KissWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockKiss", provider: GlanceProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                KissView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                KissView(entry: entry)
-            }
+            KissView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("Quick kiss")
         .description("One tap to tell them you are thinking of them.")
@@ -446,11 +470,7 @@ struct CanvasView: View {
 struct CanvasWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockCanvas", provider: GlanceProvider(wantsDrawing: true)) { entry in
-            if #available(iOS 17.0, *) {
-                CanvasView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                CanvasView(entry: entry)
-            }
+            CanvasView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("Latest drawing")
         .description("The newest drawing from the two of you.")
@@ -607,6 +627,7 @@ struct DistanceView: View {
     var body: some View {
         let s = entry.summary
         let initial = s.partnerInitial ?? "♥"
+        let meOnLeft = (s.myArt ?? "a") == "b"
         if family == .accessoryRectangular {
             // The lock-screen card this is modelled on. The system tints
             // accessory widgets itself — photographs come out as flat grey
@@ -633,8 +654,11 @@ struct DistanceView: View {
                         .foregroundColor(.glText)
                 }
                 HStack(alignment: .center, spacing: 6) {
-                    DistanceMascot(art: s.myArt ?? "a", mood: s.myMoodEmoji,
-                                   symptoms: s.mySymptomEmoji ?? [], moodOnTrailingEdge: true)
+                    // Her (picture b) on the left, him (a) on the right, on
+                    // both phones; each row follows whoever is in the slot.
+                    DistanceMascot(art: "b", mood: meOnLeft ? s.myMoodEmoji : s.partnerMoodEmoji,
+                                   symptoms: (meOnLeft ? s.mySymptomEmoji : s.partnerSymptomEmoji) ?? [],
+                                   moodOnTrailingEdge: true)
                     VStack(spacing: 6) {
                         ZStack {
                             DistanceWiggle()
@@ -656,8 +680,9 @@ struct DistanceView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    DistanceMascot(art: s.partnerArt ?? "b", mood: s.partnerMoodEmoji,
-                                   symptoms: s.partnerSymptomEmoji ?? [], moodOnTrailingEdge: false)
+                    DistanceMascot(art: "a", mood: meOnLeft ? s.partnerMoodEmoji : s.myMoodEmoji,
+                                   symptoms: (meOnLeft ? s.partnerSymptomEmoji : s.mySymptomEmoji) ?? [],
+                                   moodOnTrailingEdge: false)
                 }
                 .frame(maxHeight: .infinity)
             }
@@ -670,11 +695,7 @@ struct DistanceView: View {
 struct DistanceWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockDistance", provider: GlanceProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                DistanceView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                DistanceView(entry: entry)
-            }
+            DistanceView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("Distance apart")
         .description("How far apart you are: the two of you, a wiggly line and a heart, and how you are both feeling.")

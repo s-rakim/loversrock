@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mirrors mobile/theme.js: grey-white surfaces with the rose accent. -->
+<!-- Grey liquid glass with the rose accent (see drawable/widget_background). -->
 <resources>
     <color name="widget_surface">#FFFFFFFF</color>
     <color name="widget_border">#FFE9E1DE</color>
     <color name="widget_text">#FF2B2320</color>
-    <color name="widget_text_muted">#FF8C7F79</color>
+    <!-- Cooler and darker than the app's muted text: it has to read on
+         translucent grey over any wallpaper, not on white. -->
+    <color name="widget_text_muted">#FF555A62</color>
     <color name="widget_accent">#FFE8607A</color>
+
+    <!-- Grey liquid glass: every widget's background except the locket.
+         A launcher will not blur the wallpaper behind an app's widget, and an
+         app cannot read the wallpaper to blur a copy itself, so the glass is
+         built from what it can do: a translucent grey body the wallpaper
+         shows through (about 70% — any clearer and text stops being
+         readable over a busy wallpaper, with no blur to calm it), a bright
+         sheen across the top, and a light rim. -->
+    <color name="widget_glass_top">#C0E4E6EA</color>
+    <color name="widget_glass_bottom">#B0AEB2BA</color>
+    <color name="widget_glass_sheen">#73FFFFFF</color>
+    <color name="widget_glass_rim">#B3FFFFFF</color>
+    <color name="widget_glass_chip">#CCFFFFFF</color>
+    <color name="widget_glass_frame">#40FFFFFF</color>
 
     <string name="widget_summary_description">Your streak, next countdown, and distance apart</string>
     <string name="widget_photo_description">The latest photo from your partner</string>

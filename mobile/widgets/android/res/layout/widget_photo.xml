@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The locket: the photo they sent, edge to edge. The one widget that is
+     not glass — the picture is the point. clipToOutline rounds the photo
+     to the background's corners on Android 12+. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/photo_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background">
+    android:background="@drawable/widget_photo_background"
+    android:clipToOutline="true">
 
     <ImageView
         android:id="@+id/photo_image"

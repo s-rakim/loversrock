@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- How far apart you are: the two of you head to toe, a wiggly dotted line
-     from you to them with a heart on it, the number above, and each of you
-     as an emoji — your mood in the corner of your picture, today's symptoms
-     underneath.
+<!-- How far apart you are: the two of you head to toe on grey glass, a
+     wiggly dotted line between you with a heart on it, the number above, and
+     each of you as an emoji — a mood in the corner of each picture, today's
+     symptoms underneath.
+
+     The pictures keep their places on BOTH phones: her (picture b) on the
+     left, him (picture a) on the right. paint() puts each mood and symptom
+     row under whichever of you is in that slot.
 
      Carries the glance ids (widget_root, glance_label, glance_value,
      glance_caption, widget_refresh) on purpose. GlanceWidgetProvider paints
@@ -55,7 +59,7 @@
             android:contentDescription="Refresh" />
     </LinearLayout>
 
-    <!-- [you] ~·~·~·♥·~·~·~ [them] -->
+    <!-- [her] ~·~·~·♥·~·~·~ [him] -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -63,7 +67,7 @@
         android:layout_marginTop="6dp"
         android:orientation="horizontal">
 
-        <!-- You. The column is a fixed width and the picture scales to fit
+        <!-- Her. The column is a fixed width and the picture scales to fit
              the height it is given (fitCenter), so the whole figure is always
              in frame at any widget size — head to toe, scaled down. -->
         <LinearLayout
@@ -78,7 +82,7 @@
                 android:layout_weight="1">
 
                 <ImageView
-                    android:id="@+id/distance_me_art"
+                    android:id="@+id/distance_left_art"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_marginEnd="6dp"
@@ -86,11 +90,11 @@
                     android:background="@drawable/widget_mascot_frame"
                     android:clipToOutline="true"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/widget_mascot_a"
-                    android:contentDescription="You" />
+                    android:src="@drawable/widget_mascot_b"
+                    android:contentDescription="Her" />
 
                 <TextView
-                    android:id="@+id/distance_me_mood"
+                    android:id="@+id/distance_left_mood"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_gravity="bottom|end"
@@ -102,7 +106,7 @@
             </FrameLayout>
 
             <TextView
-                android:id="@+id/distance_me_symptoms"
+                android:id="@+id/distance_left_symptoms"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
@@ -156,7 +160,7 @@
                 android:text="" />
         </LinearLayout>
 
-        <!-- Them. -->
+        <!-- Him. -->
         <LinearLayout
             android:layout_width="60dp"
             android:layout_height="match_parent"
@@ -169,7 +173,7 @@
                 android:layout_weight="1">
 
                 <ImageView
-                    android:id="@+id/distance_them_art"
+                    android:id="@+id/distance_right_art"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_marginStart="6dp"
@@ -177,11 +181,11 @@
                     android:background="@drawable/widget_mascot_frame"
                     android:clipToOutline="true"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/widget_mascot_b"
-                    android:contentDescription="Your partner" />
+                    android:src="@drawable/widget_mascot_a"
+                    android:contentDescription="Him" />
 
                 <TextView
-                    android:id="@+id/distance_them_mood"
+                    android:id="@+id/distance_right_mood"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_gravity="bottom|start"
@@ -193,7 +197,7 @@
             </FrameLayout>
 
             <TextView
-                android:id="@+id/distance_them_symptoms"
+                android:id="@+id/distance_right_symptoms"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"

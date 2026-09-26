@@ -29,9 +29,15 @@ PAIR_ART = os.path.join(HERE, '..', '..', '..', 'assets', 'mascot', 'pair.jpg')
 SURFACE = (255, 255, 255)
 BORDER = (233, 225, 222)
 TEXT = (43, 35, 32)
-MUTED = (140, 127, 121)
+MUTED = (85, 90, 98)
 ACCENT = (232, 96, 122)
 BLUSH = (243, 184, 196)
+
+# widget_glass_top / widget_glass_bottom (ARGB there, RGBA here) and the
+# sheen's peak alpha.
+GLASS_TOP = (228, 230, 234, 0xC0)
+GLASS_BOTTOM = (174, 178, 186, 0xB0)
+GLASS_SHEEN = 0x73 / 255
 
 CELL = 150        # px per launcher cell in the preview; a preview is scaled to fit anyway
 PAD = 28
@@ -46,10 +52,26 @@ def font(size, bold=False):
 def card(cells_w, cells_h):
     w, h = cells_w * CELL, cells_h * CELL
     # 2x supersample, so the rounded corners and the heart come out smooth.
-    img = Image.new('RGBA', (w * 2, h * 2), (0, 0, 0, 0))
+    W, H = w * 2, h * 2
+    # Grey liquid glass, as drawable/widget_background.xml draws it: a
+    # translucent grey body lighter at the top, a sheen over the upper half,
+    # and a bright rim.
+    body = Image.new('RGBA', (W, H))
+    bd = ImageDraw.Draw(body)
+    for y in range(H):
+        t = y / (H - 1)
+        mix = lambda a, b: round(a + (b - a) * t)
+        top, bottom = GLASS_TOP, GLASS_BOTTOM
+        sheen = max(0.0, 1 - t / 0.45) * GLASS_SHEEN
+        rgb = [mix(top[i], bottom[i]) for i in range(3)]
+        rgb = [round(c + (255 - c) * sheen) for c in rgb]
+        bd.line([(0, y), (W, y)], fill=(*rgb, mix(top[3], bottom[3])))
+    mask = Image.new('L', (W, H), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([1, 1, W - 2, H - 2], radius=RADIUS * 2, fill=255)
+    img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    img.paste(body, (0, 0), mask)
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([1, 1, w * 2 - 2, h * 2 - 2], radius=RADIUS * 2,
-                        fill=SURFACE, outline=BORDER, width=4)
+    d.rounded_rectangle([1, 1, W - 2, H - 2], radius=RADIUS * 2, outline=(255, 255, 255, 179), width=3)
     return img, d, 2
 
 
@@ -130,16 +152,19 @@ def kiss():
 
 
 def photo():
-    img, d, s = card(2, 2)
+    # The locket is NOT glass: the photo is the whole widget, edge to edge.
+    s = 2
     size = 2 * CELL
-    inset = 10
+    img = Image.new('RGBA', (size * s, size * s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    inset = 0
     art = Image.open(PAIR_ART).convert('RGB')
     # Square crop from the top, where the faces are.
     side = min(art.size)
     art = art.crop((0, 0, side, side)).resize(((size - 2 * inset) * s, (size - 2 * inset) * s), Image.LANCZOS)
     mask = Image.new('L', art.size, 0)
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, art.size[0] - 1, art.size[1] - 1],
-                                           radius=(RADIUS - 8) * s, fill=255)
+                                           radius=RADIUS * s, fill=255)
     img.paste(art, (inset * s, inset * s), mask)
     # The caption scrim the real widget draws.
     band = Image.new('RGBA', (art.size[0], 70 * s), (0, 0, 0, 0))
@@ -148,6 +173,9 @@ def photo():
         bd.line([(0, i), (art.size[0], i)], fill=(0, 0, 0, int(150 * i / (70 * s))))
     img.alpha_composite(band, (inset * s, (size - inset - 70) * s))
     d.text(((inset + 16) * s, (size - inset - 38) * s), 'From them', font=font(18 * s, True), fill=(255, 255, 255))
+    # Keep the scrim inside the rounded corners too.
+    from PIL import ImageChops
+    img.putalpha(ImageChops.multiply(img.getchannel('A'), mask))
     return finish(img, 'photo')
 
 
@@ -215,7 +243,8 @@ def distance():
     top, bottom = 58, h - 46
     col = 78
     boxes = []
-    for x0, art in ((PAD, 'a'), (w - PAD - col, 'b')):
+    # Her (b) on the left, him (a) on the right — as the layout places them.
+    for x0, art in ((PAD, 'b'), (w - PAD - col, 'a')):
         pic = Image.open(os.path.join(MASCOTS, f'widget_mascot_{art}.jpg')).convert('RGBA')
         ph = (bottom - top) * s
         pw = int(pic.width * ph / pic.height)
@@ -229,18 +258,18 @@ def distance():
     cy = (top + bottom) / 2 - 10
     wiggle(d, s, boxes[0][0] + boxes[0][1] + 8, boxes[1][0] - 8, cy)
     d.ellipse([(w / 2 - 17) * s, (cy - 17) * s, (w / 2 + 17) * s, (cy + 17) * s],
-              fill=SURFACE, outline=BORDER, width=2 * s)
+              fill=(255, 255, 255, 204), outline=(255, 255, 255, 179), width=2 * s)
     heart(d, (w / 2) * s, (cy + 1) * s, 24 * s, ACCENT)
     cap = 'Last known distance'
     cw = d.textlength(cap, font=font(15 * s)) / s
     d.text(((w / 2 - cw / 2) * s, (cy + 30) * s), cap, font=font(15 * s), fill=MUTED)
 
     # Moods in the picture corners, symptoms underneath.
-    for (px, pw), mood, symptoms, corner in ((boxes[0], '😴', '🤕💢', 1), (boxes[1], '🥰', '😖😪', -1)):
+    for (px, pw), mood, symptoms, corner in ((boxes[0], '🥰', '😖😪', 1), (boxes[1], '😴', '🤕💢', -1)):
         bx = px + pw if corner == 1 else px
         by = bottom - 4
         d.ellipse([(bx - 15) * s, (by - 15) * s, (bx + 15) * s, (by + 15) * s],
-                  fill=SURFACE, outline=BORDER, width=2 * s)
+                  fill=(255, 255, 255, 204), outline=(255, 255, 255, 179), width=2 * s)
         emoji(img, mood, bx * s, by * s, 19 * s)
         emoji(img, symptoms, (px + pw / 2) * s, (bottom + 24) * s, 17 * s)
     return finish(img, 'distance')

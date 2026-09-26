@@ -277,31 +277,37 @@ class CanvasWidgetProvider : GlanceWidgetProvider() {
 
 /**
  * How far apart you are, drawn the way people already draw it: the two of you
- * head to toe, one on each side, a wiggly dotted line with a heart on it
- * between — and each of you as a mood and today's symptoms.
+ * head to toe, her on the left and him on the right, a wiggly dotted line
+ * with a heart on it between — and each of you as a mood and today's
+ * symptoms.
  *
  * The number is the whole point, so it gets the label's line rather than a
  * caption. When there is no number the caption says why in words somebody
  * can act on — "turn on location sharing" is a thing to do, a dash is not.
  *
- * The pictures are resources, not bitmaps: setImageViewResource hands the
- * launcher a resource id and it loads the image itself, so nothing large
- * crosses the ~1MB RemoteViews transaction.
+ * The pictures keep their places on both phones, fixed in the layout, so
+ * no bitmap crosses the ~1MB RemoteViews transaction. What moves is the
+ * data: the server says which picture is you (myArt), and each mood and
+ * symptom row goes under whoever is standing in that slot.
  */
 class DistanceWidgetProvider : GlanceWidgetProvider() {
     override val layoutId = R.layout.widget_distance
     override val refreshAction = "com.loversrock.app.widgets.REFRESH_DISTANCE"
 
     override fun paint(context: Context, views: RemoteViews, data: WidgetRepository.Summary?) {
-        // Which picture is whom. Before the server has answered, the layout's
-        // own defaults stand; they are always two different pictures.
-        data?.myArt?.let { views.setImageViewResource(R.id.distance_me_art, mascotDrawable(it)) }
-        data?.partnerArt?.let { views.setImageViewResource(R.id.distance_them_art, mascotDrawable(it)) }
+        // Her picture is on the left. If that is you, your row goes left.
+        val meOnLeft = (data?.myArt ?: "a") == LEFT_ART
+        val myMood = data?.myMoodEmoji
+        val theirMood = data?.partnerMoodEmoji
+        val mine = data?.mySymptomEmoji?.joinToString("")
+        val theirs = data?.partnerSymptomEmoji?.joinToString("")
 
-        emoji(views, R.id.distance_me_mood, data?.myMoodEmoji)
-        emoji(views, R.id.distance_them_mood, data?.partnerMoodEmoji)
-        emoji(views, R.id.distance_me_symptoms, data?.mySymptomEmoji?.joinToString(""))
-        emoji(views, R.id.distance_them_symptoms, data?.partnerSymptomEmoji?.joinToString(""))
+        emoji(views, R.id.distance_left_mood, if (meOnLeft) myMood else theirMood)
+        emoji(views, R.id.distance_right_mood, if (meOnLeft) theirMood else myMood)
+        emoji(views, R.id.distance_left_symptoms, if (meOnLeft) mine else theirs)
+        emoji(views, R.id.distance_right_symptoms, if (meOnLeft) theirs else mine)
+        views.setContentDescription(R.id.distance_left_art, if (meOnLeft) "You" else "Your partner")
+        views.setContentDescription(R.id.distance_right_art, if (meOnLeft) "Your partner" else "You")
 
         val km = data?.distanceKm
         if (km == null) {
@@ -339,9 +345,12 @@ class DistanceWidgetProvider : GlanceWidgetProvider() {
     }
 }
 
-/** The bundled full-body picture for "a" or "b"; anything else is "a". */
-internal fun mascotDrawable(art: String): Int =
-    if (art == "b") R.drawable.widget_mascot_b else R.drawable.widget_mascot_a
+/**
+ * The picture that stands on the left of the distance widget: "b", her. He
+ * ("a") is on the right. Fixed, not per phone — it is the same two people on
+ * both home screens, and they stand the same way round on both.
+ */
+internal const val LEFT_ART = "b"
 
 /**
  * Kilometres the way you would say them: "1,305 km" rather than "1305.0 km",

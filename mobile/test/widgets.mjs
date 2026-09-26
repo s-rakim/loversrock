@@ -154,7 +154,7 @@ console.log('\n=== THE DISTANCE WIDGET ===');
   for (const id of ['widget_root', 'glance_label', 'glance_value', 'glance_caption', 'widget_refresh']) {
     check(`  the layout carries @+id/${id} for the base class`, layout.includes(`@+id/${id}`));
   }
-  check('it is drawn as you ~·~ heart ~·~ them', /@\+id\/distance_me_art/.test(layout) && /@\+id\/distance_them_art/.test(layout)
+  check('it is drawn as her ~·~ heart ~·~ him', /@\+id\/distance_left_art/.test(layout) && /@\+id\/distance_right_art/.test(layout)
     && /widget_kiss_icon/.test(layout) && /@drawable\/widget_distance_wiggle/.test(layout));
 
   // Head to toe: the separate full-body pictures, the SAME files the app
@@ -166,7 +166,12 @@ console.log('\n=== THE DISTANCE WIDGET ===');
     check(`  widget_mascot_${art}.jpg is byte-for-byte the app's ${file}`,
       fs.existsSync(copy) && fs.readFileSync(copy).equals(fs.readFileSync(original)));
   }
-  const arts = layout.match(/<ImageView[^>]*distance_(me|them)_art[^>]*>/g) || [];
+  const arts = layout.match(/<ImageView[^>]*distance_(left|right)_art[^>]*>/g) || [];
+  // Her on the left, him on the right — on both phones, whoever is holding it.
+  check('  her picture (b) stands on the left and his (a) on the right',
+    /distance_left_art"[^>]*src="@drawable\/widget_mascot_b"/s.test(layout)
+    && /distance_right_art"[^>]*src="@drawable\/widget_mascot_a"/s.test(layout)
+    && /LEFT_ART = "b"/.test(kotlin) && !/setImageViewResource\(R\.id\.distance_/.test(kotlin));
   check('  both pictures are scaled to fit whole, never cropped', arts.length === 2
     && arts.every((tag) => /scaleType="fitCenter"/.test(tag)), arts.length);
   const info = fs.readFileSync(path.join(android, 'res', 'xml', 'widget_distance_info.xml'), 'utf8');
@@ -181,14 +186,19 @@ console.log('\n=== THE DISTANCE WIDGET ===');
     && /layout_height="24dp"/.test(wiggleTag) && /android:height="24dp"/.test(wiggle));
 
   // Mood and symptoms: slots in the layout, painted from the summary.
-  for (const id of ['distance_me_mood', 'distance_them_mood', 'distance_me_symptoms', 'distance_them_symptoms']) {
+  for (const id of ['distance_left_mood', 'distance_right_mood', 'distance_left_symptoms', 'distance_right_symptoms']) {
     check(`  the layout has @+id/${id}, hidden until there is something in it`,
       new RegExp(`@\\+id/${id}"[^>]*visibility="gone"`, 's').test(layout));
   }
   const distanceKt = kotlin.slice(kotlin.indexOf('class DistanceWidgetProvider'));
-  check('  and paint() fills all four and swaps the pictures by who is who',
+  check('  and paint() fills all four, each under whoever is standing in that slot',
     ['myMoodEmoji', 'partnerMoodEmoji', 'mySymptomEmoji', 'partnerSymptomEmoji'].every((f) => distanceKt.includes(f))
-    && /setImageViewResource\(R\.id\.distance_me_art/.test(distanceKt) && /data\?\.myArt/.test(distanceKt));
+    && /val meOnLeft = \(data\?\.myArt \?: "a"\) == LEFT_ART/.test(distanceKt)
+    && /distance_left_mood, if \(meOnLeft\) myMood else theirMood/.test(distanceKt)
+    && /distance_right_mood, if \(meOnLeft\) theirMood else myMood/.test(distanceKt));
+  check('  iOS stands them the same way round',
+    /DistanceMascot\(art: "b", mood: meOnLeft \? s\.myMoodEmoji/.test(swift)
+    && /DistanceMascot\(art: "a", mood: meOnLeft \? s\.partnerMoodEmoji/.test(swift));
   // iOS: the same fields, the same two pictures, the same dots.
   const data = fs.readFileSync(path.join(ios, 'WidgetData.swift'), 'utf8');
   check('iOS decodes the same six fields',
@@ -217,6 +227,39 @@ console.log('\n=== THE DISTANCE WIDGET ===');
   const bridge = fs.readFileSync(path.join(android, 'WidgetBridgeModule.kt'), 'utf8');
   check('the glance widgets refresh when the app pushes new data',
     /GlanceWidgetProvider\.refreshAll/.test(bridge) && /DistanceWidgetProvider::class\.java/.test(bridge));
+}
+
+console.log('\n=== EVERY WIDGET IS GREY LIQUID GLASS ===');
+{
+  const bg = fs.readFileSync(path.join(android, 'res', 'drawable', 'widget_background.xml'), 'utf8');
+  check('the shared Android background is the glass layer-list',
+    /<layer-list/.test(bg) && /widget_glass_top/.test(bg) && /widget_glass_sheen/.test(bg) && /widget_glass_rim/.test(bg));
+  const strings = fs.readFileSync(path.join(android, 'res', 'values', 'widget_colors.xml'), 'utf8');
+  const alpha = (name) => parseInt(strings.match(new RegExp(`<color name="${name}">#([0-9A-F]{2})`, 'i'))?.[1] ?? 'FF', 16);
+  // See-through enough for the wallpaper to tint it, solid enough to read
+  // text on with no blur behind it.
+  const [top, bottom] = [alpha('widget_glass_top'), alpha('widget_glass_bottom')];
+  check('  and it is translucent, not a solid card', top <= 0xC8 && bottom <= 0xC8 && top >= 0x99 && bottom >= 0x99, { top, bottom });
+  const layouts = fs.readdirSync(path.join(android, 'res', 'layout'));
+  const rootTag = (xml) => xml.replace(/<\?xml[^>]*>/, '').replace(/<!--[\s\S]*?-->/g, '').match(/<[A-Za-z][^>]*>/)[0];
+  for (const file of layouts) {
+    const root = rootTag(fs.readFileSync(path.join(android, 'res', 'layout', file), 'utf8'));
+    if (file === 'widget_photo.xml') {
+      // The locket is the exception: the photo they sent, edge to edge.
+      check('  the locket is NOT glass — the photo fills it, rounded',
+        /@drawable\/widget_photo_background/.test(root) && /clipToOutline="true"/.test(root));
+    } else {
+      check(`  ${file} sits on the glass`, /android:background="@drawable\/widget_background"/.test(root), root);
+    }
+  }
+  const allSwift = fs.readdirSync(ios).filter((f) => f.endsWith('.swift')).map((f) => fs.readFileSync(path.join(ios, f), 'utf8')).join('\n');
+  const configs = (allSwift.match(/StaticConfiguration\(kind:/g) || []).length;
+  const glassed = (allSwift.match(/\(entry: entry\)\.lrGlassBackground\(\)/g) || []).length;
+  check(`  and all ${configs - 1} iOS widgets but the locket use the same glass`, configs > 1 && glassed === configs - 1, { configs, glassed });
+  check('  while the iOS locket fills with the photo itself',
+    /containerBackground\(for: \.widget\) \{ PhotoWidgetFill\(entry: entry\) \}/.test(allSwift)
+    && !/PhotoWidgetView\(entry: entry\)\.lrGlassBackground/.test(allSwift));
+  check('  with no plain system background left over', !/containerBackground\(\.background/.test(allSwift));
 }
 
 console.log(`\nWIDGET WIRING RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);

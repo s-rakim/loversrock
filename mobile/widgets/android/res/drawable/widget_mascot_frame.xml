@@ -4,6 +4,6 @@
      rather than pretending to be cut-outs. The corners clip on Android 12+
      (clipToOutline); earlier, the picture simply sits on the tint. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/widget_border" />
+    <solid android:color="@color/widget_glass_frame" />
     <corners android:radius="12dp" />
 </shape>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The locket (partner photo) widget, and only it: NOT glass. The photo is
+     the whole widget, edge to edge, so this is just the rounded shape it is
+     clipped to and the soft card shown until the first photo arrives. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_border" />
+    <corners android:radius="24dp" />
+</shape>

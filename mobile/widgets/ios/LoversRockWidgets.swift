@@ -141,11 +141,7 @@ struct SummaryWidgetView: View {
 struct SummaryWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockSummary", provider: SummaryProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                SummaryWidgetView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
-                SummaryWidgetView(entry: entry)
-            }
+            SummaryWidgetView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("At a glance")
         .description("Your streak, next countdown, and distance apart.")
@@ -209,7 +205,7 @@ struct LockScreenWidgetView: View {
 struct LockScreenWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockLockScreen", provider: SummaryProvider()) { entry in
-            LockScreenWidgetView(entry: entry)
+            LockScreenWidgetView(entry: entry).lrGlassBackground()
         }
         .configurationDisplayName("loversrock glance")
         .description("Streak, countdown and distance on your lock screen.")
@@ -242,13 +238,28 @@ struct PhotoProvider: TimelineProvider {
     }
 }
 
-struct PhotoWidgetView: View {
+/// The locket: the photo they sent, edge to edge. The one widget that is not
+/// glass — the picture is the point. On iOS 17+ the photo IS the container
+/// background, which is what lets it run past the content margins to the
+/// widget's edges; the content on top is only the "no photo yet" message.
+struct PhotoWidgetFill: View {
     let entry: PhotoEntry
     var body: some View {
         if let data = entry.image, let uiImage = UIImage(data: data) {
             Image(uiImage: uiImage).resizable().aspectRatio(contentMode: .fill)
         } else {
+            Color(red: 0.914, green: 0.882, blue: 0.871)   // widget_border, as on Android
+        }
+    }
+}
+
+struct PhotoWidgetView: View {
+    let entry: PhotoEntry
+    var body: some View {
+        if entry.image.flatMap({ UIImage(data: $0) }) == nil {
             UnavailableView(message: entry.signedIn ? "No photo yet" : "Sign in to loversrock")
+        } else {
+            Color.clear
         }
     }
 }
@@ -257,9 +268,13 @@ struct PhotoWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LoversRockPhoto", provider: PhotoProvider()) { entry in
             if #available(iOS 17.0, *) {
-                PhotoWidgetView(entry: entry).containerBackground(.background, for: .widget)
-            } else {
                 PhotoWidgetView(entry: entry)
+                    .containerBackground(for: .widget) { PhotoWidgetFill(entry: entry) }
+            } else {
+                ZStack {
+                    PhotoWidgetFill(entry: entry)
+                    PhotoWidgetView(entry: entry)
+                }
             }
         }
         .configurationDisplayName("Partner photo")
