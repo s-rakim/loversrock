@@ -1,7 +1,8 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { apiFetch } from '../services/api';
+import { apiFetch, isUnpaired } from '../services/api';
+import NotPaired from '../components/NotPaired';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
@@ -15,10 +16,17 @@ export default function DateIdeasScreen({ navigation }) {
   const [browseIdeas, setBrowseIdeas] = useState([]);
   const [savedIdeas, setSavedIdeas] = useState([]);
   const [matches, setMatches] = useState([]);
+  const [unpaired, setUnpaired] = useState(false);
 
   const load = useCallback(() => {
-    apiFetch('/date-ideas').then((d) => setBrowseIdeas(d.ideas)).catch((err) => Alert.alert('Error', err.message));
-    apiFetch('/date-ideas/saved').then((d) => setSavedIdeas(d.ideas)).catch((err) => Alert.alert('Error', err.message));
+    const complain = (err) => {
+      if (isUnpaired(err)) { setUnpaired(true); return; }
+      Alert.alert('Error', err.message);
+    };
+    apiFetch('/date-ideas')
+      .then((d) => { setBrowseIdeas(d.ideas); setUnpaired(false); })
+      .catch(complain);
+    apiFetch('/date-ideas/saved').then((d) => setSavedIdeas(d.ideas)).catch(complain);
     apiFetch('/date-ideas/matches').then((d) => setMatches(d.matches)).catch(() => {});
   }, []);
 
@@ -43,6 +51,8 @@ export default function DateIdeasScreen({ navigation }) {
   }
 
   const list = tab === 'browse' ? browseIdeas : tab === 'matches' ? matches : savedIdeas;
+
+  if (unpaired) return <NotPaired navigation={navigation} what="Date ideas" />;
 
   return (
     <View style={styles.container}>

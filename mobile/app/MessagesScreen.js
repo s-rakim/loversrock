@@ -21,7 +21,8 @@ import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { View, Text, TextInput, StyleSheet, FlatList, Image, Alert, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { apiFetch, connectSocket, mediaUrl } from '../services/api';
+import { apiFetch, connectSocket, mediaUrl, isUnpaired } from '../services/api';
+import NotPaired from '../components/NotPaired';
 import { spacing, radius } from '../theme';
 import { MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
@@ -98,9 +99,17 @@ export default function MessagesScreen({ navigation }) {
   // Decrypted text by message id. Kept beside the list rather than written
   // into it, so plaintext never ends up somewhere it could be persisted.
   const [plain, setPlain] = useState({});
+  // Before pairing the server refuses this, correctly. That is a state, not
+  // a failure, and it gets a screen rather than a dialog.
+  const [unpaired, setUnpaired] = useState(false);
 
   const load = useCallback(() => {
-    apiFetch('/messages').then((d) => setMessages(d.messages)).catch((err) => Alert.alert('Error', err.message));
+    apiFetch('/messages')
+      .then((d) => { setMessages(d.messages); setUnpaired(false); })
+      .catch((err) => {
+        if (isUnpaired(err)) { setUnpaired(true); return; }
+        Alert.alert('Error', err.message);
+      });
   }, []);
 
   // One profile fetch covers all three: the wallpaper is a per-account
@@ -274,6 +283,8 @@ export default function MessagesScreen({ navigation }) {
       </>
     );
   };
+
+  if (unpaired) return <NotPaired navigation={navigation} what="Messages" />;
 
   return (
     <Wallpaper value={wallpaper} style={styles.container}>

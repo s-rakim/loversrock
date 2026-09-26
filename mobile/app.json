@@ -3,7 +3,7 @@
     "name": "loversrock",
     "slug": "loversrock",
     "scheme": "loversrock",
-    "version": "1.1.4",
+    "version": "1.1.5",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#F7F4F2",
@@ -13,7 +13,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.loversrock.app",
-      "buildNumber": "6"
+      "buildNumber": "7"
     },
     "android": {
       "package": "com.loversrock.app",
@@ -24,7 +24,7 @@
         "WRITE_EXTERNAL_STORAGE",
         "BLUETOOTH_CONNECT"
       ],
-      "versionCode": 6
+      "versionCode": 7
     },
     "plugins": [
       "./plugins/withSplashScreenColor",

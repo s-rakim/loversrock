@@ -61,6 +61,26 @@ import LoveLettersScreen from './app/games/LoveLettersScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// The tab screens, wrapped ONCE.
+//
+// These used to be written as `component={HomeTab}` inline in
+// the JSX below, which mints a brand-new component type on every render of
+// MainTabs. React Navigation compares `component` by identity: a different
+// function means a different screen, so it tore the tab down and mounted the
+// new one, which re-rendered MainTabs, which made six more. The app died with
+// "Maximum update depth exceeded" pointing at PreventRemoveProvider inside
+// PhotoSectionScreen's navigator — the section with its own nested stack was
+// simply the first to notice.
+//
+// A higher-order component has to be called at module scope for exactly this
+// reason. Called in render, it is not a wrapper; it is a new component every time.
+const PhotosTab = fadeOnFocus(PhotoSectionScreen);
+const PlayTab = fadeOnFocus(PlaySectionScreen);
+const HomeTab = fadeOnFocus(HomeScreen);
+const CycleTab = fadeOnFocus(PeriodTrackerScreen);
+const QuizTab = fadeOnFocus(QuizScreen);
+const SettingsTab = fadeOnFocus(SettingsScreen);
+
 
 // The five primary destinations live behind the floating liquid-glass tab
 // bar (components/LumaBar.js); everything else is pushed on top of it
@@ -101,6 +121,10 @@ function useNavTheme() {
   };
 }
 
+// Also hoisted: an inline arrow here is a new prop every render too. Less
+// destructive than a new `component`, but the same mistake.
+const renderTabBar = (props) => <LumaBar {...props} />;
+
 function MainTabs() {
   return (
     // bottom-tabs v6 does not animate the scene change at all — it swaps the
@@ -111,17 +135,17 @@ function MainTabs() {
       initialRouteName="Home"
       screenOptions={{ headerShown: false }}
       sceneContainerStyle={{ backgroundColor: 'transparent' }}
-      tabBar={(props) => <LumaBar {...props} />}
+      tabBar={renderTabBar}
     >
       {/* Home sits in the MIDDLE rather than first: with six buttons the
           thumb reaches the centre, and the two sections either side of it are
           the ones opened most. */}
-      <Tab.Screen name="Photos" component={fadeOnFocus(PhotoSectionScreen)} />
-      <Tab.Screen name="Play" component={fadeOnFocus(PlaySectionScreen)} />
-      <Tab.Screen name="Home" component={fadeOnFocus(HomeScreen)} />
-      <Tab.Screen name="Cycle" component={fadeOnFocus(PeriodTrackerScreen)} />
-      <Tab.Screen name="Quiz" component={fadeOnFocus(QuizScreen)} />
-      <Tab.Screen name="Settings" component={fadeOnFocus(SettingsScreen)} />
+      <Tab.Screen name="Photos" component={PhotosTab} />
+      <Tab.Screen name="Play" component={PlayTab} />
+      <Tab.Screen name="Home" component={HomeTab} />
+      <Tab.Screen name="Cycle" component={CycleTab} />
+      <Tab.Screen name="Quiz" component={QuizTab} />
+      <Tab.Screen name="Settings" component={SettingsTab} />
     </Tab.Navigator>
   );
 }

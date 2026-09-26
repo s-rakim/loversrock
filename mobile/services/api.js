@@ -201,6 +201,30 @@ export async function apiFetch(path, { method = 'GET', body, isRetry = false } =
 }
 
 /**
+ * The exact refusal the requirePair middleware sends.
+ *
+ * Kept as a constant so the two sides cannot drift apart silently: test/nav
+ * reads this string and the backend's, and fails if they stop matching.
+ */
+export const UNPAIRED_ERROR = 'Not currently paired';
+
+/**
+ * Whether a request failed only because there is nobody on the other end yet.
+ *
+ * This is not an error in the sense a person means it. Half of this app is
+ * about two people, so before pairing most endpoints answer 403 — and every
+ * screen that treated that as a failure threw a modal dialog saying
+ * "Error / Not currently paired" over a perfectly fine screen. The answer to
+ * it is a button, not an apology.
+ *
+ * Matched on the message as well as the status, because 403 also covers "not
+ * your call" and "not your date idea", which ARE errors.
+ */
+export function isUnpaired(error) {
+  return error?.status === 403 && error?.message === UNPAIRED_ERROR;
+}
+
+/**
  * A URL an <Image> can actually load.
  *
  * /media is authenticated, and the native image loaders send no headers —

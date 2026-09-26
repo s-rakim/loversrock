@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, Alert, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { apiFetch } from '../services/api';
+import { apiFetch, isUnpaired } from '../services/api';
+import NotPaired from '../components/NotPaired';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
@@ -16,16 +17,22 @@ function timeLeft(targetDate) {
   return `${days}d ${hours}h`;
 }
 
-export default function CountdownScreen() {
+export default function CountdownScreen({ navigation }) {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [countdowns, setCountdowns] = useState([]);
   const [label, setLabel] = useState('');
   const [dateInput, setDateInput] = useState(''); // YYYY-MM-DD
   const [, forceTick] = useState(0);
+  const [unpaired, setUnpaired] = useState(false);
 
   const load = useCallback(() => {
-    apiFetch('/countdowns').then((d) => setCountdowns(d.countdowns)).catch((err) => Alert.alert('Error', err.message));
+    apiFetch('/countdowns')
+      .then((d) => { setCountdowns(d.countdowns); setUnpaired(false); })
+      .catch((err) => {
+        if (isUnpaired(err)) { setUnpaired(true); return; }
+        Alert.alert('Error', err.message);
+      });
   }, []);
 
   useFocusEffect(load);
@@ -61,6 +68,8 @@ export default function CountdownScreen() {
       Alert.alert('Could not delete', err.message);
     }
   }
+
+  if (unpaired) return <NotPaired navigation={navigation} what="Countdowns" />;
 
   return (
     <View style={styles.container}>

@@ -284,5 +284,81 @@ check('the default wallpaper is still deliberately see-through',
   /transparent\) return null/.test(wallpaper),
   'if this changed, the section background note above needs revisiting');
 
+console.log('\n=== NO SCREEN IS BUILT FRESH ON EVERY RENDER ===');
+// MainTabs was written as
+//
+//     <Tab.Screen name="Home" component={fadeOnFocus(HomeScreen)} />
+//
+// which calls the higher-order component IN RENDER, so every render of
+// MainTabs produced six brand-new component types. React Navigation compares
+// `component` by identity, so a new function is a new screen: it unmounted
+// the old one and mounted the new one, which re-rendered MainTabs, which made
+// six more. The app died on launch with "Maximum update depth exceeded",
+// blaming PreventRemoveProvider inside PhotoSectionScreen's navigator —
+// the section with a nested stack of its own was just the first to notice.
+//
+// A higher-order component belongs at module scope. Called in render it is
+// not a wrapper, it is a factory.
+const screenFiles = [
+  path.join(root, 'App.js'),
+  ...walk(path.join(root, 'app')),
+];
+const inlineFactories = [];
+for (const f of screenFiles) {
+  const text = fs.readFileSync(f, 'utf8');
+  for (const m of text.matchAll(/component=\{\s*(\w+)\s*\(/g)) {
+    inlineFactories.push(`${path.relative(root, f)}: component={${m[1]}(…)}`);
+  }
+}
+check('no navigator builds its screen component inside render',
+  inlineFactories.length === 0, inlineFactories.join(', '));
+
+// The same mistake, one notch quieter: a new tabBar function every render
+// re-creates the bar rather than the screens. Not fatal, but it throws away
+// the bar's measured tab centres, so the light jumps instead of sliding.
+const tabBarInline = /tabBar=\{\s*\(/.test(app);
+check('and the tab bar is not a new function on every render', !tabBarInline,
+  app.match(/tabBar=\{[^}]*\}/)?.[0]);
+
+console.log('\n=== NOT BEING PAIRED YET IS NOT AN ERROR ===');
+// Opening the thread before pairing put a modal dialog titled "Error" over
+// the app, saying "Not currently paired". Most of this app is two people, so
+// that is the state everybody starts in — and it has an obvious next step,
+// which a dialog with an OK button is not.
+const api = read('services', 'api.js');
+const declared = api.match(/export const UNPAIRED_ERROR = '([^']+)'/)?.[1];
+check('the app knows the exact refusal the server sends', Boolean(declared), declared);
+
+// Read the server's own string rather than trusting a copy of it.
+const authMiddleware = fs.readFileSync(
+  path.join(root, '..', 'backend', 'src', 'middleware', 'auth.js'), 'utf8',
+);
+const sent = authMiddleware.match(/status\(403\)\.json\(\{ error: '([^']+)' \}\)/)?.[1];
+check('and it is the string requirePair actually sends', declared === sent, { declared, sent });
+
+// 403 alone is not enough: it also covers "not your call" and "not your date
+// idea", which are real errors and must keep alerting.
+check('isUnpaired checks the message, not just the status',
+  /status === 403 && error\?\.message === UNPAIRED_ERROR/.test(api));
+
+// Every screen that showed the raw dialog now has a state for it instead.
+for (const file of ['MessagesScreen.js', 'CountdownScreen.js', 'DateIdeasScreen.js']) {
+  const src = read('app', file);
+  check(`  ${file} treats it as a state`,
+    /isUnpaired\(err\)/.test(src) && /<NotPaired/.test(src));
+}
+
+// And nothing is left showing a bare "Error" dialog on a first load.
+const bare = [];
+for (const f of walk(path.join(root, 'app'))) {
+  const src = fs.readFileSync(f, 'utf8');
+  for (const m of src.matchAll(/Alert\.alert\('Error',[^)]*\)/g)) {
+    // Fine if the same statement checks for the unpaired case first.
+    const around = src.slice(Math.max(0, m.index - 220), m.index);
+    if (!/isUnpaired/.test(around)) bare.push(`${path.relative(root, f)}: ${m[0]}`);
+  }
+}
+check('no first load can still raise a bare "Error" dialog', bare.length === 0, bare.join(', '));
+
 console.log(`\nNAV RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
