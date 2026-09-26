@@ -71,6 +71,19 @@ services:
     build:
       context: ../backend
     restart: unless-stopped
+    # Bring the schema up to date before serving, every start.
+    #
+    # Migrating used to be a separate command to remember after pulling, and
+    # it was missed: new code went live against the old schema and every
+    # request touching the new column failed with "column cycle_role of
+    # relation users does not exist". schema.sql is written to be re-applied
+    # (CREATE ... IF NOT EXISTS, ADD COLUMN IF NOT EXISTS), so running it on
+    # every start costs a moment and removes the step.
+    #
+    # `&&`, not `;`: if the migration fails the server must NOT start on a
+    # half-applied schema. The container exits instead, restart policy retries,
+    # and the error is the first thing in `docker compose logs backend`.
+    command: sh -c "node src/config/migrate.js && node src/server.js"
     env_file:
       - ../backend/.env
     environment:
