@@ -44,7 +44,12 @@ function withWidgetSources(config) {
   ]);
 }
 
-/** Registers every AppWidgetProvider plus the notification permission. */
+const GLANCE_PERMISSIONS = [
+  'android.permission.POST_NOTIFICATIONS',
+  'android.permission.POST_PROMOTED_NOTIFICATIONS',
+];
+
+/** Registers every AppWidgetProvider plus the notification permissions. */
 function withWidgetManifest(config) {
   return withAndroidManifest(config, (cfg) => {
     const manifest = cfg.modResults;
@@ -85,15 +90,15 @@ function withWidgetManifest(config) {
       });
     }
 
-    // Needed for the lock screen glance notification on Android 13+.
+    // POST_NOTIFICATIONS: the lock screen glance notification on Android 13+.
+    // POST_PROMOTED_NOTIFICATIONS: lets Android 16 lift that glance into a
+    // Live Update — Samsung's Now Bar, OPPO's lock-screen capsule, the status
+    // bar chip. A normal permission, granted at install; phones before
+    // Android 16 ignore it.
     manifest.manifest['uses-permission'] = manifest.manifest['uses-permission'] || [];
-    const hasPermission = manifest.manifest['uses-permission'].some(
-      (p) => p.$?.['android:name'] === 'android.permission.POST_NOTIFICATIONS'
-    );
-    if (!hasPermission) {
-      manifest.manifest['uses-permission'].push({
-        $: { 'android:name': 'android.permission.POST_NOTIFICATIONS' },
-      });
+    for (const name of GLANCE_PERMISSIONS) {
+      const has = manifest.manifest['uses-permission'].some((p) => p.$?.['android:name'] === name);
+      if (!has) manifest.manifest['uses-permission'].push({ $: { 'android:name': name } });
     }
 
     return cfg;
@@ -150,3 +155,4 @@ module.exports = function withAndroidWidgets(config) {
   config = withBridgePackage(config);
   return config;
 };
+module.exports.GLANCE_PERMISSIONS = GLANCE_PERMISSIONS;

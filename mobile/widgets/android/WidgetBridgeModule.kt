@@ -50,11 +50,48 @@ class WidgetBridgeModule(private val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun refresh(promise: Promise) {
         refreshWidgets()
-        Thread {
-            val summary = WidgetRepository.fetch(reactContext)
-            if (summary != null) LockScreenNotifier.show(reactContext, summary)
-        }.start()
+        // fetch() updates the lock-screen glance itself — and only if it is
+        // switched on. This used to show it unconditionally, so "Refresh
+        // widgets now" brought back a glance that had been turned off.
+        Thread { WidgetRepository.fetch(reactContext) }.start()
         promise.resolve(true)
+    }
+
+    /** Whether the lock-screen glance can show live, as JSON — see LockScreenNotifier.status. */
+    @ReactMethod
+    fun getLockScreenStatus(promise: Promise) {
+        try {
+            promise.resolve(LockScreenNotifier.status(reactContext))
+        } catch (e: Exception) {
+            promise.reject("LOCK_SCREEN_STATUS_FAILED", e)
+        }
+    }
+
+    /**
+     * Opens the system page where Live Updates are allowed for this app, on
+     * Android 16; elsewhere, this app's notification settings.
+     */
+    @ReactMethod
+    fun openLiveUpdateSettings(promise: Promise) {
+        val pkg = reactContext.packageName
+        val candidates = listOf(
+            LockScreenNotifier.ACTION_PROMOTION_SETTINGS,
+            android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+        )
+        for (action in candidates) {
+            try {
+                val intent = android.content.Intent(action)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, pkg)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (intent.resolveActivity(reactContext.packageManager) == null) continue
+                reactContext.startActivity(intent)
+                promise.resolve(action)
+                return
+            } catch (e: Exception) {
+                // Try the next one.
+            }
+        }
+        promise.resolve(null)
     }
 
     /** The translucency slider in Settings: percent opaque, 20–100. */

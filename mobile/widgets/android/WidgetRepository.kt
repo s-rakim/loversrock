@@ -143,7 +143,11 @@ object WidgetRepository {
                 .putLong(KEY_CACHED_AT, System.currentTimeMillis())
                 .apply()
 
-            parse(body, stale = false)
+            parse(body, stale = false)?.also {
+                // Every fresh summary keeps the lock-screen glance current,
+                // including the widgets' own background refreshes.
+                LockScreenNotifier.onSummary(context, it)
+            }
         } catch (e: Exception) {
             null
         } finally {

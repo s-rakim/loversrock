@@ -22,6 +22,7 @@ class NotificationCompat {
         fun setCategory(category: String?): Builder = this
         fun setContentIntent(intent: PendingIntent?): Builder = this
         fun setAutoCancel(autoCancel: Boolean): Builder = this
+        fun addExtras(extras: android.os.Bundle?): Builder = this
         fun build(): Notification = throw UnsupportedOperationException()
     }
     abstract class Style

@@ -9,6 +9,8 @@ import {
   lockScreenStyle,
   refreshWidgets,
   setLockScreenEnabled,
+  getLockScreenStatus,
+  openLiveUpdateSettings,
   widgetsSupported,
   WIDGET_OPACITY,
   getWidgetOpacity,
@@ -46,6 +48,15 @@ export default function SettingsScreen() {
   } = useLanguage();
   const navigation = useNavigation();
   const [lockScreenOn, setLockScreenOn] = useState(false);
+  const [lockStatus, setLockStatus] = useState(null);
+
+  // The switch shows what the phone actually has, not a default of "off",
+  // and the line under it says whether it is showing live.
+  const loadLockStatus = () => getLockScreenStatus().then((st) => {
+    setLockStatus(st);
+    if (st) setLockScreenOn(Boolean(st.enabled));
+  });
+  useEffect(() => { loadLockStatus(); }, []);
   const [widgetOpacity, setWidgetOpacityState] = useState(WIDGET_OPACITY.default);
 
   useEffect(() => { getWidgetOpacity().then(setWidgetOpacityState); }, []);
@@ -91,7 +102,18 @@ export default function SettingsScreen() {
 
   function toggleLockScreen(value) {
     setLockScreenOn(value);
-    setLockScreenEnabled(value);
+    setLockScreenEnabled(value).then(loadLockStatus);
+  }
+
+  /** One line on what the lock screen glance will actually do on this phone. */
+  function lockScreenLine() {
+    if (!lockStatus) return 'Shows as a quiet notification on your lock screen.';
+    if (!lockStatus.notifications) return 'Notifications are off for loversrock, so it cannot show. Turn them on in your phone settings.';
+    if (!lockStatus.liveUpdates) {
+      return 'Shows as a quiet notification on your lock screen. On Android 16 (One UI 8, ColorOS 16) it goes live in the Now Bar or lock-screen capsule.';
+    }
+    if (lockStatus.liveAllowed === false) return 'Live Updates are off for loversrock, so it shows as a plain notification. Turn them on to see it live.';
+    return 'Live: in the status bar and on the lock screen (Samsung Now Bar, OPPO lock-screen capsule).';
   }
 
   async function unlink() {
@@ -437,8 +459,15 @@ export default function SettingsScreen() {
                   <Text style={font.muted}>
                     {lockScreenStyle === 'widget'
                       ? 'Add it from the lock screen customise menu.'
-                      : 'Android has no lock screen widgets, so this shows as a quiet ongoing notification.'}
+                      : lockScreenLine()}
                   </Text>
+                  {lockScreenStyle === 'notification' && lockStatus?.liveUpdates && lockStatus.liveAllowed === false && (
+                    <MorphButton onPress={() => openLiveUpdateSettings().then(() => setTimeout(loadLockStatus, 1500))}>
+                      <Text style={{ color: colors.accent, fontWeight: '600', marginTop: spacing.xs }}>
+                        Turn on Live Updates
+                      </Text>
+                    </MorphButton>
+                  )}
                 </View>
                 {lockScreenStyle === 'notification' && (
                   <Switch

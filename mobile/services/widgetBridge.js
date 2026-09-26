@@ -96,6 +96,34 @@ export async function setWidgetOpacity(percent) {
   return value;
 }
 
+/**
+ * Whether the lock-screen glance can show live (Android): { sdk, liveUpdates,
+ * liveAllowed, notifications, enabled }, or null where there is no bridge or
+ * this build predates the call.
+ *
+ * liveUpdates: the OS supports Live Updates (Android 16+), which is what
+ * Samsung's Now Bar and OPPO's lock-screen capsule show. liveAllowed: the
+ * user's per-app switch for them, null where it does not exist.
+ */
+export async function getLockScreenStatus() {
+  if (!native || typeof native.getLockScreenStatus !== 'function') return null;
+  try {
+    return JSON.parse(await native.getLockScreenStatus());
+  } catch {
+    return null;
+  }
+}
+
+/** Opens the system page that allows Live Updates for this app. */
+export async function openLiveUpdateSettings() {
+  if (!native || typeof native.openLiveUpdateSettings !== 'function') return null;
+  try {
+    return await native.openLiveUpdateSettings();
+  } catch {
+    return null;
+  }
+}
+
 export async function setLockScreenEnabled(enabled) {
   if (!native) return;
   try {

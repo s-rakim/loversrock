@@ -296,5 +296,45 @@ console.log('\n=== EVERY WIDGET IS GREY LIQUID GLASS ===');
   check('  with no plain system background left over', !/containerBackground\(\.background/.test(allSwift));
 }
 
+console.log('\n=== THE LOCK SCREEN GLANCE IS AN ANDROID 16 LIVE UPDATE ===');
+{
+  // Samsung (One UI 8, Now Bar) and OPPO (ColorOS 16.1, lock-screen capsule)
+  // keep their lock-screen widget pickers to their own apps, but both show
+  // Android 16 Live Updates from any app. These are the rules Android checks
+  // before it promotes a notification; break one and it silently stays plain.
+  const notifier = fs.readFileSync(path.join(android, 'LockScreenNotifier.kt'), 'utf8');
+  // The code alone: the comments explain the rules, and naming a rule is not breaking it.
+  const notifierCode = notifier.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const pluginMod = await import(path.join(root, 'plugins', 'withAndroidWidgets.js'));
+  const plugin = pluginMod.default ?? pluginMod;
+  check('the promoted-notification permission is declared',
+    (plugin.GLANCE_PERMISSIONS || []).includes('android.permission.POST_PROMOTED_NOTIFICATIONS')
+    && plugin.GLANCE_PERMISSIONS.includes('android.permission.POST_NOTIFICATIONS'));
+  // Raw keys, because this compiles against Android 14's SDK. The values are
+  // Android 16's own (Notification.EXTRA_REQUEST_PROMOTED_ONGOING etc).
+  check('  it asks to be promoted, with the exact Android 16 key',
+    /EXTRA_REQUEST_PROMOTED_ONGOING = "android\.requestPromotedOngoing"/.test(notifier)
+    && /putBoolean\(EXTRA_REQUEST_PROMOTED_ONGOING, true\)/.test(notifier) && /\.addExtras\(live\)/.test(notifier));
+  check('  and gives the status bar chip its short text',
+    /EXTRA_SHORT_CRITICAL_TEXT = "android\.shortCriticalText"/.test(notifier)
+    && /putString\(EXTRA_SHORT_CRITICAL_TEXT, chipText\(data\)\)/.test(notifier));
+  check('  ongoing, with a title and an allowed style',
+    /\.setOngoing\(true\)/.test(notifier) && /\.setContentTitle\(title\)/.test(notifier)
+    && /BigTextStyle/.test(notifier));
+  check('  and none of what disqualifies one: custom views, colour, group summary',
+    !/setCustomContentView|setCustomBigContentView|RemoteViews|setColorized\(true\)|setGroupSummary\(true\)/.test(notifierCode));
+  check('  on a channel above IMPORTANCE_MIN', /IMPORTANCE_LOW/.test(notifierCode) && !/IMPORTANCE_MIN/.test(notifierCode));
+  check('  kept current by every fresh summary, but only when switched on',
+    /LockScreenNotifier\.onSummary\(context, it\)/.test(fs.readFileSync(path.join(android, 'WidgetRepository.kt'), 'utf8'))
+    && /fun onSummary[\s\S]{0,120}if \(isEnabled\(context\)\) show\(context, data\)/.test(notifier));
+  const bridgeKt = fs.readFileSync(path.join(android, 'WidgetBridgeModule.kt'), 'utf8');
+  const refreshBody = bridgeKt.slice(bridgeKt.indexOf('fun refresh('), bridgeKt.indexOf('fun getLockScreenStatus'));
+  check('  "Refresh widgets now" no longer brings back a glance that was turned off', !/LockScreenNotifier\.show/.test(refreshBody));
+  check('  and Settings can ask whether it is live, and open the switch for it',
+    /fun getLockScreenStatus\(promise: Promise\)/.test(bridgeKt) && /fun openLiveUpdateSettings\(promise: Promise\)/.test(bridgeKt)
+    && /ACTION_PROMOTION_SETTINGS = "android\.settings\.APP_NOTIFICATION_PROMOTION_SETTINGS"/.test(notifier)
+    && /canPostPromotedNotifications/.test(notifier));
+}
+
 console.log(`\nWIDGET WIRING RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
