@@ -262,5 +262,27 @@ check('nothing in the app reads a lock', !/is_locked|isLocked/.test(allSource));
 // A promise nobody had made.
 check('and no "Coming soon" label survives', !/Coming soon/.test(allSource));
 
+console.log('\n=== A SECTION SCREEN COVERS THE ONE IT WAS PUSHED OVER ===');
+// The photo section shipped with contentStyle transparent, copied from the
+// root stack where it is correct: there, the only thing behind a screen is
+// the lava lamp. Inside a section the thing behind is the sibling you just
+// came from, so tapping Chat drew the thread over the live camera and read
+// as a button that does nothing.
+for (const [tab, file] of [['Photos', 'PhotoSectionScreen.js'], ['Play', 'PlaySectionScreen.js']]) {
+  const src = read('app', file);
+  const style = src.match(/contentStyle:\s*\{([^}]*)\}/)?.[1] || '';
+  check(`  the ${tab} section gives its screens a background`,
+    /backgroundColor:\s*colors\./.test(style), style.trim());
+  check(`  and it is not transparent, which would show the previous screen`,
+    !/transparent/.test(style), style.trim());
+}
+
+// Wallpaper's default draws nothing by design, so the screen under it is
+// the only thing standing between the thread and whatever is behind.
+const wallpaper = read('components', 'Wallpaper.js');
+check('the default wallpaper is still deliberately see-through',
+  /transparent\) return null/.test(wallpaper),
+  'if this changed, the section background note above needs revisiting');
+
 console.log(`\nNAV RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

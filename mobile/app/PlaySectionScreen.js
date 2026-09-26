@@ -20,7 +20,7 @@ const Drawings = withSectionBar(CanvasGalleryScreen, ITEMS, 'Drawings');
 const Arcade = withSectionBar(GamesScreen, ITEMS, 'Arcade');
 
 export default function PlaySectionScreen() {
-  const { reduceMotion } = useTheme();
+  const { colors, reduceMotion } = useTheme();
 
   return (
     <Stack.Navigator
@@ -28,7 +28,18 @@ export default function PlaySectionScreen() {
         headerShown: false,
         animation: reduceMotion ? 'fade' : 'slide_from_right',
         animationDuration: 200,
-        contentStyle: { backgroundColor: 'transparent' },
+        // Opaque, and this matters more than it looks. A transparent
+        // content style works in the ROOT stack because the only thing
+        // behind it is the lava lamp. In here, the thing behind is the
+        // sibling screen you just came from — so a pushed screen drew
+        // straight over the previous one, and tapping through the bar
+        // looked like tapping a button that does nothing.
+        //
+        // The default wallpaper makes it worse rather than causing it:
+        // Wallpaper's 'none' preset renders null on purpose, to let the
+        // lava lamp through, so the thread had no backdrop of its own
+        // either.
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="Drawings" component={Drawings} />
