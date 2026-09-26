@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiFetch, connectSocket, getSocket } from '../services/api';
+import { apiFetch, connectSocket, getSocket, isUnpaired } from '../services/api';
+import NotPaired from '../components/NotPaired';
 import { spacing, radius } from '../theme';
 import { useBarClearance } from '../components/LumaBar';
 import { FadeInUp, MorphButton, ProgressDot } from '../components/Motion';
@@ -11,7 +12,7 @@ import CelebrationBurst from '../components/Celebration';
 import { useTheme } from '../components/ThemeContext';
 import QuizResult from '../components/QuizResult';
 
-export default function QuizScreen() {
+export default function QuizScreen({ navigation }) {
   const { colors, font } = useTheme();
   // The quiz is a bottom tab now rather than a pushed screen, so there is no
   // stack header supplying a title or clearing the status bar. It carries its
@@ -28,6 +29,9 @@ export default function QuizScreen() {
   const [progress, setProgress] = useState(null);
   const [revealed, setRevealed] = useState(false);
   const [result, setResult] = useState(null);
+  // Why there is nothing to show: 'unpaired', 'empty' (the server has no
+  // questions at all), or null.
+  const [emptyReason, setEmptyReason] = useState(null);
 
   const load = useCallback(async (isFirst = false) => {
     try {
@@ -36,12 +40,17 @@ export default function QuizScreen() {
       setProgress(data.progress);
       setRevealed(Boolean(data.revealed));
       setResult(data.result || null);
+      setEmptyReason(null);
       if (isFirst) {
         const firstUnanswered = data.questions.findIndex((q) => q.myAnswer === null);
         setIndex(firstUnanswered === -1 ? 0 : firstUnanswered);
       }
     } catch (err) {
-      if (isFirst) Alert.alert('Could not load quiz', err.message);
+      // Neither of these is a failure to shout about in a dialog: one needs
+      // pairing, the other a server with questions in it.
+      if (isUnpaired(err)) setEmptyReason('unpaired');
+      else if (err.status === 404) setEmptyReason('empty');
+      else if (isFirst) Alert.alert('Could not load quiz', err.message);
     } finally {
       setLoading(false);
     }
@@ -107,14 +116,20 @@ export default function QuizScreen() {
     );
   }
 
+  if (emptyReason === 'unpaired') return <NotPaired navigation={navigation} what="The quiz" />;
+
   if (questions.length === 0) {
     return (
       <View style={styles.container}>
         <Header />
         <View style={styles.centered}>
           <Icon name="calendar-outline" size={36} color={colors.textMuted} />
-          <Text style={[font.body, { marginTop: spacing.sm }]}>No quiz scheduled for today.</Text>
-          <Text style={[font.muted, { marginTop: 2 }]}>A new one lands overnight.</Text>
+          <Text style={[font.body, { marginTop: spacing.sm }]}>No quiz today.</Text>
+          <Text style={[font.muted, { marginTop: 2, textAlign: 'center' }]}>
+            {emptyReason === 'empty'
+              ? "The server has no quiz questions yet. Updating the backend fills them in (docker compose up -d --build)."
+              : 'Try again in a moment.'}
+          </Text>
         </View>
       </View>
     );

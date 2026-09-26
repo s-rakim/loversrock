@@ -5,6 +5,7 @@ import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
 import { fetchQuestions } from '../services/promptSources.js';
+import { freshenUpcomingDays, quizLlmConfig } from '../models/quizGenerator.js';
 
 const MEMORY_RETENTION_DAYS = 30;
 const QUIZ_BANK_WARNING_DAYS = 7;
@@ -258,6 +259,33 @@ export async function refreshDailyPrompts(today = new Date()) {
   return { scheduled, source, topic };
 }
 
+/**
+ * Fresh questions for the coming week, when a language model is configured
+ * (models/quizGenerator.js). Replaces only days nobody has started and whose
+ * questions are all recycled repeats, so it pays for new questions once per
+ * day rather than re-writing the week every night. Without a model this
+ * does nothing, and the recycled bank carries on as before.
+ */
+export async function freshenQuiz() {
+  let config;
+  try {
+    config = quizLlmConfig();
+  } catch (err) {
+    console.error(`[cron] quiz generator is misconfigured: ${err.message}`);
+    return;
+  }
+  if (!config) return;
+  try {
+    await refillQuizBank();
+    const { days, questions } = await freshenUpcomingDays({ days: 7, config });
+    if (days.length) console.log(`[cron] quiz: ${questions} fresh questions from ${config.provider} for ${days.join(', ')}`);
+  } catch (err) {
+    // A bad key, a rate limit, an outage: the recycled questions stay, and
+    // tomorrow's run tries again.
+    console.error(`[cron] quiz generator failed (${config.provider}): ${err.message}`);
+  }
+}
+
 export function startCronJobs() {
   cron.schedule('0 3 * * *', cleanupExpiredMemories);
   cron.schedule('0 6 * * *', checkQuizBankLevel);
@@ -265,7 +293,11 @@ export function startCronJobs() {
   cron.schedule('0 8 * * *', pushPeriodReminders);
   // 04:00, before anyone is likely to open the app for the day.
   cron.schedule('0 4 * * *', refreshDailyPrompts);
+  cron.schedule('30 6 * * *', freshenQuiz);
+  // And once shortly after starting, so a key added to .env shows up in the
+  // quiz from tomorrow rather than a week of recycled days later.
+  setTimeout(() => { freshenQuiz(); }, 60 * 1000).unref?.();
   console.log(
-    '[cron] jobs scheduled: memory cleanup (nightly), quiz bank check (daily), weekly date idea (Mondays), period reminders (daily), prompt refresh (daily)'
+    '[cron] jobs scheduled: memory cleanup (nightly), quiz bank check (daily), fresh quiz questions (daily, if a model is set), weekly date idea (Mondays), period reminders (daily), prompt refresh (daily)'
   );
 }

@@ -49,6 +49,28 @@ check('its storage object was also removed (no orphan blob)', (await objectExist
 check('5-day-old soft-deleted memory SURVIVES (still restorable)', stillFresh.rows.length === 1);
 check('surviving memory keeps its storage object', await objectExists(freshKey));
 
+// The refill recycles questions from the bank's history, so there has to be
+// some history. On a long-lived database there always is; on a fresh one
+// (or one a previous run of this file emptied ahead of today) there is not,
+// and every quiz check below failed for a reason that had nothing to do with
+// the code. So a past bank is put in place from the seed file itself, far
+// enough back not to overlap anything real.
+{
+  const fsMod = await import('node:fs');
+  const days = JSON.parse(fsMod.readFileSync(new URL('../seed/quiz_questions.json', import.meta.url), 'utf8'));
+  for (const day of days) {
+    for (const q of day.questions) {
+      await query(
+        `INSERT INTO quiz_questions (scheduled_date, question_order, type, question_text, choices, correct_answer)
+         VALUES (CURRENT_DATE - $1::int, $2, $3, $4, $5, $6)
+         ON CONFLICT (scheduled_date, question_order) DO NOTHING`,
+        [400 + day.dayOffset, q.questionOrder, q.type, q.questionText,
+          q.choices ? JSON.stringify(q.choices) : null, q.correctAnswer || null]
+      );
+    }
+  }
+}
+
 console.log('\n=== CRON: QUIZ BANK WARNING ===');
 const warnings = [];
 const origWarn = console.warn;

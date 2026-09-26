@@ -8,6 +8,7 @@
     "dev": "node --watch src/server.js",
     "migrate": "node src/config/migrate.js",
     "seed": "node seed/run-seed.js",
+    "quiz:generate": "node scripts/generate-quiz.js",
     "test:integration": "node test/integration.mjs",
     "test:contract": "node test/contract.mjs",
     "test:cron": "node test/cron.mjs",
@@ -38,13 +39,15 @@
     "test:cycle-role": "node test/cycleRole.mjs",
     "test:partner-calendar": "node test/partnerCalendar.mjs",
     "test:widget-mascots": "node --no-warnings test/widgetMascots.mjs",
-    "test:mascot": "node test/mascot.mjs"
+    "test:mascot": "node test/mascot.mjs",
+    "test:quiz-generator": "node --env-file=.env test/quizGenerator.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",
     "socket.io-client": "^4.7.5"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
