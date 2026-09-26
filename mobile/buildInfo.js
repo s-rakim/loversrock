@@ -7,7 +7,7 @@
 //
 // BUILD_STAMP changes with each change worth reinstalling for. Settings →
 // Diagnostics shows it, so the first question always has an answer.
-export const BUILD_STAMP = '2026-09-27 · doodles stay';
+export const BUILD_STAMP = '2026-09-27 · over-the-air updates';
 
 /** Bumped whenever the app and the server have to agree on something new. */
 export const API_CONTRACT = 3;

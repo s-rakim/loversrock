@@ -19,7 +19,9 @@
     "test:crypto": "node test/crypto.mjs",
     "test:widgets": "node test/widgets.mjs",
     "test:nav": "node test/nav.mjs",
-    "test:i18n": "node test/i18n.mjs"
+    "test:i18n": "node test/i18n.mjs",
+    "ship": "node scripts/ship-update.js",
+    "test:runtime": "node test/runtime.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^9.0.0",
@@ -45,6 +47,7 @@
     "expo-sensors": "~13.0.9",
     "expo-status-bar": "~1.12.1",
     "expo-system-ui": "~3.0.7",
+    "expo-updates": "~0.25.27",
     "react": "18.2.0",
     "react-native": "0.74.5",
     "react-native-incall-manager": "^4.3.0",

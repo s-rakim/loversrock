@@ -26,6 +26,16 @@ import Icon from '../components/Icon';
 // string would pass a check that the image pipeline would still fail.
 const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
+// expo-updates, required rather than imported: an APK built before it was
+// added does not contain the native module, and Diagnostics must still open.
+let Updates = null;
+try {
+  // eslint-disable-next-line global-require
+  Updates = require('expo-updates');
+} catch {
+  Updates = null;
+}
+
 const OK = 'ok';
 const BAD = 'bad';
 const WARN = 'warn';
@@ -49,6 +59,28 @@ export default function DiagnosticsScreen() {
   const [results, setResults] = useState([]);
   const [running, setRunning] = useState(false);
   const [probeUrl, setProbeUrl] = useState(null);
+  const [updating, setUpdating] = useState(false);
+  const [updateNote, setUpdateNote] = useState(null);
+
+  async function checkForUpdate() {
+    setUpdating(true);
+    setUpdateNote(null);
+    try {
+      const found = await Updates.checkForUpdateAsync();
+      if (!found.isAvailable) {
+        setUpdateNote('Already up to date.');
+        return;
+      }
+      setUpdateNote('Downloading the update…');
+      await Updates.fetchUpdateAsync();
+      // Restarts the JavaScript into the new bundle; the app reopens itself.
+      await Updates.reloadAsync();
+    } catch (err) {
+      setUpdateNote(`Could not check: ${err.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  }
   const [imageVerdict, setImageVerdict] = useState(null);
 
   const run = useCallback(async () => {
@@ -65,6 +97,18 @@ export default function DiagnosticsScreen() {
 
     // ---------------------------------------------------------------- build
     add('Build', OK, `${Constants.expoConfig?.version || '?'} · ${BUILD_STAMP}`);
+    // Which code is actually running. An update is JavaScript sent after the
+    // APK was installed; "built-in" means nothing has arrived since.
+    if (!Updates?.channel && !Updates?.runtimeVersion) {
+      add('App updates', WARN, 'Not in this build — changes need a new APK until the next one is installed');
+    } else if (Updates.isEmbeddedLaunch || !Updates.updateId) {
+      add('App updates', OK,
+        `Running the APK's built-in code · channel ${Updates.channel || '?'} · runtime ${Updates.runtimeVersion || '?'}`);
+    } else {
+      const when = Updates.createdAt ? new Date(Updates.createdAt).toLocaleString() : 'unknown time';
+      add('App updates', OK,
+        `Running an update from ${when} · channel ${Updates.channel || '?'} · runtime ${Updates.runtimeVersion || '?'}`);
+    }
     add('Server address', OK, getApiUrl());
 
     // --------------------------------------------------------------- server
@@ -216,6 +260,22 @@ export default function DiagnosticsScreen() {
             ? <ActivityIndicator color="#fff" size="small" />
             : <Text style={styles.runText}>Run checks</Text>}
         </MorphButton>
+
+        {/* An update downloads in the background on launch and applies on the
+            NEXT launch, which reads as "the update did nothing". This fetches
+            it now and restarts into it. */}
+        {Updates?.checkForUpdateAsync ? (
+          <MorphButton
+            onPress={checkForUpdate}
+            disabled={updating}
+            style={[styles.run, styles.updateButton, updating && styles.disabled]}
+          >
+            {updating
+              ? <ActivityIndicator color={colors.accent} size="small" />
+              : <Text style={[styles.runText, { color: colors.accent }]}>Check for app update</Text>}
+          </MorphButton>
+        ) : null}
+        {updateNote ? <Text style={[font.muted, { marginTop: spacing.xs }]}>{updateNote}</Text> : null}
       </View>
 
       {results.length > 0 && (
@@ -289,6 +349,7 @@ const makeStyles = (colors) =>
       backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
       borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,
     },
+    updateButton: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.accent, marginTop: spacing.sm },
     run: {
       backgroundColor: colors.accent, borderRadius: radius.pill,
       paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.md,
