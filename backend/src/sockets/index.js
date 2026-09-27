@@ -97,6 +97,9 @@ export function initSockets(httpServer, corsOrigins) {
     socket.on('call:renegotiate', (payload) => broadcast('call:renegotiate', payload));
     // "Still ringing" / "I picked up on another device".
     socket.on('call:ringing', (payload) => broadcast('call:ringing', payload));
+    // "Send me that offer again": the callee opened the app from the call
+    // notification, after the original offer had gone to nobody.
+    socket.on('call:want-offer', (payload) => broadcast('call:want-offer', payload));
 
     // A dropped socket mid-call must not leave the other end staring at a
     // frozen frame. The peer connection's own ICE timeout would eventually

@@ -56,6 +56,34 @@ one, with a message that says what would fix it. `hasTurn` in the config
 response tells the client which situation it is in. Running your own is a
 `coturn` container; there are also hosted ones.
 
+### When a call cannot connect
+
+The error under a failed call lists which networks each phone offered:
+
+- **Tailscale:** an address on the tailnet (100.64.x.x to 100.127.x.x).
+- **local network:** Wi-Fi or LAN.
+- **internet:** the public address STUN found.
+- **relay:** the TURN server.
+
+If both phones list **Tailscale**, they can reach each other over the tailnet
+and no relay is needed. When one side has no Tailscale address, fix that
+first:
+
+- Turn Tailscale on for that phone.
+- Check that loversrock is not in Tailscale's excluded apps.
+
+A relay is the fallback when that is not possible. For the bundled coturn,
+set `TURN_PUBLIC_IP` and `TURN_SECRET` in `docker/.env`.
+
+A failed connection is given one ICE restart by the caller and fifteen
+seconds to recover before the call is ended.
+
+If the callee's app was closed when the call came in, the original offer went
+nowhere. When the app opens (from the call notification, or just by being
+brought to the front), it checks `GET /calls/current`. If it finds it is being
+rung, it sends `call:want-offer`, and the caller sends its offer and
+candidates again.
+
 ## Building it
 
 `react-native-webrtc` is **native code**, so:

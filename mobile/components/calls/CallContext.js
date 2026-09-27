@@ -43,6 +43,7 @@ const {
   RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices,
 } = WebRTC || {};
 import { apiFetch, connectSocket, getSocket, waitForSocket } from '../../services/api';
+import { candidateLines, describePaths } from './paths';
 
 /**
  * Audio routing, the ringtone, the proximity sensor and the wake lock.
@@ -114,6 +115,16 @@ export function CallProvider({ children }) {
   const pendingCandidates = useRef([]);
   const callIdRef = useRef(null);
   const hasTurn = useRef(false);
+  // Which end this phone is, and what kind of call: read from event
+  // listeners, which would otherwise see the state from when they were added.
+  const roleRef = useRef(null);
+  const kindRef = useRef(null);
+  // Every candidate each side offered, for resending the offer and for
+  // saying which networks were tried when a call cannot connect.
+  const localCandidates = useRef([]);
+  const remoteCandidates = useRef([]);
+  // A failed connection gets one ICE restart before the call is ended.
+  const failTimer = useRef(null);
 
   const teardown = useCallback(() => {
     pc.current?.getSenders?.().forEach((sender) => {
@@ -132,6 +143,12 @@ export function CallProvider({ children }) {
 
     pendingCandidates.current = [];
     callIdRef.current = null;
+    roleRef.current = null;
+    kindRef.current = null;
+    localCandidates.current = [];
+    remoteCandidates.current = [];
+    clearTimeout(failTimer.current);
+    failTimer.current = null;
     restarted.current = false;
     setIceState(null);
     setRelayed(false);
@@ -196,6 +213,18 @@ export function CallProvider({ children }) {
     return stream;
   }, []);
 
+  /** Why a call that was answered never connected. */
+  const failureMessage = () => (hasTurn.current
+    ? 'Could not connect, even through the relay. Check that both phones can reach the server.'
+    : 'Could not find a path between the two phones, and the server has no relay: '
+      + 'TURN_PUBLIC_IP is not set (see docker/turnserver.conf).');
+
+  /** Which networks each phone offered, from the SDPs and trickled candidates. */
+  const pathSummary = (connection) => describePaths(
+    candidateLines(connection?.localDescription?.sdp, localCandidates.current.map((c) => c?.candidate)),
+    candidateLines(connection?.remoteDescription?.sdp, remoteCandidates.current),
+  );
+
   const buildPeerConnection = useCallback(async (kind, stream) => {
     const config = await apiFetch('/calls/config');
     hasTurn.current = Boolean(config?.hasTurn);
@@ -218,6 +247,7 @@ export function CallProvider({ children }) {
 
     connection.addEventListener('icecandidate', (event) => {
       if (!event.candidate) return; // null means gathering finished
+      localCandidates.current.push(event.candidate);
       getSocket()?.emit('call:ice', {
         callId: callIdRef.current,
         candidate: event.candidate,
@@ -230,16 +260,22 @@ export function CallProvider({ children }) {
         audio.stopRingback();
         audio.stopRing();
         setCall((c) => ({ ...c, phase: 'connected' }));
+        clearTimeout(failTimer.current);
+        failTimer.current = null;
       }
-      // 'failed' is terminal; 'disconnected' often recovers on its own, so
-      // it is deliberately not treated as the end of the call.
-      if (state === 'failed') {
-        setError(hasTurn.current
-          ? 'The connection failed even through the relay. Check that both phones can reach the server.'
-          : 'Could not find a path between the two phones, and no TURN relay is configured. '
-            + 'Start the coturn service and set TURN_PUBLIC_IP — see docker/turnserver.conf.');
-        setCall((c) => ({ ...c, phase: 'ended' }));
-        teardown();
+      // 'disconnected' often recovers on its own, so it is deliberately not
+      // treated as the end of the call. 'failed' gets one ICE restart (below)
+      // and fifteen seconds for it to work: ending the call the moment it
+      // failed, as this used to, tore down the connection the restart was
+      // trying to save, so the restart never once ran.
+      if (state === 'failed' && !failTimer.current) {
+        failTimer.current = setTimeout(() => {
+          failTimer.current = null;
+          if (pc.current !== connection || connection.connectionState === 'connected') return;
+          setError(`${failureMessage()}\n\n${pathSummary(connection)}`);
+          setCall((c) => ({ ...c, phase: 'ended' }));
+          teardown();
+        }, 15000);
       }
     });
 
@@ -250,7 +286,9 @@ export function CallProvider({ children }) {
       // One ICE restart before giving up. A candidate set gathered while the
       // phone was switching from Wi-Fi to mobile data is stale rather than
       // wrong, and re-gathering fixes it without dropping the call.
-      if (state === 'failed' && !restarted.current && pc.current) {
+      // Only the caller restarts. Both ends restarting at once would each
+      // send an offer while holding one of their own, and both would fail.
+      if (state === 'failed' && !restarted.current && pc.current && roleRef.current === 'caller') {
         restarted.current = true;
         (async () => {
           try {
@@ -298,6 +336,8 @@ export function CallProvider({ children }) {
       const stream = await getMedia(kind);
       const { call: record } = await apiFetch('/calls/start', { method: 'POST', body: { kind } });
       callIdRef.current = record.id;
+      roleRef.current = 'caller';
+      kindRef.current = kind;
       setCall({ phase: 'ringing-out', kind, id: record.id, role: 'caller' });
 
       const connection = await buildPeerConnection(kind, stream);
@@ -406,6 +446,21 @@ export function CallProvider({ children }) {
     });
   }, []);
 
+  /**
+   * Is the partner ringing this phone right now? If so, ask for their offer.
+   * Run whenever the socket (re)connects and whenever the app comes to the
+   * front, which covers opening it from the incoming-call notification.
+   */
+  const askForRingingCall = useCallback(async () => {
+    if (pc.current || callIdRef.current) return; // already in, or ringing with, a call
+    try {
+      const { call: live } = await apiFetch('/calls/current');
+      if (live?.status === 'ringing' && live.role === 'callee' && !callIdRef.current) {
+        getSocket()?.emit('call:want-offer', { callId: live.id });
+      }
+    } catch { /* offline or unpaired: nothing is ringing that can be answered */ }
+  }, []);
+
   // ------------------------------------------------------------- signalling
   useEffect(() => {
     let socket;
@@ -422,6 +477,8 @@ export function CallProvider({ children }) {
           return;
         }
         callIdRef.current = payload.callId;
+        roleRef.current = 'callee';
+        kindRef.current = payload.kind || 'voice';
         audio.ring();
         setCall({
           phase: 'ringing-in',
@@ -463,6 +520,7 @@ export function CallProvider({ children }) {
 
       socket.on('call:ice', async (payload) => {
         if (!payload?.candidate) return;
+        remoteCandidates.current.push(payload.candidate.candidate);
         // Before the remote description exists, addIceCandidate throws — so
         // early candidates wait rather than being dropped.
         if (!pc.current?.remoteDescription) {
@@ -480,15 +538,36 @@ export function CallProvider({ children }) {
       socket.on('call:hangup', remoteEnded);
       socket.on('call:decline', remoteEnded);
       socket.on('call:peer-gone', () => { if (pc.current) remoteEnded(); });
+
+      // The callee's app was closed when the call came in, so the offer went
+      // into a socket that was not there and was lost; the push opened the
+      // app onto a call it had never heard of, with nothing to answer. The
+      // callee asks for the offer again, and the caller, still ringing,
+      // sends it again with every candidate gathered so far.
+      socket.on('call:want-offer', (payload) => {
+        const connection = pc.current;
+        if (!connection || roleRef.current !== 'caller' || payload?.callId !== callIdRef.current) return;
+        const sdp = connection.localDescription?.sdp;
+        if (!sdp || connection.remoteDescription) return; // not offered yet, or already answered
+        socket.emit('call:offer', { callId: callIdRef.current, kind: kindRef.current, sdp, type: 'offer' });
+        localCandidates.current.forEach((candidate) => {
+          socket.emit('call:ice', { callId: callIdRef.current, candidate });
+        });
+      });
+
+      socket.on('connect', askForRingingCall);
+      askForRingingCall();
     })();
 
     return () => {
       cancelled = true;
       const live = getSocket();
-      ['call:offer', 'call:answer', 'call:ice', 'call:hangup', 'call:decline', 'call:peer-gone', 'call:renegotiate']
+      ['call:offer', 'call:answer', 'call:ice', 'call:hangup', 'call:decline', 'call:peer-gone', 'call:renegotiate',
+        'call:want-offer']
         .forEach((event) => live?.off(event));
+      live?.off('connect', askForRingingCall);
     };
-  }, [flushCandidates, teardown]);
+  }, [flushCandidates, teardown, askForRingingCall]);
 
   // Answered, but never actually connected.
   //
@@ -499,10 +578,7 @@ export function CallProvider({ children }) {
   useEffect(() => {
     if (call.phase !== 'connecting') return undefined;
     const timer = setTimeout(() => {
-      setError(hasTurn.current
-        ? 'Could not connect. Both phones reached the relay but no media got through.'
-        : "Could not find a path between the two phones. There's no TURN relay configured — "
-          + 'start the coturn service and set TURN_PUBLIC_IP, then try again.');
+      setError(`${failureMessage()}\n\n${pathSummary(pc.current)}`);
       endCall('ice-timeout');
     }, 30000);
     return () => clearTimeout(timer);
@@ -524,9 +600,10 @@ export function CallProvider({ children }) {
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'inactive' && call.phase === 'ringing-out') endCall('backgrounded');
+      if (next === 'active' && call.phase === 'idle') askForRingingCall();
     });
     return () => sub.remove();
-  }, [call.phase, endCall]);
+  }, [call.phase, endCall, askForRingingCall]);
 
   useEffect(() => () => teardown(), [teardown]);
 

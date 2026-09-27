@@ -163,6 +163,13 @@ const renegotiated = waitFor(sockB, 'call:renegotiate');
 sockA.emit('call:renegotiate', { callId: 'test-call', sdp: 'v=0\r\n', reason: 'voice-to-video' });
 check('a voice call can renegotiate to video', Boolean(await renegotiated));
 
+// The callee opened the app from the call notification, after the offer
+// had gone to nobody: it asks the caller to send it again.
+const wantHeard = waitFor(sockA, 'call:want-offer');
+sockB.emit('call:want-offer', { callId: 'test-call' });
+const want = await wantHeard;
+check('a phone that missed the offer can ask for it again', want.callId === 'test-call' && want.fromUserId === B.id, want);
+
 const hangupHeard = waitFor(sockB, 'call:hangup');
 sockA.emit('call:hangup', { callId: 'test-call' });
 check('hangup is relayed', Boolean(await hangupHeard));
