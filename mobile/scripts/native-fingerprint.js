@@ -71,7 +71,12 @@ function fingerprint() {
   // Normalised so the same checkout hashes the same on Windows: forward
   // slashes in paths, and \n line endings in text files, since git may check
   // text out with \r\n. Binary files (the widget preview PNGs) go in as-is.
-  for (const file of [...walk(path.join(root, 'widgets')), ...walk(path.join(root, 'plugins'))]) {
+  for (const file of [
+    ...walk(path.join(root, 'widgets')),
+    ...walk(path.join(root, 'plugins')),
+    // The voice-note service (plugins/withVoiceNotes.js copies it in).
+    ...walk(path.join(root, 'native')),
+  ]) {
     hash.update(`file:${path.relative(root, file).split(path.sep).join('/')}\n`);
     const bytes = fs.readFileSync(file);
     const text = !bytes.includes(0);

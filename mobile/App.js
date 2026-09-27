@@ -17,6 +17,7 @@ import { ensureChannels, routeForNotification, syncPushToken } from './services/
 import LumaBar, { TAB_ROUTES } from './components/LumaBar';
 import { CallProvider, useCall } from './components/calls/CallContext';
 import CrashScreen from './components/CrashScreen';
+import VoiceInbox from './components/voice/VoiceInbox';
 import { fadeOnFocus } from './components/Motion';
 
 import LoginScreen from './app/LoginScreen';
@@ -57,6 +58,7 @@ import DrawDuelScreen from './app/games/DrawDuelScreen';
 import WhatYouSayingScreen from './app/games/WhatYouSayingScreen';
 import PerfectPairScreen from './app/games/PerfectPairScreen';
 import LoveLettersScreen from './app/games/LoveLettersScreen';
+import VoiceNotesScreen from './app/VoiceNotesScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -256,6 +258,8 @@ function Root() {
       <NavigationContainer ref={navigationRef} theme={navTheme}>
           <StatusBar style={statusBarStyle} />
           <CallPresenter navigationRef={navigationRef} />
+          {/* Plays a voice note that arrives while the app is open. */}
+          <VoiceInbox />
           <Stack.Navigator initialRouteName={hasToken ? 'MainTabs' : 'Login'} screenOptions={screenOptions}>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Pairing" component={PairingScreen} options={{ title: 'Pair up' }} />
@@ -309,6 +313,8 @@ function Root() {
             <Stack.Screen name="WhatYouSaying" component={WhatYouSayingScreen} options={{ title: 'What You Saying' }} />
             <Stack.Screen name="PerfectPair" component={PerfectPairScreen} options={{ title: 'Perfect Pair' }} />
             <Stack.Screen name="LoveLetters" component={LoveLettersScreen} options={{ title: 'Love Letters' }} />
+            {/* Tapping the mic in the middle of the nav bar; holding it records. */}
+            <Stack.Screen name="VoiceNotes" component={VoiceNotesScreen} options={{ title: 'Voice messages' }} />
           </Stack.Navigator>
       </NavigationContainer>
     </View>

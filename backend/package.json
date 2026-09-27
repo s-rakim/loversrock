@@ -40,7 +40,9 @@
     "test:partner-calendar": "node test/partnerCalendar.mjs",
     "test:widget-mascots": "node --no-warnings test/widgetMascots.mjs",
     "test:mascot": "node test/mascot.mjs",
-    "test:quiz-generator": "node --env-file=.env test/quizGenerator.mjs"
+    "test:quiz-generator": "node --env-file=.env test/quizGenerator.mjs",
+    "test:voice": "node --env-file=.env test/voice.mjs",
+    "test:voice-ai": "node --env-file=.env test/voiceAi.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

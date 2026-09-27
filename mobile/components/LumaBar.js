@@ -33,7 +33,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 import Icon from './Icon';
+import VoiceMic, { MIC_SIZE } from './voice/VoiceMic';
 import { useGlass } from './GlassContext';
 import { radius, spacing } from '../theme';
 import { useTheme } from './ThemeContext';
@@ -68,6 +70,64 @@ const GLOW = 64;
 const BAR_HEIGHT = 44 + 8 * 2 + 2;
 const BAR_GAP = 12;
 
+// THE BULGE. The voice mic sits in the middle of the bar and rises out of
+// it, with the pill's top edge swelling up around it. HUMP is how far the
+// swell rises above the pill; HUMP_HALF_WIDTH is half its footprint on the
+// pill's top edge. The mic's centre sits MIC_DROP below that edge, so the
+// swell hugs the top of the button with a few pixels to spare.
+const HUMP = 16;
+const HUMP_HALF_WIDTH = 46;
+const MIC_DROP = 16;
+
+/**
+ * The bar's outline: the pill, with a smooth swell in the top edge at `cx`.
+ *
+ * Drawn rather than composed from views, because two overlapping
+ * translucent shapes show a darker band where they meet, and a pill plus a
+ * circle can only make a keyhole, not a swell. y = 0 is the top of the
+ * swell; the pill itself runs from HUMP to HUMP + BAR_HEIGHT.
+ */
+export function barOutline(width, cx, inset = 0.5) {
+  const top = HUMP + inset;
+  const bottom = HUMP + BAR_HEIGHT - inset;
+  const r = (bottom - top) / 2;
+  const left = inset;
+  const right = width - inset;
+  const hw = HUMP_HALF_WIDTH;
+  return [
+    `M ${left + r} ${top}`,
+    `L ${cx - hw} ${top}`,
+    `C ${cx - hw * 0.5} ${top} ${cx - hw * 0.55} ${inset} ${cx} ${inset}`,
+    `C ${cx + hw * 0.55} ${inset} ${cx + hw * 0.5} ${top} ${cx + hw} ${top}`,
+    `L ${right - r} ${top}`,
+    `A ${r} ${r} 0 0 1 ${right - r} ${bottom}`,
+    `L ${left + r} ${bottom}`,
+    `A ${r} ${r} 0 0 1 ${left + r} ${top}`,
+    'Z',
+  ].join(' ');
+}
+
+/** Just the swell, closed along the pill's top edge — the part the pill does not already cover. */
+export function humpOutline(cx) {
+  const hw = HUMP_HALF_WIDTH;
+  return [
+    `M ${cx - hw} ${HUMP}`,
+    `C ${cx - hw * 0.5} ${HUMP} ${cx - hw * 0.55} 0.5 ${cx} 0.5`,
+    `C ${cx + hw * 0.55} 0.5 ${cx + hw * 0.5} ${HUMP} ${cx + hw} ${HUMP}`,
+    'Z',
+  ].join(' ');
+}
+
+/**
+ * The colour expo-blur paints on Android, where it does not blur by default
+ * and draws a flat tint instead (expo-blur's getBackgroundColor). The swell
+ * has to be the same colour as the pill to read as one shape.
+ */
+function glassFill(intensity, isDark) {
+  const opacity = (intensity / 100) * 0.78;
+  return isDark ? `rgba(25,25,25,${opacity})` : `rgba(249,249,249,${opacity})`;
+}
+
 /**
  * How much of the bottom of the screen the floating bar covers.
  *
@@ -85,8 +145,9 @@ export function useBarClearance() {
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, spacing.sm);
   return {
-    // Where something floating above the bar should sit.
-    above: bottom + BAR_HEIGHT + BAR_GAP,
+    // Where something floating above the bar should sit — above the swell
+    // around the mic too, which rises HUMP past the pill.
+    above: bottom + BAR_HEIGHT + HUMP + BAR_GAP,
     // What a scrolling screen should pad its content by, so the last row can
     // be scrolled clear of the bar rather than resting behind it.
     content: bottom + BAR_HEIGHT + BAR_GAP * 2,
@@ -131,6 +192,16 @@ export default function LumaBar({ state, navigation }) {
 
   const target = centres[state.index];
 
+  // The pill's width and the mic slot's centre, both measured: the swell is
+  // drawn at the slot, and the slot moves with the phone's width.
+  const [pillWidth, setPillWidth] = useState(0);
+  const [micCentre, setMicCentre] = useState(null);
+  // Half-way along the tabs: three either side of the mic.
+  const micIndex = Math.ceil(state.routes.length / 2);
+  const openVoiceNotes = () => navigation.navigate('VoiceNotes');
+  const fill = glassFill(intensity, isDark);
+  const android = Platform.OS === 'android';
+
   useEffect(() => {
     if (target == null) return;
     if (reduceMotion) {
@@ -168,7 +239,25 @@ export default function LumaBar({ state, navigation }) {
       style={[styles2.wrapper, { bottom: Math.max(insets.bottom, spacing.sm) }]}
       pointerEvents="box-none"
     >
-      <BlurView intensity={intensity} tint={isDark ? 'dark' : 'light'} style={styles2.pill}>
+      {pillWidth > 0 && micCentre != null && (
+        <Svg
+          pointerEvents="none"
+          width={pillWidth}
+          height={BAR_HEIGHT + HUMP}
+          style={styles.shape}
+        >
+          {/* Android draws the whole shape here and the pill stays clear, so
+              there is no seam between pill and swell. iOS keeps its real
+              blur in the pill and only the swell is painted. */}
+          <Path d={android ? barOutline(pillWidth, micCentre, 0) : humpOutline(micCentre)} fill={fill} />
+        </Svg>
+      )}
+      <BlurView
+        intensity={android ? 0 : intensity}
+        tint={isDark ? 'dark' : 'light'}
+        style={[styles2.pill, android ? styles.clearPill : styles.clearBorder]}
+        onLayout={(e) => setPillWidth(e.nativeEvent.layout.width)}
+      >
         {target != null && (
           <Animated.View
             pointerEvents="none"
@@ -182,7 +271,18 @@ export default function LumaBar({ state, navigation }) {
         )}
 
         <View style={styles2.row}>
-          {state.routes.map((route, index) => {
+          {withMicSlot(micIndex, (
+            <View
+              key="voice-mic-slot"
+              style={styles2.tab}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                // +1: the row sits inside the pill's one-pixel border.
+                const centre = x + width / 2 + 1;
+                setMicCentre((prev) => (prev === centre ? prev : centre));
+              }}
+            />
+          ), state.routes.map((route, index) => {
             const meta = TAB_META[route.name]
               || { icon: 'ellipse-outline', iconActive: 'ellipse', label: route.name };
             const focused = state.index === index;
@@ -225,11 +325,32 @@ export default function LumaBar({ state, navigation }) {
                 {focused && <Text style={styles2.label} numberOfLines={1}>{meta.label}</Text>}
               </Pressable>
             );
-          })}
+          }))}
         </View>
       </BlurView>
+
+      {pillWidth > 0 && micCentre != null && (
+        <>
+          {/* The outline over everything, so the swell and the pill share
+              one continuous edge instead of the pill's own border cutting
+              straight through the bottom of the swell. */}
+          <Svg pointerEvents="none" width={pillWidth} height={BAR_HEIGHT + HUMP} style={styles.shape}>
+            <Path d={barOutline(pillWidth, micCentre)} fill="none" stroke={colors.glassBorder} strokeWidth={1} />
+          </Svg>
+          <VoiceMic
+            onTap={openVoiceNotes}
+            overlayBottom={MIC_SIZE + (HUMP - (MIC_SIZE / 2 - MIC_DROP)) + BAR_GAP}
+            style={[styles.mic, { left: micCentre - MIC_SIZE / 2, top: MIC_DROP - MIC_SIZE / 2 }]}
+          />
+        </>
+      )}
     </View>
   );
+}
+
+/** The tabs with the (empty) mic slot spliced in at `index`, so the tabs either side space evenly around it. */
+function withMicSlot(index, slot, tabs) {
+  return [...tabs.slice(0, index), slot, ...tabs.slice(index)];
 }
 
 const styles = StyleSheet.create({
@@ -243,6 +364,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   glowStack: { alignItems: 'center', justifyContent: 'center' },
+  // The drawn outline and fill, lined up with the pill: the swell rises
+  // HUMP above the pill's top edge.
+  shape: { position: 'absolute', left: 0, top: -HUMP },
+  // On Android the drawn shape is the fill, and the drawn outline is the
+  // border — the pill keeps its border width (the bar's height depends on it)
+  // but paints neither.
+  clearPill: { backgroundColor: 'transparent', borderColor: 'transparent' },
+  clearBorder: { borderColor: 'transparent' },
+  mic: { position: 'absolute' },
 });
 
 const makeStyles = (colors, font) =>

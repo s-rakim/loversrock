@@ -47,6 +47,23 @@ export async function getObjectStream(key) {
   return storageClient.getObject(BUCKET, key);
 }
 
+/** Stores raw bytes under a key the caller chose — voice notes, which are not images. */
+export async function putBuffer(key, buffer, contentType) {
+  await storageClient.putObject(BUCKET, key, buffer, buffer.length, { 'Content-Type': contentType });
+  return key;
+}
+
+/**
+ * Part of an object, for an HTTP Range request.
+ *
+ * Audio players seek: an .m4a from a phone's recorder keeps its index at the
+ * END of the file, so a player asks for the tail first, and a server that
+ * ignores Range hands it the whole file from byte zero instead.
+ */
+export async function getPartialObjectStream(key, offset, length) {
+  return storageClient.getPartialObject(BUCKET, key, offset, length);
+}
+
 /** The stored metadata for a key — used to serve the right Content-Type. */
 export async function statObject(key) {
   return storageClient.statObject(BUCKET, key);

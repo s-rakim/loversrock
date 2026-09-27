@@ -900,3 +900,37 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_thumb_key TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_width INTEGER;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_height INTEGER;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mascot_updated_at TIMESTAMPTZ;
+
+-- Voice notes: held on the mic in the middle of the nav bar, and played out
+-- loud on the other phone as they arrive, app open or not
+-- (backend/src/routes/voice.js, mobile/native/android/voice/).
+--
+-- The audio lives in object storage; this row is what points at it. Not
+-- end-to-end encrypted, unlike the message thread: the partner's phone has to
+-- fetch and play it from a background service before anyone opens the app,
+-- and that service holds no keys.
+CREATE TABLE IF NOT EXISTS voice_messages (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pair_id      UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  sender_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  audio_key    TEXT NOT NULL,
+  mime_type    TEXT NOT NULL DEFAULT 'audio/mp4',
+  duration_ms  INTEGER NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
+  size_bytes   INTEGER NOT NULL DEFAULT 0,
+  listened_at  TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS voice_messages_pair_idx ON voice_messages (pair_id, created_at DESC);
+
+-- Voice notes: what the AI connector adds (backend/src/models/voiceAi.js).
+-- All optional: with no provider configured, transcript_status stays 'off'
+-- and everything else works exactly as before.
+ALTER TABLE voice_messages ADD COLUMN IF NOT EXISTS transcript TEXT;
+-- off | pending | done | failed
+ALTER TABLE voice_messages ADD COLUMN IF NOT EXISTS transcript_status TEXT NOT NULL DEFAULT 'off';
+-- Translations of the transcript, cached per language code: {"fr": "..."}.
+ALTER TABLE voice_messages ADD COLUMN IF NOT EXISTS translations JSONB NOT NULL DEFAULT '{}'::jsonb;
+-- The voice effect it was sent with, if any, and whether it could be applied.
+ALTER TABLE voice_messages ADD COLUMN IF NOT EXISTS filter TEXT;
+-- What language each person wants voice notes translated into, if any.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_translate_to TEXT;

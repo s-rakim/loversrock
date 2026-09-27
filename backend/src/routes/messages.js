@@ -16,7 +16,7 @@ const router = asyncRouter();
  *
  * Never an empty title: on Android that renders as the package name.
  */
-async function senderName(pairId, senderId, recipientId) {
+export async function senderName(pairId, senderId, recipientId) {
   const { rows } = await query(
     `SELECT (SELECT nickname FROM pair_nicknames
               WHERE pair_id = $1 AND set_by_id = $3) AS nickname,

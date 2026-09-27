@@ -215,6 +215,7 @@ they're load-bearing and shouldn't be casually reversed:
 | Nicknames (each partner names the other, independently) | ✅ Fully implemented |
 | Daily prompts refreshed nightly from a random topic (any URL / local bank) | ✅ Fully implemented |
 | Games — all 12 played against your partner, none solo: Tic Tac Toe, Four in a Row, Checkers, Chess, Uno Reverse, Block Blitz, Anagrams, What You Saying, Perfect Pair, Love Letters, Love Golf, Draw Duel | ✅ Server-authoritative (Love Golf's score is client-reported — `docs/GAMES.md` says why). Chess verified by perft. |
+| Voice messages — hold the mic in the middle of the nav bar, auto-play on the partner's phone even closed or locked (Android), transcripts, translation, voice effects | ⚠️ Server tested end to end (72 checks); the Android player type-checks but needs a two-device pass. See `docs/VOICE.md`. |
 | Voice and video calls (WebRTC, peer to peer) | ⚠️ Signalling tested end to end; the media itself needs a two-device pass. See `docs/CALLS.md`. |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
 | Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |

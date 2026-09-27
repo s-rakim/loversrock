@@ -30,6 +30,7 @@ import achievementsRoutes from './routes/achievements.js';
 import canvasRoutes from './routes/canvas.js';
 import checkinRoutes from './routes/checkins.js';
 import feedRoutes from './routes/feed.js';
+import voiceRoutes from './routes/voice.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -67,6 +68,8 @@ app.use('/canvas', canvasRoutes);
 app.use('/checkins', checkinRoutes);
 // Everything the two of you have done, derived rather than stored.
 app.use('/feed', feedRoutes);
+// Voice notes from the mic in the nav bar — see routes/voice.js.
+app.use('/voice', voiceRoutes);
 
 /** image/jpeg for a .jpg, and so on. */
 const EXTENSION_TYPES = {
