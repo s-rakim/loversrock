@@ -34,16 +34,18 @@ if (record[runtimeVersion] !== hash) {
   process.exit(1);
 }
 
-// The server address is baked in at bundle time, and the builds get it from
-// eas.json. Without the same value here the fallback address inside an update
-// would silently become localhost.
-const eas = JSON.parse(fs.readFileSync(path.join(root, 'eas.json'), 'utf8'));
-const env = { ...process.env, ...(eas.build.preview.env || {}) };
+// The server address is baked in at bundle time. It is an EAS environment
+// variable (EXPO_PUBLIC_API_URL, the "preview" environment), not a line in
+// eas.json, so it never lands in the public repository; --environment gives
+// this update the same value the builds get. Without it the fallback address
+// inside an update would silently become localhost.
+const env = process.env;
 
 console.log(`Sending "${message}" to the preview channel (runtime ${runtimeVersion}) ...`);
 const result = spawnSync(
   'eas',
-  ['update', '--branch', 'preview', '--platform', 'android', '--message', JSON.stringify(message)],
+  ['update', '--branch', 'preview', '--environment', 'preview', '--platform', 'android',
+    '--message', JSON.stringify(message)],
   // shell: true so Windows finds eas.cmd.
   { stdio: 'inherit', env, cwd: root, shell: true },
 );

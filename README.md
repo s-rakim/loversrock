@@ -84,8 +84,10 @@ native and cannot run in it**. To get an actual APK you can sideload:
 
 ```bash
 cd mobile
-# edit eas.json: replace 100.x.x.x with your Tailscale IP
 npm install -g eas-cli && eas login
+# Once: tell EAS your server's address. It is kept on EAS, not in eas.json,
+# because this repository is public.
+eas env:create --name EXPO_PUBLIC_API_URL --value http://<tailscale-ip>:4000 --visibility sensitive --environment development --environment preview --environment production
 eas build --profile preview --platform android
 ```
 
@@ -133,7 +135,7 @@ Calls use MAX importance so a ring can interrupt; reminders sit lower.
 #### If the app says it can't reach the server
 
 **Fix it on the phone — you do not need a new build.** `EXPO_PUBLIC_API_URL`
-from `eas.json` is only the starting value; the address the app actually uses
+(an EAS environment variable) is only the starting value; the address the app actually uses
 is whatever was last saved on the device.
 
 On the login screen tap **“Can't connect? Check the server address”**, or go to
@@ -147,7 +149,7 @@ Whatever the app reports, it names the address it tried. What each message means
 
 | Message | Cause |
 |---|---|
-| "still the placeholder" | The build shipped with `100.x.x.x`. Set the real address in Settings → Server, or replace it in **all three** `eas.json` profiles before the next build. |
+| "still the placeholder" | The build shipped without a real address. Set it in Settings → Server, or set the `EXPO_PUBLIC_API_URL` EAS variable before the next build. |
 | "points at the phone itself" | The address is `localhost`/`127.0.0.1`. On a phone that means the phone. Use the server's Tailscale IP. |
 | "Can't reach the server at …" | The address is plausible but nothing answered: Tailscale down on either end, or the backend isn't running. From the server: `curl http://<tailscale-ip>:4000/health`. |
 | Connects, then 500s | Backend is up but the database isn't ready — usually migrations were never run. See setup step 4, and `docker compose logs backend`. |

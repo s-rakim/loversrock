@@ -45,7 +45,15 @@ const ship = fs.readFileSync(path.join(root, 'scripts', 'ship-update.js'), 'utf8
 check('npm run ship refuses when the fingerprint does not match',
   /record\[runtimeVersion\] !== hash/.test(ship) && /process\.exit\(1\)/.test(ship));
 check('and bakes in the same server address the builds use',
-  /eas\.build\.preview\.env/.test(ship));
+  /'--environment', 'preview'/.test(ship));
+// The repository is public: the server's address comes from an EAS
+// environment variable, never from a file anyone can read.
+check('eas.json holds no server address',
+  !/EXPO_PUBLIC_API_URL|\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(JSON.stringify(eas)));
+for (const profile of ['development', 'preview', 'production']) {
+  check(`  the ${profile} build reads its variables from the ${profile} environment`,
+    eas.build[profile]?.environment === profile, eas.build[profile]?.environment);
+}
 
 // The fingerprint must mean the same thing on a Windows checkout, where git
 // may write text files with \r\n. Checked for real in the session that added

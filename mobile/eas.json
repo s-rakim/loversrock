@@ -11,9 +11,7 @@
       "android": {
         "buildType": "apk"
       },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://100.120.105.81:4000"
-      }
+      "environment": "development"
     },
     "preview": {
       "channel": "preview",
@@ -24,9 +22,7 @@
       "ios": {
         "simulator": false
       },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://100.120.105.81:4000"
-      }
+      "environment": "preview"
     },
     "production": {
       "channel": "production",
@@ -34,9 +30,7 @@
       "android": {
         "buildType": "apk"
       },
-      "env": {
-        "EXPO_PUBLIC_API_URL": "http://100.120.105.81:4000"
-      }
+      "environment": "production"
     }
   }
 }

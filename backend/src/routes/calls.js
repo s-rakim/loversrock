@@ -63,10 +63,25 @@ function turnUrls() {
   return [`turn:${host}:${port}?transport=udp`, `turn:${host}:${port}?transport=tcp`];
 }
 
+/**
+ * Public STUN servers, only if asked for (STUN_URLS, comma-separated).
+ *
+ * Off by default, for privacy. A STUN server's whole job is to tell a phone
+ * its public internet address, and the phone then hands that address to the
+ * other phone as a call candidate. Both phones already share a tailnet, and
+ * that path needs no STUN: the Tailscale addresses connect directly, and
+ * TURN_PUBLIC_IP (also a tailnet address) relays when they cannot. So by
+ * default nobody outside the tailnet learns anything from a call.
+ */
+function stunUrls() {
+  return String(process.env.STUN_URLS || '').split(',').map((u) => u.trim()).filter(Boolean);
+}
+
 router.get('/config', async (req, res) => {
-  const iceServers = [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-  ];
+  const iceServers = [];
+  const stun = stunUrls();
+  if (stun.length) iceServers.push({ urls: stun });
+  let hasTurn = false;
 
   const urls = turnUrls();
   const secret = process.env.TURN_SECRET;
@@ -76,6 +91,7 @@ router.get('/config', async (req, res) => {
     const { username, credential, expiresAt: expiry } = turnCredentials(secret, req.userId);
     iceServers.push({ urls, username, credential });
     expiresAt = expiry;
+    hasTurn = true;
   } else if (urls.length && process.env.TURN_USERNAME) {
     // A relay someone else runs, with credentials they issued.
     iceServers.push({
@@ -83,11 +99,12 @@ router.get('/config', async (req, res) => {
       username: process.env.TURN_USERNAME,
       credential: process.env.TURN_PASSWORD,
     });
+    hasTurn = true;
   }
 
   res.json({
     iceServers,
-    hasTurn: iceServers.length > 1,
+    hasTurn,
     turnExpiresAt: expiresAt,
   });
 });

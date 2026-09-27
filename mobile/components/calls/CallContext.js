@@ -43,7 +43,9 @@ const {
   RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices,
 } = WebRTC || {};
 import { apiFetch, connectSocket, getSocket, waitForSocket } from '../../services/api';
-import { candidateLines, describePaths } from './paths';
+import {
+  candidateLines, describePaths, isPrivateCandidate, privateSdp, scrubCandidate,
+} from './paths';
 
 /**
  * Audio routing, the ringtone, the proximity sensor and the wake lock.
@@ -247,11 +249,15 @@ export function CallProvider({ children }) {
 
     connection.addEventListener('icecandidate', (event) => {
       if (!event.candidate) return; // null means gathering finished
-      localCandidates.current.push(event.candidate);
-      getSocket()?.emit('call:ice', {
-        callId: callIdRef.current,
-        candidate: event.candidate,
-      });
+      // A public address stays on this phone (see paths.js).
+      if (!isPrivateCandidate(event.candidate.candidate)) return;
+      const candidate = {
+        candidate: scrubCandidate(event.candidate.candidate),
+        sdpMid: event.candidate.sdpMid,
+        sdpMLineIndex: event.candidate.sdpMLineIndex,
+      };
+      localCandidates.current.push(candidate);
+      getSocket()?.emit('call:ice', { callId: callIdRef.current, candidate });
     });
 
     connection.addEventListener('connectionstatechange', () => {
@@ -295,7 +301,7 @@ export function CallProvider({ children }) {
             const offer = await pc.current.createOffer({ iceRestart: true });
             await pc.current.setLocalDescription(offer);
             getSocket()?.emit('call:renegotiate', {
-              callId: callIdRef.current, sdp: offer.sdp, type: offer.type,
+              callId: callIdRef.current, sdp: privateSdp(offer.sdp), type: offer.type,
             });
           } catch { /* the failure handler above still runs */ }
         })();
@@ -353,7 +359,7 @@ export function CallProvider({ children }) {
       // other phone simply never rings. Wait for a live socket, and say so
       // if there isn't one.
       const socket = await waitForSocket();
-      socket.emit('call:offer', { callId: record.id, kind, sdp: offer.sdp, type: offer.type });
+      socket.emit('call:offer', { callId: record.id, kind, sdp: privateSdp(offer.sdp), type: offer.type });
       audio.ringback();   // so the caller hears that it is ringing
     } catch (err) {
       const message = err.body?.call ? 'A call is already in progress.' : err.message;
@@ -390,7 +396,7 @@ export function CallProvider({ children }) {
       await connection.setLocalDescription(answer);
 
       await apiFetch(`/calls/${call.id}/answer`, { method: 'POST' });
-      getSocket()?.emit('call:answer', { callId: call.id, sdp: answer.sdp, type: answer.type });
+      getSocket()?.emit('call:answer', { callId: call.id, sdp: privateSdp(answer.sdp), type: answer.type });
       setCall((c) => ({ ...c, phase: 'connecting' }));
     } catch (err) {
       // A 404 here means the caller gave up (or their call failed) before
@@ -499,7 +505,7 @@ export function CallProvider({ children }) {
           }));
           const answer = await pc.current.createAnswer();
           await pc.current.setLocalDescription(answer);
-          socket.emit('call:answer', { callId: payload.callId, sdp: answer.sdp, type: answer.type });
+          socket.emit('call:answer', { callId: payload.callId, sdp: privateSdp(answer.sdp), type: answer.type });
         } catch (err) {
           setError(err.message);
         }
@@ -549,7 +555,7 @@ export function CallProvider({ children }) {
         if (!connection || roleRef.current !== 'caller' || payload?.callId !== callIdRef.current) return;
         const sdp = connection.localDescription?.sdp;
         if (!sdp || connection.remoteDescription) return; // not offered yet, or already answered
-        socket.emit('call:offer', { callId: callIdRef.current, kind: kindRef.current, sdp, type: 'offer' });
+        socket.emit('call:offer', { callId: callIdRef.current, kind: kindRef.current, sdp: privateSdp(sdp), type: 'offer' });
         localCandidates.current.forEach((candidate) => {
           socket.emit('call:ice', { callId: callIdRef.current, candidate });
         });

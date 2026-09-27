@@ -45,9 +45,9 @@ await req('/auth/invite/accept', { method: 'POST', token: B.token, body: { invit
 console.log('=== ICE CONFIGURATION ===');
 const config = await req('/calls/config', { token: A.token });
 check('config is served', config.status === 200, config.data);
-check('at least one STUN server', config.data.iceServers?.length > 0, config.data.iceServers);
-check('STUN urls look like STUN urls',
-  config.data.iceServers[0].urls.every((u) => u.startsWith('stun:')), config.data.iceServers[0]);
+check('no public STUN server unless asked for (it would learn each phone\'s internet address)',
+  Array.isArray(config.data.iceServers)
+    && !JSON.stringify(config.data.iceServers).includes('stun:'), config.data.iceServers);
 check('whether TURN is configured is stated plainly',
   typeof config.data.hasTurn === 'boolean', config.data.hasTurn);
 check('no credentials are served when there is no TURN',

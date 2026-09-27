@@ -153,13 +153,14 @@ recommended path, and the only one that works for iOS without a Mac.
 ```bash
 cd mobile
 
-# 1. Point the build at your server. Edit eas.json and replace
-#    100.x.x.x with your Tailscale IP in every profile's EXPO_PUBLIC_API_URL.
-
-# 2. One-time
+# 1. One-time
 npm install -g eas-cli
 eas login
 eas build:configure
+
+# 2. Point the builds at your server. The address lives on EAS, not in
+#    eas.json, so it never appears in the (public) repository.
+eas env:create --name EXPO_PUBLIC_API_URL --value http://<tailscale-ip>:4000 --visibility sensitive --environment development --environment preview --environment production
 
 # 3. Build an installable APK you can sideload
 eas build --profile preview --platform android
