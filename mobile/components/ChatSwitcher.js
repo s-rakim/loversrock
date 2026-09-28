@@ -1,11 +1,8 @@
-// The chats on the message board.
-//
-// The thread with your partner lives in this app. Fable is the group chat
-// between the two of you and your AI agents, and it lives in its own project
-// (collaboration-des-esprits), not here. So it is not a person and has no
-// thread of its own: tapping it leaves the app for that project.
+// The chats on the message board: the thread with your partner, and Fable,
+// the group chat between the two of you and your AI agents (app/FableScreen.js).
+// The chip for the chat you are in is highlighted; the other one switches.
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { spacing, radius } from '../theme';
 import { useTheme } from './ThemeContext';
 import { MorphButton } from './Motion';
@@ -14,46 +11,48 @@ import Icon from './Icon';
 export const FABLE_CHAT = {
   name: 'Fable',
   blurb: 'You two and your AI agents',
-  url: 'https://github.com/s-rakim/collaboration-des-esprits',
+  screen: 'Fable',
 };
 
-export default function ChatSwitcher({ partnerName }) {
+export default function ChatSwitcher({ partnerName, current = 'partner', navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const openFable = async () => {
-    try {
-      await Linking.openURL(FABLE_CHAT.url);
-    } catch {
-      Alert.alert(`Couldn't open ${FABLE_CHAT.name}`, FABLE_CHAT.url);
-    }
-  };
+  const chats = [
+    { key: 'partner', screen: 'Messages', icon: 'heart', name: partnerName || 'Partner' },
+    { key: 'fable', screen: FABLE_CHAT.screen, icon: 'people', name: FABLE_CHAT.name, blurb: FABLE_CHAT.blurb },
+  ];
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.row}
-    >
-      {/* The thread you are in. Not a button: you are already here. */}
-      <View style={[styles.chip, styles.current]} accessibilityState={{ selected: true }}>
-        <Icon name="heart" chip={false} size={14} color={colors.accent} />
-        <Text style={[styles.name, { color: colors.accent }]}>{partnerName || 'Partner'}</Text>
-      </View>
-
-      <MorphButton
-        onPress={openFable}
-        style={styles.chip}
-        accessibilityRole="link"
-        accessibilityLabel={`${FABLE_CHAT.name}: ${FABLE_CHAT.blurb}. Opens outside the app.`}
-      >
-        <Icon name="people" chip={false} size={14} color={colors.text} />
-        <View>
-          <Text style={styles.name}>{FABLE_CHAT.name}</Text>
-          <Text style={styles.blurb}>{FABLE_CHAT.blurb}</Text>
-        </View>
-        <Icon name="open-outline" chip={false} size={12} color={colors.textMuted} />
-      </MorphButton>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      {chats.map((chat) => {
+        const here = chat.key === current;
+        const inner = (
+          <>
+            <Icon name={chat.icon} chip={false} size={14} color={here ? colors.accent : colors.text} />
+            <View>
+              <Text style={[styles.name, here && { color: colors.accent }]}>{chat.name}</Text>
+              {chat.blurb ? <Text style={styles.blurb}>{chat.blurb}</Text> : null}
+            </View>
+          </>
+        );
+        // The chat you are in is not a button: you are already here.
+        return here ? (
+          <View key={chat.key} style={[styles.chip, styles.current]} accessibilityState={{ selected: true }}>
+            {inner}
+          </View>
+        ) : (
+          <MorphButton
+            key={chat.key}
+            onPress={() => navigation?.navigate(chat.screen)}
+            style={styles.chip}
+            accessibilityRole="button"
+            accessibilityLabel={chat.blurb ? `${chat.name}: ${chat.blurb}` : `Chat with ${chat.name}`}
+          >
+            {inner}
+          </MorphButton>
+        );
+      })}
     </ScrollView>
   );
 }

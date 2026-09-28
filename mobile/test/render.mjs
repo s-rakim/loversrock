@@ -682,42 +682,72 @@ console.log('\n=== THE MOOD PICKER ===');
 
 console.log('\n=== FABLE: THE GROUP CHAT WITH YOUR AI AGENTS ===');
 {
-  // Collects every element the tree produces, so the chips can be found by
+  // Collects every element the tree produces, so things can be found by
   // their props rather than by position.
-  const all = [];
-  const collect = (element, depth = 0) => {
-    if (element === null || element === undefined || typeof element !== 'object' || depth > 12) return;
-    if (Array.isArray(element)) { element.forEach((e) => collect(e, depth)); return; }
-    all.push(element);
-    const { type, props } = element;
-    if (typeof type === 'function') { collect(type(props), depth + 1); return; }
-    if (props?.children) collect(props.children, depth + 1);
+  const collectAll = (root) => {
+    const all = [];
+    const walk = (element, depth = 0) => {
+      if (element === null || element === undefined || typeof element !== 'object' || depth > 14) return;
+      if (Array.isArray(element)) { element.forEach((e) => walk(e, depth)); return; }
+      all.push(element);
+      const { type, props } = element;
+      if (typeof type === 'function') { walk(type(props), depth + 1); return; }
+      if (props?.children) walk(props.children, depth + 1);
+    };
+    walk(root);
+    return all;
   };
-  const reactStub = { ...React, useMemo: (f) => f(), useState: (v) => [v, () => {}] };
-  const ChatSwitcher = load('components/ChatSwitcher.js', {
+  const textOf = (e) => [].concat(e.props.children).flat(Infinity).filter((x) => typeof x === 'string' || typeof x === 'number').join('');
+  const reactStub = {
+    ...React,
+    useMemo: (f) => f(), useState: (v) => [v, () => {}], useRef: (v) => ({ current: v }), useCallback: (f) => f,
+  };
+  const stubs = {
     react: reactStub,
     './ThemeContext': themeStub,
-    // Kept as an element rather than unwrapped, so its onPress can be found.
+    '../components/ThemeContext': themeStub,
+    // Kept as elements rather than unwrapped, so their props can be found.
     './Motion': { MorphButton: (props) => React.createElement('MorphButton', props) },
-  });
+    '../components/Motion': { MorphButton: (props) => React.createElement('MorphButton', props) },
+    '@react-navigation/native': { useFocusEffect: () => {} },
+    '../components/LumaBar': { useBarClearance: () => ({ above: 0 }) },
+    '../services/api': { apiFetch: async () => ({}), isUnpaired: () => false },
+    '../components/NotPaired': () => null,
+  };
+
+  const ChatSwitcher = load('components/ChatSwitcher.js', stubs);
   check('the chat is called Fable', ChatSwitcher.FABLE_CHAT?.name === 'Fable', ChatSwitcher.FABLE_CHAT?.name);
-  check('and leaves for the collaboration-des-esprits project',
-    ChatSwitcher.FABLE_CHAT?.url === 'https://github.com/s-rakim/collaboration-des-esprits', ChatSwitcher.FABLE_CHAT?.url);
+
+  const went = [];
+  const navigation = { navigate: (to) => went.push(to) };
+  let all = collectAll(ChatSwitcher.default({ partnerName: 'Hobi', current: 'partner', navigation }));
+  const texts = all.filter((e) => e.type === 'Text').map(textOf);
+  check('the thread shows your partner and Fable side by side', texts.includes('Hobi') && texts.includes('Fable'), texts.join(' | '));
+  let buttons = all.filter((e) => e.type === 'MorphButton');
+  check('from your partner\'s thread, only Fable is a button', buttons.length === 1, buttons.length);
+  buttons[0]?.props.onPress();
+  check('and it opens the Fable chat in the app, not a link', went.at(-1) === 'Fable', went);
+
+  all = collectAll(ChatSwitcher.default({ partnerName: 'Hobi', current: 'fable', navigation }));
+  buttons = all.filter((e) => e.type === 'MorphButton');
+  buttons[0]?.props.onPress();
+  check('from Fable, one tap goes back to your partner', buttons.length === 1 && went.at(-1) === 'Messages', went);
+  check('ChatSwitcher never leaves the app', !/Linking|https?:\/\//.test(fs.readFileSync(path.join(root, 'components', 'ChatSwitcher.js'), 'utf8')));
+
+  const Fable = load('app/FableScreen.js', stubs);
   let threw = null;
-  try { collect(ChatSwitcher.default({ partnerName: 'Hobi' })); } catch (err) { threw = err.message; }
-  check('the chat row renders', threw === null, threw);
-  const texts = all.filter((e) => e.type === 'Text').map((e) => [].concat(e.props.children).join(''));
-  check('it shows your partner\'s thread and Fable side by side',
-    texts.includes('Hobi') && texts.includes('Fable'), texts.join(' | '));
-  const link = all.find((e) => e.type === 'MorphButton' && e.props.accessibilityRole === 'link');
-  check('Fable is a link, and says it opens outside the app',
-    Boolean(link) && /outside the app/.test(link.props.accessibilityLabel || ''), link?.props.accessibilityLabel);
-  await link?.props.onPress();
-  check('tapping Fable opens the project', openedUrls.at(-1) === ChatSwitcher.FABLE_CHAT?.url, openedUrls.at(-1));
-  check('Fable is not a person: no thread, no messages, no call buttons',
-    !/apiFetch|CallButtons|messages/.test(fs.readFileSync(path.join(root, 'components', 'ChatSwitcher.js'), 'utf8')));
+  try { collectAll(Fable.default({ navigation })); } catch (err) { threw = err.message; }
+  check('the Fable chat renders', threw === null, threw);
+  const merged = Fable.mergeFeed([{ id: 2, body: 'b' }, { id: 1, body: 'a' }], [{ id: 3, body: 'c' }, { id: 2, body: 'b2' }]);
+  check('new messages merge in order, without duplicates', merged.map((m) => `${m.id}${m.body}`).join(',') === '1a,2b2,3c', merged);
+
+  const nav = fs.readFileSync(path.join(root, 'app', 'PhotoSectionScreen.js'), 'utf8');
+  check('Fable is a screen in the chat section', /<Stack\.Screen name="Fable" component=\{FableThread\} \/>/.test(nav));
   const thread = fs.readFileSync(path.join(root, 'app', 'MessagesScreen.js'), 'utf8');
-  check('the message board shows the chat row', /<ChatSwitcher partnerName=\{partnerName\} \/>/.test(thread));
+  check('the message board shows the chat chips', /<ChatSwitcher partnerName=\{partnerName\} current="partner" navigation=\{navigation\} \/>/.test(thread));
+  const screen = fs.readFileSync(path.join(root, 'app', 'FableScreen.js'), 'utf8');
+  check('Fable talks only to our own server', /apiFetch\(`\/fable\/feed/.test(screen) && /apiFetch\('\/fable\/messages'/.test(screen) && !/\bfetch\(|:4300/.test(screen));
+  check('and stops polling when you leave it', /return \(\) => \{ live = false; clearTimeout\(timer\); \}/.test(screen));
 }
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);

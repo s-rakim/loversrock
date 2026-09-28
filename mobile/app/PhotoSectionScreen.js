@@ -14,6 +14,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import PhotoWidgetScreen from './PhotoWidgetScreen';
 import PhotoHistoryScreen from './PhotoHistoryScreen';
 import MessagesScreen from './MessagesScreen';
+import FableScreen from './FableScreen';
 import { withSectionBar } from '../components/SectionBar';
 import { useTheme } from '../components/ThemeContext';
 
@@ -28,6 +29,9 @@ const ITEMS = [
 const Camera = withSectionBar(PhotoWidgetScreen, ITEMS, 'Camera');
 const Wall = withSectionBar(PhotoHistoryScreen, ITEMS, 'Wall');
 const Thread = withSectionBar(MessagesScreen, ITEMS, 'Messages');
+// Fable is a chat too, reached from the chips at the top of the thread, so
+// the bar keeps Chat lit.
+const FableThread = withSectionBar(FableScreen, ITEMS, 'Messages');
 
 export default function PhotoSectionScreen() {
   const { colors, reduceMotion } = useTheme();
@@ -57,6 +61,7 @@ export default function PhotoSectionScreen() {
       <Stack.Screen name="Camera" component={Camera} />
       <Stack.Screen name="Wall" component={Wall} />
       <Stack.Screen name="Messages" component={Thread} />
+      <Stack.Screen name="Fable" component={FableThread} />
     </Stack.Navigator>
   );
 }

@@ -312,8 +312,8 @@ export default function MessagesScreen({ navigation }) {
         </View>
       </View>
 
-      {/* The other chats: Fable, the group chat with your AI agents. */}
-      <ChatSwitcher partnerName={partnerName} />
+      {/* The other chat: Fable, the group chat with your AI agents. */}
+      <ChatSwitcher partnerName={partnerName} current="partner" navigation={navigation} />
 
       <FlatList
         ref={listRef}

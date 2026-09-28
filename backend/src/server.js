@@ -31,6 +31,7 @@ import canvasRoutes from './routes/canvas.js';
 import checkinRoutes from './routes/checkins.js';
 import feedRoutes from './routes/feed.js';
 import voiceRoutes from './routes/voice.js';
+import fableRoutes from './routes/fable.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -70,6 +71,7 @@ app.use('/checkins', checkinRoutes);
 app.use('/feed', feedRoutes);
 // Voice notes from the mic in the nav bar — see routes/voice.js.
 app.use('/voice', voiceRoutes);
+app.use('/fable', fableRoutes);
 
 /** image/jpeg for a .jpg, and so on. */
 const EXTENSION_TYPES = {

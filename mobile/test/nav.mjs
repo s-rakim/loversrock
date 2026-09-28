@@ -42,8 +42,11 @@ for (const [name, why] of [
 // rather than left to the tab name.
 const sections = {
   'app/PhotoSectionScreen.js': {
-    screens: ['Camera', 'Wall', 'Messages'],
-    components: ['PhotoWidgetScreen', 'PhotoHistoryScreen', 'MessagesScreen'],
+    screens: ['Camera', 'Wall', 'Messages', 'Fable'],
+    components: ['PhotoWidgetScreen', 'PhotoHistoryScreen', 'MessagesScreen', 'FableScreen'],
+    // Reached from the chat chips at the top of the thread, not the pill:
+    // Fable is a second chat, so it lives under Chat.
+    viaChips: ['Fable'],
   },
   'app/PlaySectionScreen.js': {
     screens: ['Drawings', 'Arcade'],
@@ -59,8 +62,15 @@ for (const [file, want] of Object.entries(sections)) {
   // Every screen in the section must be reachable from its own pill, or one
   // of them is in the build and unreachable.
   const pill = [...src.matchAll(/key: '(\w+)'/g)].map((m) => m[1]);
+  const onPill = want.screens.filter((n) => !(want.viaChips || []).includes(n));
   check('  every screen is on the section pill',
-    JSON.stringify([...pill].sort()) === JSON.stringify([...want.screens].sort()), { pill, inner });
+    JSON.stringify([...pill].sort()) === JSON.stringify([...onPill].sort()), { pill, inner });
+  if (want.viaChips?.length) {
+    const chips = read('components', 'ChatSwitcher.js');
+    for (const name of want.viaChips) {
+      check(`  and ${name} is reached from the chat chips`, new RegExp(`screen: '${name}'`).test(chips));
+    }
+  }
 }
 
 // Home in the middle: with six buttons the thumb reaches the centre.
