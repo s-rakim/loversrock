@@ -19,6 +19,7 @@ import { MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import { useTheme } from '../components/ThemeContext';
 import ChatSwitcher from '../components/ChatSwitcher';
+import Icon3D from '../components/Icon3D';
 
 const POLL_MS = 3000;
 
@@ -170,7 +171,7 @@ export default function FableScreen({ navigation }) {
 
       {offline ? (
         <View style={styles.card}>
-          <Icon name="cloud-offline-outline" chip chipSize={40} color={colors.textMuted} />
+          <Icon3D name="cloud" size={56} />
           <Text style={[font.body, { fontWeight: '700' }]}>
             {status.configured ? 'Fable\'s room is not answering' : 'Fable is not set up yet'}
           </Text>
@@ -195,7 +196,7 @@ export default function FableScreen({ navigation }) {
           ListEmptyComponent={
             status ? (
               <View style={styles.emptyRow}>
-                <Icon name="sparkles-outline" chip chipSize={40} />
+                <Icon3D name="robot" size={56} />
                 <Text style={font.muted}>Say hello to the room. @name tags an agent.</Text>
               </View>
             ) : null

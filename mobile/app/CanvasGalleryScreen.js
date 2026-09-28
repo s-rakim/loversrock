@@ -18,6 +18,7 @@ import { useTheme } from '../components/ThemeContext';
 import { MorphButton, FadeInUp } from '../components/Motion';
 import { useBarClearance } from '../components/LumaBar';
 import Doodle from '../components/Doodle';
+import Icon3D from '../components/Icon3D';
 
 const GAP = spacing.sm;
 
@@ -200,7 +201,7 @@ export default function CanvasGalleryScreen({ navigation }) {
         ListEmptyComponent={
           loading ? null : (
             <View style={styles.empty}>
-              <Ionicons name="color-palette-outline" size={40} color={colors.textMuted} />
+              <Icon3D name="palette" size={56} />
               <Text style={[font.h3, { marginTop: spacing.sm }]}>Nothing on the shelf yet</Text>
               <Text style={[font.muted, styles.emptyText]}>
                 Draw something and keep it. Either of you can open it again and

@@ -8,6 +8,7 @@ import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
+import Icon3D from '../components/Icon3D';
 
 function timeLeft(targetDate) {
   const diff = new Date(targetDate).getTime() - Date.now();
@@ -101,7 +102,7 @@ export default function CountdownScreen({ navigation }) {
         renderItem={({ item, index }) => (
           <FadeInUp delay={index * 30}>
             <View style={styles.card}>
-              <Icon name="hourglass-outline" chip chipSize={36} style={{ marginRight: spacing.sm }} />
+              <Icon3D name="hourglass" size={40} style={{ marginRight: spacing.sm }} />
               <View style={{ flex: 1 }}>
                 <Text style={font.h2}>{item.label}</Text>
                 <Text style={styles.countdownText}>{timeLeft(item.target_date)}</Text>

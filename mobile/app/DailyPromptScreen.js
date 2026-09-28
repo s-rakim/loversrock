@@ -7,6 +7,7 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import CelebrationBurst from '../components/Celebration';
 import { useTheme } from '../components/ThemeContext';
+import Icon3D from '../components/Icon3D';
 
 export default function DailyPromptScreen() {
   const { colors, font } = useTheme();
@@ -106,7 +107,7 @@ export default function DailyPromptScreen() {
       )}
       <FadeInUp>
         <View style={styles.streakPill}>
-          <Icon name="flame" size={16} color={colors.gold} />
+          <Icon3D name="fire" size={20} />
           <Text style={styles.streakText}>{streak} day streak</Text>
         </View>
         <Text style={styles.prompt}>{prompt.content}</Text>

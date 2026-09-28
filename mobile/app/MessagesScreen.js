@@ -35,6 +35,7 @@ import { setActiveScreen } from '../services/notifications';
 import Doodle from '../components/Doodle';
 import Wallpaper from '../components/Wallpaper';
 import { getKeyPair, encryptFor, decryptFrom, isEncrypted } from '../services/crypto';
+import Icon3D from '../components/Icon3D';
 
 /**
  * Adds a message without ever adding it twice.
@@ -324,7 +325,7 @@ export default function MessagesScreen({ navigation }) {
         renderItem={renderItem}
         ListEmptyComponent={
           <View style={styles.emptyRow}>
-            <Icon name="chatbubble-outline" chip chipSize={40} />
+            <Icon3D name="chat" size={56} />
             <Text style={font.muted}>Say something</Text>
           </View>
         }

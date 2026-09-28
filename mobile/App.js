@@ -19,6 +19,7 @@ import { CallProvider, useCall } from './components/calls/CallContext';
 import CrashScreen from './components/CrashScreen';
 import VoiceInbox from './components/voice/VoiceInbox';
 import { fadeOnFocus } from './components/Motion';
+import HeaderTitle, { HEADER_ICONS } from './components/HeaderTitle';
 
 import LoginScreen from './app/LoginScreen';
 import PairingScreen from './app/PairingScreen';
@@ -105,7 +106,12 @@ function useNavTheme() {
         primary: colors.accentPink,
       },
     },
-    screenOptions: {
+    // A function of the route, so each screen's title can carry its 3D icon
+    // (components/HeaderTitle.js). Everything else is the same for all.
+    screenOptions: ({ route }) => ({
+      ...(HEADER_ICONS[route.name]
+        ? { headerTitle: (props) => <HeaderTitle icon={HEADER_ICONS[route.name]} {...props} /> }
+        : {}),
       headerStyle: { backgroundColor: colors.surface },
       headerTintColor: colors.textPrimary,
       headerShadowVisible: false,
@@ -119,7 +125,7 @@ function useNavTheme() {
       // The lava lamp lives behind the navigator, so a transparent card during
       // the transition is what stops a grey flash between screens.
       freezeOnBlur: true,
-    },
+    }),
   };
 }
 

@@ -7,6 +7,7 @@ import { FadeInUp } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
+import Icon3D from '../components/Icon3D';
 
 const UPDATE_INTERVAL_MS = 30000;
 
@@ -88,7 +89,7 @@ export default function DistanceApartScreen() {
       <FadeInUp>
         <View style={styles.toggleRow}>
           <View style={styles.toggleLabel}>
-            <Icon name="navigate-outline" chip chipSize={36} />
+            <Icon3D name="pin" size={40} />
             <Text style={font.h2}>Share my location</Text>
           </View>
           <Switch value={enabled} onValueChange={toggle} trackColor={{ true: colors.accent }} />
@@ -106,7 +107,7 @@ export default function DistanceApartScreen() {
             </>
           ) : (
             <>
-              <Icon name="heart-half-outline" chip chipSize={40} style={{ marginBottom: spacing.sm }} />
+              <Icon3D name="two_hearts" size={56} style={{ marginBottom: spacing.sm }} />
               <Text style={font.muted}>{reason || 'Turn on sharing to see how far apart you are.'}</Text>
             </>
           )}

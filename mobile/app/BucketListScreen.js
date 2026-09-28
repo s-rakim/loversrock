@@ -7,6 +7,7 @@ import { FadeInUp, MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
+import Icon3D from '../components/Icon3D';
 
 export default function BucketListScreen() {
   const { colors, font } = useTheme();
@@ -99,7 +100,7 @@ export default function BucketListScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyRow}>
-            <Icon name="checkbox-outline" chip chipSize={40} />
+            <Icon3D name="check" size={56} />
             <Text style={font.muted}>Nothing on your list yet.</Text>
           </View>
         }

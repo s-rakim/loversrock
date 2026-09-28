@@ -20,6 +20,7 @@ import { apiFetch, mediaUrl } from '../services/api';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { FadeInUp } from '../components/Motion';
+import Icon3D from '../components/Icon3D';
 
 const COLUMNS = 5;
 const DOT_ROWS = 6;
@@ -219,7 +220,7 @@ export default function PhotoHistoryScreen({ navigation }) {
       {months.length === 0 ? (
         <View style={styles.card}>
           <View style={styles.emptyInner}>
-            <Ionicons name="camera-outline" size={40} color={colors.textMuted} />
+            <Icon3D name="camera" size={56} />
             <Text style={[font.body, { marginTop: spacing.sm }]}>No photos yet.</Text>
             <Text style={[font.muted, { marginTop: 2, textAlign: 'center' }]}>
               The first photo either of you sends shows up here — and on the

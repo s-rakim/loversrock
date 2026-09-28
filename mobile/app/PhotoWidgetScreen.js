@@ -21,6 +21,7 @@ import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton } from '../components/Motion';
 import { refreshWidgets } from '../services/widgetBridge';
+import Icon3D from '../components/Icon3D';
 
 const MAX_CAPTION = 60;
 
@@ -111,7 +112,7 @@ export default function PhotoWidgetScreen({ navigation }) {
   if (!permission.granted) {
     return (
       <View style={[styles.root, styles.centered, { paddingTop: insets.top }]}>
-        <Ionicons name="camera-outline" size={44} color={colors.textMuted} />
+        <Icon3D name="camera" size={60} />
         <Text style={[font.h2, { marginTop: spacing.md }]}>Camera access</Text>
         <Text style={[font.muted, styles.permissionBody]}>
           The locket takes a picture and puts it straight on their home screen,

@@ -11,6 +11,7 @@ import StickerField from '../components/Stickers';
 import CelebrationBurst from '../components/Celebration';
 import { useTheme } from '../components/ThemeContext';
 import QuizResult from '../components/QuizResult';
+import Icon3D from '../components/Icon3D';
 
 export default function QuizScreen({ navigation }) {
   const { colors, font } = useTheme();
@@ -100,7 +101,7 @@ export default function QuizScreen({ navigation }) {
 
   const Header = ({ subtitle }) => (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-      <Icon name="help-circle" chip chipSize={38} />
+      <Icon3D name="quiz" size={44} />
       <View style={{ flex: 1 }}>
         <Text style={font.h1}>Daily Quiz</Text>
         {subtitle ? <Text style={font.muted}>{subtitle}</Text> : null}
@@ -123,7 +124,7 @@ export default function QuizScreen({ navigation }) {
       <View style={styles.container}>
         <Header />
         <View style={styles.centered}>
-          <Icon name="calendar-outline" size={36} color={colors.textMuted} />
+          <Icon3D name="calendar" size={56} />
           <Text style={[font.body, { marginTop: spacing.sm }]}>No quiz today.</Text>
           <Text style={[font.muted, { marginTop: 2, textAlign: 'center' }]}>
             {emptyReason === 'empty'
@@ -162,7 +163,7 @@ export default function QuizScreen({ navigation }) {
         <StickerField variant="minimal" />
         <Header subtitle="Waiting on them" />
         <View style={styles.centered}>
-        <Icon name="hourglass-outline" size={40} color={colors.accent} />
+        <Icon3D name="hourglass" size={56} />
         <Text style={[font.h2, styles.waitTitle]}>All answered</Text>
         <Text style={[font.muted, styles.waitBody]}>
           Your answers stay hidden until your partner finishes theirs.

@@ -17,6 +17,7 @@ import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton, FadeInUp } from '../components/Motion';
 import CelebrationBurst from '../components/Celebration';
+import Icon3D from '../components/Icon3D';
 
 export default function AchievementsScreen() {
   const { colors, font } = useTheme();
@@ -136,11 +137,8 @@ export default function AchievementsScreen() {
             <FadeInUp key={badge.slug} delay={Math.min(i, 10) * 25} style={styles.cell}>
               <View style={[styles.badge, !badge.earned && styles.badgeLocked]}>
                 <View style={[styles.badgeIcon, badge.earned && { backgroundColor: colors.accentSoft }]}>
-                  <Ionicons
-                    name={badge.icon}
-                    size={20}
-                    color={badge.earned ? colors.accent : colors.textMuted}
-                  />
+                  {/* Faded, not greyed: a locked badge still shows what it is. */}
+                  <Icon3D name={badge.icon} size={34} style={!badge.earned && { opacity: 0.35 }} />
                 </View>
                 <Text style={[font.body, styles.badgeTitle, !badge.earned && { color: colors.textMuted }]}>
                   {badge.title}
@@ -187,7 +185,7 @@ const makeStyles = (colors) =>
     },
     badgeLocked: { opacity: 0.55, borderStyle: 'dashed' },
     badgeIcon: {
-      width: 38, height: 38, borderRadius: 19,
+      width: 48, height: 48, borderRadius: 24,
       alignItems: 'center', justifyContent: 'center',
       backgroundColor: colors.surfaceAlt,
     },

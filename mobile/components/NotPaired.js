@@ -13,13 +13,14 @@ import Icon from './Icon';
 import { MorphButton } from './Motion';
 import { spacing, radius } from '../theme';
 import { useTheme } from './ThemeContext';
+import Icon3D from './Icon3D';
 
 export default function NotPaired({ navigation, what = 'This' }) {
   const { colors, font } = useTheme();
 
   return (
     <View style={styles.root}>
-      <Icon name="heart-half-outline" chip chipSize={56} />
+      <Icon3D name="two_hearts" size={72} />
       <Text style={[font.h2, styles.title]}>{what} needs the two of you</Text>
       <Text style={[font.muted, styles.body]}>
         Pair with your partner and this fills up on its own.

@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, radius } from '../theme';
 import { useTheme } from './ThemeContext';
 import { Stagger, GrowBar } from './Motion';
+import Icon3D from './Icon3D';
 
 // Each tier gets its own look, so the result reads at a glance before the
 // words are.
@@ -31,7 +32,7 @@ export default function QuizResult({ result, questions }) {
   return (
     <Stagger delayStep={70}>
       <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
-        <Ionicons name={tier.icon} size={34} color={isDark ? '#FFFFFF' : '#3A2A33'} />
+        <Icon3D name={tier.icon} size={44} />
         <Text style={[styles.title, { color: isDark ? '#FFFFFF' : '#2A1F26' }]}>{result.title}</Text>
         <Text style={[styles.blurb, { color: isDark ? 'rgba(255,255,255,0.85)' : '#4A3A44' }]}>
           {result.blurb}

@@ -27,6 +27,7 @@ import { FadeInUp, MorphButton } from '../components/Motion';
 import ConnectionCard from '../components/ConnectionCard';
 import ColorPicker from '../components/ColorPicker';
 import { useLanguage } from '../components/LanguageContext';
+import Icon3D from '../components/Icon3D';
 import {
   useTheme, THEME_PREFERENCES, ACCENTS, ACCENT_NAMES, BACKGROUND_SPEEDS, TEXT_SCALES,
   BLOB_PALETTES, BLOB_PALETTE_NAMES,
@@ -144,7 +145,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <FadeInUp>
         <View style={styles.headerRow}>
-          <Icon name="settings-outline" chip chipSize={44} />
+          <Icon3D name="gear" size={48} />
           <Text style={font.h1}>Settings</Text>
         </View>
       </FadeInUp>
@@ -479,7 +480,7 @@ export default function SettingsScreen() {
               {/* Colour, gradient, pattern and translucency all live on their
                   own screen, with a live preview. */}
               <MorphButton onPress={() => navigation.navigate('WidgetLook')} style={styles.motionRow}>
-                <Icon name="color-palette-outline" chip chipColor={colors.surfaceAlt} />
+                <Icon3D name="palette" size={34} />
                 <View style={{ flex: 1 }}>
                   <Text style={font.body}>Widget look</Text>
                   <Text style={font.muted}>Colours, gradients, patterns and how see-through they are.</Text>
@@ -526,7 +527,7 @@ export default function SettingsScreen() {
 
       <FadeInUp delay={52}>
         <MorphButton onPress={() => navigation.navigate('Wardrobe')} style={styles.actionRow}>
-          <Icon name="shirt-outline" chip chipColor={colors.surfaceAlt} />
+          <Icon3D name="tshirt" size={34} />
           <View style={{ flex: 1 }}>
             <Text style={font.body}>Your character</Text>
             <Text style={font.muted}>Skin, hair and a wardrobe. They see what you put on.</Text>
@@ -544,7 +545,7 @@ export default function SettingsScreen() {
           a read-only screen forever. */}
       <FadeInUp delay={70}>
         <MorphButton onPress={changeCycleRole} style={styles.actionRow}>
-          <Icon name="water-outline" chip chipColor={colors.surfaceAlt} />
+          <Icon3D name="droplet" size={34} />
           <View style={{ flex: 1 }}>
             <Text style={font.body}>Cycle tracker mode</Text>
             <Text style={font.muted}>
@@ -560,7 +561,7 @@ export default function SettingsScreen() {
 
       <FadeInUp delay={98}>
         <MorphButton onPress={() => navigation.navigate('Diagnostics')} style={styles.actionRow}>
-          <Icon name="pulse-outline" chip chipColor={colors.surfaceAlt} />
+          <Icon3D name="wrench" size={34} />
           <View style={{ flex: 1 }}>
             <Text style={font.body}>Diagnostics</Text>
             <Text style={font.muted}>Check what is working: server, live connection, photos, calls.</Text>

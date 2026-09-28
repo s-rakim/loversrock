@@ -52,6 +52,8 @@ function load(relative, extraStubs = {}) {
     if (id === 'react-native') return rn;
     if (extraStubs[id]) return extraStubs[id];
     if (id.startsWith('.')) {
+      // An image require() is an asset for Metro, not a module to load.
+      if (/\.(png|jpe?g|gif|webp)$/i.test(id)) return { __asset: true, uri: id };
       const resolved = path.join(path.dirname(relative), id);
       return load(resolved.endsWith('.js') ? resolved : `${resolved}.js`, extraStubs);
     }

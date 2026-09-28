@@ -20,6 +20,7 @@ import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton } from '../components/Motion';
 import Celebration from '../components/Celebration';
+import Icon3D from '../components/Icon3D';
 
 const { width: SCREEN } = Dimensions.get('window');
 
@@ -141,7 +142,7 @@ export default function SwipeDeckScreen({ navigation }) {
   if (!current) {
     return (
       <View style={[styles.root, styles.centered]}>
-        <Ionicons name="checkmark-done-outline" size={44} color={colors.textMuted} />
+        <Icon3D name="party" size={60} />
         <Text style={[font.h2, { marginTop: spacing.sm }]}>
           {voted > 0 ? "That's the whole deck" : 'Nothing to swipe yet'}
         </Text>

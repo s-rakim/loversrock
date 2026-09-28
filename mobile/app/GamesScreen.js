@@ -18,6 +18,7 @@ import { Stagger, MorphButton, Pop } from '../components/Motion';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
+import Icon3D from '../components/Icon3D';
 
 const ROUTE_BY_SLUG = {
   'tic-tac-toe': 'TicTacToe',
@@ -108,7 +109,7 @@ export default function GamesScreen({ navigation }) {
                     onPress={() => navigation.navigate(ROUTE_BY_SLUG[game.slug])}
                     style={[styles.row, yourMove && styles.rowHighlighted]}
                   >
-                    <Icon name={game.emoji} chip chipSize={44} />
+                    <Icon3D name={game.emoji} size={48} />
                     <View style={styles.rowText}>
                       <Text style={font.h2}>{game.title}</Text>
                       <Text style={font.muted} numberOfLines={1}>
@@ -152,7 +153,7 @@ export default function GamesScreen({ navigation }) {
               onPress={() => navigation.navigate(ROUTE_BY_SLUG[game.slug])}
               style={styles.card}
             >
-              <Icon name={game.emoji} chip chipSize={44} style={{ marginBottom: spacing.sm }} />
+              <Icon3D name={game.emoji} size={56} style={{ marginBottom: spacing.sm }} />
               <Text style={font.h2}>{game.title}</Text>
               {game.subtitle ? <Text style={font.muted}>{game.subtitle}</Text> : null}
             </MorphButton>

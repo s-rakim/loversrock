@@ -16,6 +16,7 @@ import { apiFetch, mediaUrl, onSocketEvent } from '../services/api';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton } from '../components/Motion';
+import Icon3D from '../components/Icon3D';
 
 // What each kind looks like at a glance. Icon and label only — the layout is
 // shared, because nine different card designs in one scroll reads as a mess
@@ -209,7 +210,7 @@ export default function FeedScreen({ navigation }) {
     return (
       <View style={styles.card}>
         <View style={styles.head}>
-          <Ionicons name={meta.icon} size={14} color={colors.accent} />
+          <Icon3D name={meta.icon} size={20} />
           <Text style={styles.kindLabel}>{meta.label.toUpperCase()}</Text>
           <Text style={[font.muted, { fontSize: 11 }]}>{when(item.at)}</Text>
         </View>
@@ -302,7 +303,7 @@ export default function FeedScreen({ navigation }) {
       ListFooterComponent={cursor ? <ActivityIndicator style={{ margin: spacing.lg }} color={colors.accent} /> : null}
       ListEmptyComponent={(
         <View style={styles.empty}>
-          <Ionicons name="time-outline" size={40} color={colors.textMuted} />
+          <Icon3D name="book" size={56} />
           <Text style={[font.h3, { marginTop: spacing.sm }]}>Nothing here yet</Text>
           <Text style={[font.muted, styles.emptyText]}>
             Answer a question, send a photo, tick something off — it all lands
