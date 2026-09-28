@@ -14,11 +14,16 @@ export default function BucketListScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [items, setItems] = useState([]);
   const [draft, setDraft] = useState('');
+  const [ideas, setIdeas] = useState([]);
 
   const load = useCallback(() => {
     apiFetch('/bucket-list')
       .then((data) => setItems(data.items))
       .catch((err) => Alert.alert('Could not load bucket list', err.message));
+    // Ideas are a nicety: an older server without them just shows none.
+    apiFetch('/bucket-list/suggestions')
+      .then((data) => setIdeas(data.suggestions || []))
+      .catch(() => setIdeas([]));
   }, []);
 
   useFocusEffect(load);
@@ -57,6 +62,15 @@ export default function BucketListScreen() {
     }
   }
 
+  async function addIdea(title) {
+    setIdeas((list) => list.filter((i) => i.title !== title));
+    try {
+      await apiFetch('/bucket-list', { method: 'POST', body: { title } });
+    } catch (err) {
+      Alert.alert('Could not add item', err.message);
+    }
+  }
+
   async function toggle(item) {
     try {
       await apiFetch(`/bucket-list/${item.id}`, { method: 'PATCH', body: { isCompleted: !item.is_completed } });
@@ -79,6 +93,28 @@ export default function BucketListScreen() {
         />
         <Icon name="add-circle" chip={false} color={colors.accent} size={40} onPress={addItem} />
       </View>
+
+      {ideas.length > 0 && (
+        <View style={{ marginBottom: spacing.md }}>
+          <View style={styles.ideasHead}>
+            <Icon3D name="sparkles" size={20} />
+            <Text style={[font.muted, { fontWeight: '700' }]}>Ideas to add</Text>
+          </View>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={ideas}
+            keyExtractor={(idea) => idea.title}
+            contentContainerStyle={{ gap: spacing.sm }}
+            renderItem={({ item: idea }) => (
+              <MorphButton onPress={() => addIdea(idea.title)} style={styles.idea}>
+                <Icon name="add" chip={false} size={14} color={colors.accent} />
+                <Text style={[font.body, { fontSize: 13 }]}>{idea.title}</Text>
+              </MorphButton>
+            )}
+          />
+        </View>
+      )}
 
       <FlatList
         data={items}
@@ -124,5 +160,11 @@ const makeStyles = (colors) =>
     padding: spacing.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border,
   },
   completedText: { textDecorationLine: 'line-through', color: colors.textMuted },
+  ideasHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
+  idea: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: colors.accentSoft, borderRadius: radius.pill,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
+  },
   emptyRow: { alignItems: 'center', gap: spacing.sm, padding: spacing.lg },
 });

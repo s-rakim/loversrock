@@ -145,6 +145,15 @@ async function seedChallenges() {
   console.log(`[seed] challenges: ${challenges.length} challenges`);
 }
 
+/** Ideas for the bucket list, so the suggestions row works with no AI set up. */
+async function seedBucketSuggestions() {
+  const ideas = loadJson('bucket_suggestions.json');
+  for (const title of ideas) {
+    await query(`INSERT INTO bucket_suggestions (title) VALUES ($1) ON CONFLICT DO NOTHING`, [title]);
+  }
+  console.log(`[seed] bucket_suggestions: ${ideas.length} ideas`);
+}
+
 async function seedGamesCatalog() {
   const games = loadJson('games_catalog.json');
   for (const game of games) {
@@ -191,6 +200,7 @@ async function run() {
   await seedQuestionDecks();
   await seedFollowUps();
   await seedChallenges();
+  await seedBucketSuggestions();
   await seedGamesCatalog();
   await pool.end();
   console.log('[seed] done');

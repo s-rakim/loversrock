@@ -300,7 +300,9 @@ const conv = await req(`/bucket-list/${bl.data.item.id}/convert-to-memory`, { me
 check('bucket item converts to a real memory', conv.status === 201 && conv.data.memory.caption === 'See the northern lights', conv.data);
 
 const ideas = await req('/date-ideas', { token: A.token });
-check('10 global curated ideas', ideas.data.ideas.length === 10, ideas.data.ideas.length);
+// At least the 10 curated ones: the AI connector adds to the catalogue weekly.
+check('the 10 global curated ideas are all there', ideas.data.ideas.filter((i) => (i.source || 'seed') === 'seed').length === 10
+  && ideas.data.ideas.length >= 10, ideas.data.ideas.length);
 const freeIdeas = await req('/date-ideas?costTier=free', { token: A.token });
 check('ideas filter by cost tier', freeIdeas.data.ideas.length > 0 && freeIdeas.data.ideas.every((i) => i.cost_tier === 'free'), freeIdeas.data.ideas.length);
 const catIdeas = await req('/date-ideas?category=at_home', { token: A.token });

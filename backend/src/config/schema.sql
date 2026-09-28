@@ -934,3 +934,19 @@ ALTER TABLE voice_messages ADD COLUMN IF NOT EXISTS translations JSONB NOT NULL 
 ALTER TABLE voice_messages ADD COLUMN IF NOT EXISTS filter TEXT;
 -- What language each person wants voice notes translated into, if any.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS voice_translate_to TEXT;
+
+-- Content the AI connector writes (models/contentGenerator.js). `source` says
+-- where a row came from — seed, or ai — so it is visible whether the nightly
+-- generation is working.
+ALTER TABLE date_ideas ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'seed';
+ALTER TABLE challenges ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'seed';
+
+-- Ideas for the shared bucket list: suggestions, not items. Tapping one adds
+-- it to your list as an ordinary item; this table is the same for everyone.
+CREATE TABLE IF NOT EXISTS bucket_suggestions (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       TEXT NOT NULL,
+  source      TEXT NOT NULL DEFAULT 'seed',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS bucket_suggestions_title ON bucket_suggestions (lower(title));

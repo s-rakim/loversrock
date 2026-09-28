@@ -15,6 +15,24 @@ router.get('/', async (req, res) => {
   res.json({ items: rows });
 });
 
+/**
+ * Ideas to add: a handful of suggestions (seeded, and grown weekly by the AI
+ * connector) that are not already on your list. Random each time, so the row
+ * does not show the same eight forever.
+ */
+router.get('/suggestions', async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 8, 1), 20);
+  const { rows } = await query(
+    `SELECT s.title, s.source FROM bucket_suggestions s
+      WHERE NOT EXISTS (
+        SELECT 1 FROM bucket_list_items i WHERE i.pair_id = $1 AND lower(i.title) = lower(s.title)
+      )
+      ORDER BY random() LIMIT $2`,
+    [req.pair.id, limit]
+  );
+  res.json({ suggestions: rows.map((r) => ({ title: r.title, fromAi: r.source === 'ai' })) });
+});
+
 router.post('/', async (req, res) => {
   const { title } = req.body;
   if (!title) return res.status(400).json({ error: 'title is required' });

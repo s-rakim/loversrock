@@ -125,7 +125,18 @@ const SCHEMA = {
 
 // --------------------------------------------------------------- providers
 
-async function askAnthropic(config, count, avoid) {
+/**
+ * One request for JSON, to whichever provider is configured: the part every
+ * generator shares (this file's quiz, and models/contentGenerator.js). The
+ * reply's text comes back; the caller parses and checks it.
+ */
+export async function askLlm(config, { system, user, schema }) {
+  return config.provider === 'anthropic'
+    ? askAnthropic(config, { system, user, schema })
+    : askOpenAiCompatible(config, { system, user });
+}
+
+async function askAnthropic(config, { system, user, schema }) {
   // Loaded only when Claude is actually the chosen provider, so a missing or
   // broken install of the SDK can cost the quiz its fresh questions but never
   // stop the server starting: this module is imported by the nightly jobs.
@@ -139,14 +150,13 @@ async function askAnthropic(config, count, avoid) {
   const response = await client.messages.create({
     model: config.model,
     max_tokens: 16000,
-    system: SYSTEM,
-    messages: [{ role: 'user', content: userPrompt(count, avoid) }],
-    output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+    system,
+    messages: [{ role: 'user', content: user }],
+    ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
   });
   if (response.stop_reason === 'refusal') throw new Error('the model declined');
   if (response.stop_reason === 'max_tokens') throw new Error('the reply was cut off');
-  const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-  return parseReply(text);
+  return response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
 }
 
 /**
@@ -174,12 +184,12 @@ export function networkError(config, err) {
   return wrapped;
 }
 
-async function askOpenAiCompatible(config, count, avoid) {
+async function askOpenAiCompatible(config, { system, user }) {
   const body = {
     model: config.model,
     messages: [
-      { role: 'system', content: SYSTEM },
-      { role: 'user', content: userPrompt(count, avoid) },
+      { role: 'system', content: system },
+      { role: 'user', content: user },
     ],
     temperature: 0.9,
     response_format: { type: 'json_object' },
@@ -206,19 +216,22 @@ async function askOpenAiCompatible(config, count, avoid) {
     throw new Error(`${config.provider} answered ${res.status}${detail ? `: ${detail}` : ''}`);
   }
   const data = await res.json();
-  return parseReply(data?.choices?.[0]?.message?.content ?? '');
+  return data?.choices?.[0]?.message?.content ?? '';
 }
 
-/** The questions out of a reply, tolerating code fences and chatter around the JSON. */
-export function parseReply(text) {
+/** A list out of a reply, tolerating code fences and chatter around the JSON. */
+export function parseJsonList(text, listKey) {
   const raw = String(text || '');
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
   if (start < 0 || end <= start) throw new Error('the reply had no JSON in it');
   const parsed = JSON.parse(raw.slice(start, end + 1));
-  if (!Array.isArray(parsed?.questions)) throw new Error('the reply had no questions list');
-  return parsed.questions;
+  if (!Array.isArray(parsed?.[listKey])) throw new Error(`the reply had no ${listKey} list`);
+  return parsed[listKey];
 }
+
+/** The questions out of a reply. */
+export const parseReply = (text) => parseJsonList(text, 'questions');
 
 // -------------------------------------------------------------- validation
 
@@ -258,7 +271,9 @@ export function validateQuestions(raw, avoid = []) {
 /** Fresh, checked questions: as many as it could get, up to `count`. */
 export async function generateQuizQuestions(count, avoid = [], config = quizLlmConfig()) {
   if (!config) return [];
-  const ask = config.provider === 'anthropic' ? askAnthropic : askOpenAiCompatible;
+  const ask = async (cfg, want, avoidNow) => parseReply(
+    await askLlm(cfg, { system: SYSTEM, user: userPrompt(want, avoidNow), schema: SCHEMA })
+  );
   const got = [];
   // Asked in batches, with what came back added to the avoid list, so a
   // second batch cannot repeat the first.

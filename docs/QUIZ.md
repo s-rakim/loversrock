@@ -1,4 +1,4 @@
-# The daily quiz, and fresh questions from an AI model
+# The daily quiz, and fresh content from an AI model
 
 ## Where the questions come from
 
@@ -71,6 +71,40 @@ When that looks right, fill the coming week straight away, starting today:
 docker compose exec backend npm run quiz:generate -- --today
 ```
 
+## It writes more than the quiz
+
+The same four `QUIZ_LLM_*` lines power everything below. There is nothing
+else to set up.
+
+| What | When | Where it shows up |
+|---|---|---|
+| Daily quiz | nightly, 06:30 | Daily Quiz |
+| Daily prompts | nightly, 04:00 | Today's Prompt |
+| Date ideas | Sundays, 05:15 | Date Ideas **and** Swipe Dates, which share one catalogue |
+| Bucket-list ideas | Sundays, 05:15 | the "Ideas to add" row on the Bucket List |
+| Challenges | Sundays, 05:15 | "Draw a challenge" on Home |
+
+- **Prompts** are asked for on the day's topic. The AI is tried first, then
+  the web pages in `PROMPT_SOURCE_URL`, then the built-in set. Upcoming
+  prompts that came from the web or the built-in set are replaced, but only
+  while nobody has answered them.
+- **Catalogues** grow by a handful a week, and never repeat an idea already
+  in them. Each row is marked `source = 'ai'`, so you can always tell which
+  ones came from the AI.
+- **On first start** with a key, the backend does one round of everything a
+  minute after starting, so you see results straight away.
+
+To do it all now, or to check a key first:
+
+```powershell
+docker compose exec backend npm run ai:generate -- --dry-run   # show, save nothing
+docker compose exec backend npm run ai:generate                # do it
+docker compose exec backend npm run ai:generate -- --only prompts
+```
+
+`--only` also takes `quiz` and `catalogues`. `--today` includes today's
+prompt and quiz, if nobody has started them yet.
+
 ## What it does and does not do
 
 - **Only unstarted days.** It replaces a day only if nobody has answered any
@@ -78,7 +112,8 @@ docker compose exec backend npm run quiz:generate -- --today
 - **Only recycled days, nightly.** The nightly run (06:30) replaces days that
   are all repeats, so it never pays twice for the same day. Run it by hand
   with `--all` to replace fresh days too.
-- **Checked before use.** Every question is checked before it is saved:
+- **Checked before use.** Everything is checked before it is saved. For quiz
+  questions, the checks are:
   - the right number of choices (four, or two for "this or that")
   - no duplicate choices
   - a trivia answer that is exactly one of its choices

@@ -4,7 +4,8 @@ import { deleteObject } from '../config/storage.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
-import { fetchQuestions } from '../services/promptSources.js';
+import { fetchQuestions, pickTopic } from '../services/promptSources.js';
+import { generatePrompts, growCatalogues } from '../models/contentGenerator.js';
 import { freshenUpcomingDays, quizLlmConfig } from '../models/quizGenerator.js';
 
 const MEMORY_RETENTION_DAYS = 30;
@@ -286,17 +287,103 @@ export async function freshenQuiz() {
   }
 }
 
+/** The AI connector, or null when there is none (or it is misconfigured). */
+function aiConfig() {
+  try {
+    return quizLlmConfig();
+  } catch (err) {
+    console.error(`[cron] AI connector is misconfigured: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * AI-written questions on the coming week's daily prompts. The nightly fetch
+ * already asks the AI first for empty days; this also replaces upcoming days
+ * that came from the web or the built-in bank, as long as nobody has answered
+ * them yet, so with a connector set up every prompt is a fresh one.
+ */
+export async function freshenPrompts({ days = 7, includeToday = false, today = new Date(), config = aiConfig(), dryRun = false } = {}) {
+  if (!config) return { replaced: 0, preview: [] };
+  const first = new Date(`${toDateString(today)}T00:00:00Z`);
+  if (!includeToday) first.setUTCDate(first.getUTCDate() + 1);
+  const { rows } = await query(
+    `SELECT d.id, d.scheduled_date FROM daily_prompts d
+      WHERE d.scheduled_date >= $1::date AND d.scheduled_date < $1::date + $2::int
+        AND d.source NOT LIKE 'ai:%'
+        AND NOT EXISTS (SELECT 1 FROM prompt_responses r WHERE r.prompt_id = d.id)
+      ORDER BY d.scheduled_date`,
+    [toDateString(first), days]
+  );
+  if (!rows.length) return { replaced: 0, preview: [] };
+  const { rows: all } = await query('SELECT content FROM daily_prompts');
+  const topic = pickTopic();
+  const fresh = await generatePrompts(rows.length, all.map((r) => r.content), { topic, config });
+  if (dryRun) return { replaced: 0, preview: fresh, topic };
+  let replaced = 0;
+  for (let i = 0; i < Math.min(rows.length, fresh.length); i += 1) {
+    const { rowCount } = await query(
+      `UPDATE daily_prompts SET content = $1, category = $2, source = $3
+        WHERE id = $4 AND NOT EXISTS (SELECT 1 FROM prompt_responses r WHERE r.prompt_id = $4)`,
+      [fresh[i], topic, `ai:${config.provider}`, rows[i].id]
+    );
+    replaced += rowCount;
+  }
+  return { replaced, preview: [], topic };
+}
+
+/** Nightly: fill the week's prompts, then make them AI-written if a connector is set. */
+export async function freshenDailyPrompts() {
+  try {
+    await refreshDailyPrompts();
+    const config = aiConfig();
+    if (!config) return;
+    const { replaced, topic } = await freshenPrompts({ config });
+    if (replaced) console.log(`[cron] prompts: ${replaced} AI-written from ${config.provider} on "${topic}"`);
+  } catch (err) {
+    console.error(`[cron] prompt freshening failed: ${err.message}`);
+  }
+}
+
+/**
+ * Weekly: new date ideas (the Date Ideas and Swipe Dates catalogue),
+ * bucket-list ideas and challenges from the AI connector. `onlyIfNew` is the
+ * startup run: it does nothing once the AI has ever added anything, so a
+ * restart does not ask the provider again.
+ */
+export async function growContent({ onlyIfNew = false } = {}) {
+  const config = aiConfig();
+  if (!config) return;
+  try {
+    if (onlyIfNew) {
+      const { rows } = await query(`SELECT EXISTS (SELECT 1 FROM date_ideas WHERE source = 'ai') AS done`);
+      if (rows[0].done) return;
+    }
+    const added = await growCatalogues({ config });
+    console.log(`[cron] content from ${config.provider}: +${added.dateIdeas.length} date ideas, `
+      + `+${added.bucketIdeas.length} bucket-list ideas, +${added.challenges.length} challenges`);
+  } catch (err) {
+    console.error(`[cron] content generation failed (${config.provider}): ${err.message}`);
+  }
+}
+
 export function startCronJobs() {
   cron.schedule('0 3 * * *', cleanupExpiredMemories);
   cron.schedule('0 6 * * *', checkQuizBankLevel);
   cron.schedule('0 9 * * 1', pushWeeklyDateIdea);
   cron.schedule('0 8 * * *', pushPeriodReminders);
   // 04:00, before anyone is likely to open the app for the day.
-  cron.schedule('0 4 * * *', refreshDailyPrompts);
+  cron.schedule('0 4 * * *', freshenDailyPrompts);
+  // Sundays, early: the catalogues grow by a handful a week.
+  cron.schedule('15 5 * * 0', () => growContent());
   cron.schedule('30 6 * * *', freshenQuiz);
   // And once shortly after starting, so a key added to .env shows up in the
   // quiz from tomorrow rather than a week of recycled days later.
-  setTimeout(() => { freshenQuiz(); }, 60 * 1000).unref?.();
+  setTimeout(() => {
+    freshenQuiz();
+    freshenDailyPrompts();
+    growContent({ onlyIfNew: true });
+  }, 60 * 1000).unref?.();
   console.log(
     '[cron] jobs scheduled: memory cleanup (nightly), quiz bank check (daily), fresh quiz questions (daily, if a model is set), weekly date idea (Mondays), period reminders (daily), prompt refresh (daily)'
   );

@@ -2,21 +2,23 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+import { generatePrompts } from '../models/contentGenerator.js';
+import { quizLlmConfig } from '../models/quizGenerator.js';
+
 const here = dirname(fileURLToPath(import.meta.url)); // no __dirname in ESM
 
 /**
  * Where tomorrow's daily prompts come from.
  *
- * Two providers, chosen by what's configured, each falling back to the next
- * so the app is never left without a prompt:
+ * Three providers, chosen by what's configured, each falling back to the
+ * next so the app is never left without a prompt:
  *
+ *   ai      — the AI connector (QUIZ_LLM_*, e.g. Gemini on its free tier),
+ *             writing new questions on the day's topic; see
+ *             models/contentGenerator.js. Skipped when none is set up.
  *   http    — pulls from any URL returning a JSON array or newline-separated
  *             text, for a dataset you host or point at
  *   local   — recombines the seeded bank; always works, no network
- *
- * There was a third that generated questions from a hosted model. It is gone:
- * it needed a paid API key nobody was going to buy, and the two that remain
- * cover the job without one.
  */
 
 // Deliberately broad: a couple who've been together years shouldn't get the
@@ -212,6 +214,11 @@ export async function fetchQuestions({ count = 6, exclude = [], topic } = {}) {
   const chosenTopic = topic || pickTopic();
   const attempts = [];
 
+  let ai = null;
+  try { ai = quizLlmConfig(); } catch (err) { console.error(`[prompts] AI connector misconfigured: ${err.message}`); }
+  if (ai) {
+    attempts.push([`ai:${ai.provider}`, () => generatePrompts(count, exclude, { topic: chosenTopic, config: ai })]);
+  }
   for (const url of sourceUrls()) {
     attempts.push([`http:${url}`, () => fetchFromHttp(url, count)]);
   }
