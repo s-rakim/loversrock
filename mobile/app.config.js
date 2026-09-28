@@ -47,6 +47,12 @@ const icon = asset('icon.png');
 const adaptiveIcon = asset('adaptive-icon.png') || icon;
 const splashIcon = asset('splash-icon.png') || icon;
 
+// 4. The update channel, for a build made on your own PC (scripts/build-local.ps1).
+//    `eas build` writes the channel from eas.json into the APK, which is how an
+//    update sent to "preview" finds a preview build. A local build has no
+//    eas build step, so without this it would never receive an update at all.
+const LOCAL_UPDATE_CHANNEL = process.env.LOVERSROCK_UPDATE_CHANNEL || null;
+
 const isWidgetPlugin = (plugin) =>
   String(Array.isArray(plugin) ? plugin[0] : plugin).includes('Widgets');
 
@@ -64,6 +70,14 @@ module.exports = ({ config }) => ({
       ? { adaptiveIcon: { foregroundImage: adaptiveIcon, backgroundColor: config.backgroundColor } }
       : {}),
   },
+  ...(LOCAL_UPDATE_CHANNEL
+    ? {
+      updates: {
+        ...config.updates,
+        requestHeaders: { ...(config.updates?.requestHeaders || {}), 'expo-channel-name': LOCAL_UPDATE_CHANNEL },
+      },
+    }
+    : {}),
   extra: {
     ...config.extra,
     commit: (process.env.EAS_BUILD_GIT_COMMIT_HASH || '').slice(0, 7) || 'local',

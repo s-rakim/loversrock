@@ -18,6 +18,13 @@ mobile/*.p8
 mobile/*.p12
 mobile/*.key
 mobile/*.mobileprovision
+# The signing key and its passwords, downloaded for local builds
+# (mobile/scripts/build-local.ps1). Whoever has these can publish an update
+# the phones would accept as this app.
+mobile/credentials.json
+mobile/credentials/
+*.keystore
+*.jks
 mobile/.env
 
 # OS
