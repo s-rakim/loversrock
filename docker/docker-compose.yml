@@ -87,7 +87,11 @@ services:
     # date — see `--startup` in seed/run-seed.js. A seed failure is logged
     # but does not stop the server: an app with an old games list beats no
     # app at all.
-    command: sh -c "node src/config/migrate.js && (node seed/run-seed.js --startup || echo '[seed] failed - starting anyway') && node src/server.js"
+    #
+    # check-packages.js goes first: if the image lost its node_modules (a
+    # Docker crash can do that) it says so in one line, with the fix, instead
+    # of a stack trace from the first import.
+    command: sh -c "node scripts/check-packages.js && node src/config/migrate.js && (node seed/run-seed.js --startup || echo '[seed] failed - starting anyway') && node src/server.js"
     env_file:
       - ../backend/.env
     environment:
