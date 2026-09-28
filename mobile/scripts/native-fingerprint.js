@@ -56,10 +56,12 @@ function fingerprint() {
     hash.update(`dep:${name}@${version}\n`);
   }
 
-  // The native parts of the app config. Version strings, the update URL and
-  // `extra` are deliberately out: none of them changes what the binary can do.
+  // The native parts of the app config. Version strings, the update URL,
+  // `extra` and `owner` are deliberately out: none of them changes what the binary can do.
   const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8')).expo;
-  const { version, runtimeVersion, updates, extra, ...native } = app;
+  // `owner` is which Expo account the project lives in, set by `eas init`:
+  // moving the project to another account changes nothing in the binary.
+  const { version, runtimeVersion, updates, extra, owner, ...native } = app;
   const android = { ...(native.android || {}) };
   delete android.versionCode;
   const ios = { ...(native.ios || {}) };

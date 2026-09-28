@@ -2,11 +2,12 @@
   "expo": {
     "name": "loversrock",
     "slug": "loversrock",
+    "owner": "rakimmys-team",
     "scheme": "loversrock",
     "version": "1.12.0",
     "runtimeVersion": "9",
     "updates": {
-      "url": "https://u.expo.dev/8d0ca221-948b-47fc-9e81-36c304490bde",
+      "url": "https://u.expo.dev/ad169659-ec2c-4395-a7c1-3f6e3e9e6e1d",
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_LOAD"
     },
@@ -67,7 +68,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "8d0ca221-948b-47fc-9e81-36c304490bde"
+        "projectId": "ad169659-ec2c-4395-a7c1-3f6e3e9e6e1d"
       }
     }
   }
