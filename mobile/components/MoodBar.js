@@ -7,6 +7,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, TextInput, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Icon3D from './Icon3D';
 import { spacing, radius } from '../theme';
 import { useTheme } from './ThemeContext';
 import { MorphButton } from './Motion';
@@ -32,10 +33,10 @@ const ICONS = {
 // The four the server takes. The widget can only send the first — a home
 // screen button has no room to ask — so this is the only way to the rest.
 const NUDGES = [
-  { kind: 'kiss', icon: 'heart', label: 'Kiss' },
-  { kind: 'hug', icon: 'body', label: 'Hug' },
-  { kind: 'thinking', icon: 'sparkles', label: 'Thinking of you' },
-  { kind: 'miss', icon: 'moon', label: 'Miss you' },
+  { kind: 'kiss', icon: 'heart', icon3d: 'kiss', label: 'Kiss' },
+  { kind: 'hug', icon: 'body', icon3d: 'hug', label: 'Hug' },
+  { kind: 'thinking', icon: 'sparkles', icon3d: 'sparkles', label: 'Thinking of you' },
+  { kind: 'miss', icon: 'moon', icon3d: 'moon', label: 'Miss you' },
 ];
 const NUDGE_ICONS = Object.fromEntries(NUDGES.map((n) => [n.kind, n.icon]));
 
@@ -184,7 +185,7 @@ export default function MoodBar({ partnerName }) {
                   style={styles.nudgeCell}
                 >
                   <View style={styles.nudgeIcon}>
-                    <Ionicons name={n.icon} size={20} color={colors.accentPink} />
+                    <Icon3D name={n.icon3d} size={30} />
                   </View>
                   <Text style={[font.muted, { fontSize: 11 }]}>{n.label}</Text>
                 </Pressable>

@@ -6,7 +6,7 @@
 // + Animated.timing/spring. Zero extra dependencies, so it cannot hit that
 // crash class again.
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable } from 'react-native';
+import { Animated, Pressable, StyleSheet } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { colors } from '../theme';
 import { useTheme } from './ThemeContext';
@@ -102,12 +102,40 @@ export function MorphButton({ onPress, style, children, disabled, ...rest }) {
   const pressOut = () =>
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
 
+  // How the button sits among its siblings (flex, alignSelf, a percentage
+  // width in a grid) belongs on the Pressable, because that is the element
+  // the parent lays out. It used to stay on the inner view, so a button told
+  // to take half a row shrank to its label instead: the squashed call
+  // buttons on Home.
+  const { outer, inner } = splitLayout(style);
+
   return (
     // `rest` carries accessibilityRole / accessibilityLabel and the like.
-    <Pressable {...rest} onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} disabled={disabled}>
-      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    <Pressable {...rest} style={outer} onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} disabled={disabled}>
+      <Animated.View style={[inner, { transform: [{ scale }] }]}>{children}</Animated.View>
     </Pressable>
   );
+}
+
+const OUTER_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'alignSelf'];
+
+/** Splits a button's style into how it is placed and how it looks. */
+export function splitLayout(style) {
+  const flat = StyleSheet.flatten(style) || {};
+  const outer = {};
+  const inner = { ...flat };
+  for (const key of OUTER_KEYS) {
+    if (key in flat) { outer[key] = flat[key]; delete inner[key]; }
+  }
+  // A percentage width is a share of the parent, which only the Pressable
+  // can see. The inner view then fills the Pressable.
+  if (typeof flat.width === 'string' && flat.width.endsWith('%')) {
+    outer.width = flat.width;
+    inner.width = '100%';
+  }
+  // When the button grows to fill its slot, the look grows with it.
+  if (outer.flex || outer.flexGrow) inner.flexGrow = 1;
+  return { outer: Object.keys(outer).length ? outer : undefined, inner };
 }
 
 export function ProgressDot({ active, size = 8 }) {

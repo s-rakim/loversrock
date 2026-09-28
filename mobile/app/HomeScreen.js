@@ -5,6 +5,7 @@ import { apiFetch, mediaUrl } from '../services/api';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton, PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
+import Icon3D from '../components/Icon3D';
 import ShineBorder from '../components/ShineBorder';
 import MoodBar from '../components/MoodBar';
 import StickerField from '../components/Stickers';
@@ -12,18 +13,20 @@ import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
 import ChallengeCard from '../components/ChallengeCard';
 
+// Everything else, as a grid of tiles: a colourful 3D icon over its name,
+// the way a phone's own home screen shows apps. [route, label, 3D icon]
 const QUICK_LINKS = [
-  ['BucketList', 'Bucket List', 'checkbox-outline'],
   // The deck first: choosing what to do is the thing people open this for,
   // and the list is where the ones you both said yes to end up.
-  ['SwipeDeck', 'Swipe Dates', 'albums-outline'],
-  ['DateIdeas', 'Date Ideas', 'bulb-outline'],
-  ['Countdown', 'Countdowns', 'hourglass-outline'],
-  ['DistanceApart', 'Distance Apart', 'navigate-outline'],
-  ['Cycle', 'Cycle Tracker', 'water-outline'],
-  ['Checkin', 'Monthly Check-In', 'clipboard-outline'],
-  ['Feed', 'Your Story', 'time-outline'],
-  ['Achievements', 'Badges & Streak', 'ribbon-outline'],
+  ['SwipeDeck', 'Swipe Dates', 'love_letter'],
+  ['BucketList', 'Bucket List', 'check'],
+  ['DateIdeas', 'Date Ideas', 'bulb'],
+  ['Countdown', 'Countdowns', 'hourglass'],
+  ['DistanceApart', 'Distance', 'pin'],
+  ['Cycle', 'Cycle', 'calendar'],
+  ['Checkin', 'Check-In', 'memo'],
+  ['Feed', 'Your Story', 'book'],
+  ['Achievements', 'Badges', 'trophy'],
 ];
 
 export default function HomeScreen({ navigation }) {
@@ -64,7 +67,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.headerRow}>
             <Text style={font.wordmark}>loversrock.</Text>
             <MorphButton onPress={() => navigation.navigate('Achievements')} style={styles.streakPill}>
-              <Icon name="flame" size={16} color={colors.gold} chip={false} />
+              <Icon3D name="fire" size={20} />
               <Text style={styles.streakText}>{streak}</Text>
             </MorphButton>
           </View>
@@ -92,14 +95,14 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.widgetRow}>
             <ShineBorder variant="beam" radius={radius.card} style={{ flex: 1 }} phase={0}>
               <MorphButton onPress={() => navigation.navigate('DailyPrompt')} style={styles.widgetCardInner}>
-                <Icon name="chatbox-ellipses-outline" chip chipSize={36} style={{ marginBottom: spacing.xs }} />
+                <Icon3D name="chat" size={52} style={styles.heroIcon} />
                 <Text style={font.h2}>Daily Prompt</Text>
                 <Text style={font.muted}>Answer today's question</Text>
               </MorphButton>
             </ShineBorder>
             <ShineBorder variant="beam" radius={radius.card} style={{ flex: 1 }} phase={0.5}>
               <MorphButton onPress={() => navigation.navigate('Quiz')} style={styles.widgetCardInner}>
-                <Icon name="help-buoy-outline" chip chipSize={36} style={{ marginBottom: spacing.xs }} />
+                <Icon3D name="quiz" size={52} style={styles.heroIcon} />
                 <Text style={font.h2}>Daily Quiz</Text>
                 <Text style={font.muted}>5 questions, revealed together</Text>
               </MorphButton>
@@ -120,7 +123,7 @@ export default function HomeScreen({ navigation }) {
               </>
             ) : (
               <View style={styles.widgetWideEmpty}>
-                <Icon name="camera-outline" chip chipSize={36} />
+                <Icon3D name="camera" size={52} />
                 <Text style={font.muted}>Send a photo to their home screen</Text>
               </View>
             )}
@@ -129,13 +132,13 @@ export default function HomeScreen({ navigation }) {
 
           <View style={styles.doodleSplit}>
             <MorphButton onPress={() => navigation.navigate('Canvas')} style={styles.doodleRow}>
-              <Icon name="brush-outline" chip={false} size={16} color={colors.accent} />
+              <Icon3D name="palette" size={32} />
               <Text style={font.body}>Doodle</Text>
             </MorphButton>
             {/* The shelf. Worth its own way in from Home: a drawing you can
                 reopen is only useful if finding it is one tap. */}
             <MorphButton onPress={() => navigation.navigate('Play')} style={styles.doodleRow}>
-              <Icon name="images-outline" chip={false} size={16} color={colors.accent} />
+              <Icon3D name="picture" size={32} />
               <Text style={font.body}>Your drawings</Text>
             </MorphButton>
           </View>
@@ -143,7 +146,7 @@ export default function HomeScreen({ navigation }) {
 
         <FadeInUp delay={100}>
           <MorphButton onPress={() => navigation.navigate('ThumbKiss')} style={styles.thumbKissBanner}>
-            <Icon name="finger-print-outline" color={colors.accent} size={18} />
+            <Icon3D name="kiss" size={32} />
             <PulsingText style={styles.thumbKissText}>Thumb Kiss — touch to connect</PulsingText>
           </MorphButton>
         </FadeInUp>
@@ -155,14 +158,27 @@ export default function HomeScreen({ navigation }) {
         </FadeInUp>
 
         <FadeInUp delay={140}>
-          <View style={styles.quickLinks}>
+          <View style={styles.tiles}>
             {QUICK_LINKS.map(([route, label, icon]) => (
-              <MorphButton key={route} onPress={() => navigation.navigate(route)} style={styles.quickLink}>
-                <Icon name={icon} size={16} />
-                <Text style={font.body}>{label}</Text>
+              <MorphButton key={route} onPress={() => navigation.navigate(route)} style={styles.tile}>
+                <Icon3D name={icon} size={44} />
+                <Text style={styles.tileLabel} numberOfLines={1}>{label}</Text>
               </MorphButton>
             ))}
           </View>
+
+          {/* Fable lives beside your partner's thread; this is a way in from Home. */}
+          <MorphButton
+            onPress={() => navigation.navigate('Photos', { screen: 'Fable' })}
+            style={styles.fableCard}
+          >
+            <Icon3D name="robot" size={44} />
+            <View style={{ flex: 1 }}>
+              <Text style={[font.body, { fontWeight: '700' }]}>Fable</Text>
+              <Text style={font.muted}>Your group chat with your AI agents</Text>
+            </View>
+            <Icon name="chevron-forward" chip={false} size={16} color={colors.textMuted} />
+          </MorphButton>
         </FadeInUp>
 
         {/* Decks that are nearly in season. Announced rather than hidden,
@@ -178,7 +194,7 @@ export default function HomeScreen({ navigation }) {
                   onPress={() => navigation.navigate('DeckDetail', { slug: deck.slug, title: deck.title })}
                   style={[styles.deckCard, styles.soonCard]}
                 >
-                  <Icon name={deck.emoji} chip chipColor={colors.surfaceAlt} size={20} />
+                  <Icon3D name={deck.emoji} size={36} />
                   <Text style={[font.body, { marginTop: spacing.sm }]}>{deck.title}</Text>
                   <Text style={[font.muted, { fontSize: 11 }]}>
                     in {deck.daysUntilSeason} day{deck.daysUntilSeason === 1 ? '' : 's'}
@@ -201,7 +217,7 @@ export default function HomeScreen({ navigation }) {
                     onPress={() => navigation.navigate('DeckDetail', { slug: deck.slug, title: deck.title })}
                     style={[styles.deckCard, { backgroundColor: c1 }]}
                   >
-                    <Icon name={deck.emoji} chip chipColor="rgba(255,255,255,0.6)" size={20} />
+                    <Icon3D name={deck.emoji} size={36} />
                     <Text style={[font.body, { marginTop: spacing.sm }]}>{deck.title}</Text>
                     {deck.seasonal && (
                       <Text style={[font.muted, { fontSize: 10, fontWeight: '700' }]}>IN SEASON</Text>
@@ -213,17 +229,20 @@ export default function HomeScreen({ navigation }) {
           </FadeInUp>
         ))}
 
+        {/* Nothing to play means no heading: an empty section looks broken. */}
+        {games.length > 0 && (
         <FadeInUp delay={220}>
           <Text style={styles.sectionTitle}>Arcade</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: spacing.lg }}>
             {games.map((game) => (
               <MorphButton key={game.id} onPress={() => navigation.navigate('Play')} style={styles.gameCard}>
-                <Icon name={game.emoji} chip chipSize={36} />
-                <Text style={[font.body, { marginTop: spacing.xs }]}>{game.title}</Text>
+                <Icon3D name={game.emoji} size={44} />
+                <Text style={[font.body, { marginTop: spacing.xs, textAlign: 'center' }]} numberOfLines={2}>{game.title}</Text>
               </MorphButton>
             ))}
           </ScrollView>
         </FadeInUp>
+        )}
       </ScrollView>
     </View>
   );
@@ -271,6 +290,8 @@ const makeStyles = (colors, font) =>
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     marginTop: spacing.sm, paddingVertical: spacing.sm,
     justifyContent: 'center',
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border,
   },
   thumbKissBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
@@ -278,11 +299,23 @@ const makeStyles = (colors, font) =>
     marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.accent,
   },
   thumbKissText: { color: colors.accent, fontWeight: '700' },
-  quickLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  quickLink: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: colors.surface,
-    borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderWidth: 1, borderColor: colors.border,
+  heroIcon: { marginBottom: spacing.xs },
+  // Three to a row. A percentage width rather than a measured one, so the
+  // grid is the same on every phone width without doing any arithmetic.
+  tiles: {
+    flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between',
+    rowGap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.sm,
+  },
+  tile: {
+    width: '31.5%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border, padding: spacing.xs,
+  },
+  tileLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  fableCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
+    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg,
   },
   sectionTitle: { ...font.h2, marginBottom: spacing.sm, marginTop: spacing.sm },
   deckCard: {
@@ -296,7 +329,7 @@ const makeStyles = (colors, font) =>
     borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
   },
   gameCard: {
-    width: 110, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
+    width: 116, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
     marginRight: spacing.sm, borderWidth: 1, borderColor: colors.border, minHeight: 100, justifyContent: 'center', alignItems: 'center',
   },
 });

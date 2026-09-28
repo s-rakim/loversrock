@@ -8,6 +8,7 @@ import { spacing, radius } from '../../theme';
 import { useTheme } from '../ThemeContext';
 import { MorphButton } from '../Motion';
 import { useCall } from './CallContext';
+import Icon3D from '../Icon3D';
 
 export default function CallButtons({ compact = false }) {
   const { colors, font } = useTheme();
@@ -37,13 +38,13 @@ export default function CallButtons({ compact = false }) {
 
   return (
     <View style={styles.row}>
-      <MorphButton onPress={() => ring('voice')} style={[styles.button, styles.voice]}>
-        <Ionicons name="call" size={20} color="#fff" />
-        <Text style={styles.label}>Voice call</Text>
+      <MorphButton onPress={() => ring('voice')} style={styles.button} accessibilityLabel="Voice call">
+        <Icon3D name="phone" size={34} />
+        <Text style={font.body}>Voice call</Text>
       </MorphButton>
-      <MorphButton onPress={() => ring('video')} style={[styles.button, styles.video]}>
-        <Ionicons name="videocam" size={20} color="#fff" />
-        <Text style={styles.label}>Video call</Text>
+      <MorphButton onPress={() => ring('video')} style={styles.button} accessibilityLabel="Video call">
+        <Icon3D name="video" size={34} />
+        <Text style={font.body}>Video call</Text>
       </MorphButton>
     </View>
   );
@@ -54,11 +55,9 @@ const makeStyles = (colors) =>
     row: { flexDirection: 'row', gap: spacing.sm },
     button: {
       flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      gap: spacing.xs, borderRadius: radius.pill, paddingVertical: spacing.md,
+      gap: spacing.sm, borderRadius: radius.lg, paddingVertical: spacing.sm,
+      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     },
-    voice: { backgroundColor: colors.accentPink },
-    video: { backgroundColor: colors.accentIndigo },
-    label: { color: '#fff', fontWeight: '700' },
     compactRow: { flexDirection: 'row', gap: spacing.xs },
     compactButton: {
       width: 40, height: 40, borderRadius: 20,

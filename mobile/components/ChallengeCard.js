@@ -9,6 +9,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Icon3D from './Icon3D';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch, onSocketEvent } from '../services/api';
 import { spacing, radius } from '../theme';
@@ -75,7 +76,7 @@ export default function ChallengeCard() {
   if (!challenge) {
     return (
       <MorphButton onPress={draw} disabled={busy} style={[styles.empty, busy && { opacity: 0.6 }]}>
-        <Ionicons name="dice-outline" size={18} color={colors.accent} />
+        <Icon3D name="die" size={36} />
         <View style={{ flex: 1 }}>
           <Text style={[font.body, { fontWeight: '700' }]}>Draw a challenge</Text>
           <Text style={[font.muted, { fontSize: 11 }]}>
