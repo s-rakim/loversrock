@@ -94,7 +94,7 @@ export function FadeInUp({ delay = 0, distance = 20, children, style }) {
   );
 }
 
-export function MorphButton({ onPress, style, children, disabled }) {
+export function MorphButton({ onPress, style, children, disabled, ...rest }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   const pressIn = () =>
@@ -103,7 +103,8 @@ export function MorphButton({ onPress, style, children, disabled }) {
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
 
   return (
-    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} disabled={disabled}>
+    // `rest` carries accessibilityRole / accessibilityLabel and the like.
+    <Pressable {...rest} onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} disabled={disabled}>
       <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
     </Pressable>
   );

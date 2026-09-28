@@ -74,6 +74,8 @@ function imageSize(file) {
   return [0, 0];
 }
 
+const openedUrls = [];
+
 /** Loads a component module with react-native and friends stubbed out. */
 function load(relative, extraStubs = {}) {
   const file = path.join(root, relative);
@@ -96,6 +98,8 @@ function load(relative, extraStubs = {}) {
     Dimensions: { get: () => ({ width: 390, height: 844 }) },
     Platform: { OS: 'android', select: (o) => o.android },
     Alert: { alert() {} },
+    // Records what would have been opened, for the tests that tap a link.
+    Linking: { openURL: async (url) => { openedUrls.push(url); } },
     AppState: { addEventListener: () => ({ remove() {} }), currentState: 'active' },
     PanResponder: { create: () => ({ panHandlers: {} }) },
     Appearance: { getColorScheme: () => 'light', addChangeListener: () => ({ remove() {} }) },
@@ -674,6 +678,46 @@ console.log('\n=== THE MOOD PICKER ===');
     /async function choose[\s\S]*?catch \(err\)[\s\S]*?setPickError/.test(bar));
   check('and before pairing it says why, in the sheet',
     /isUnpaired\(err\)[\s\S]{0,120}sends once you are paired/.test(bar) && /\{pickError \?/.test(bar));
+}
+
+console.log('\n=== FABLE: THE GROUP CHAT WITH YOUR AI AGENTS ===');
+{
+  // Collects every element the tree produces, so the chips can be found by
+  // their props rather than by position.
+  const all = [];
+  const collect = (element, depth = 0) => {
+    if (element === null || element === undefined || typeof element !== 'object' || depth > 12) return;
+    if (Array.isArray(element)) { element.forEach((e) => collect(e, depth)); return; }
+    all.push(element);
+    const { type, props } = element;
+    if (typeof type === 'function') { collect(type(props), depth + 1); return; }
+    if (props?.children) collect(props.children, depth + 1);
+  };
+  const reactStub = { ...React, useMemo: (f) => f(), useState: (v) => [v, () => {}] };
+  const ChatSwitcher = load('components/ChatSwitcher.js', {
+    react: reactStub,
+    './ThemeContext': themeStub,
+    // Kept as an element rather than unwrapped, so its onPress can be found.
+    './Motion': { MorphButton: (props) => React.createElement('MorphButton', props) },
+  });
+  check('the chat is called Fable', ChatSwitcher.FABLE_CHAT?.name === 'Fable', ChatSwitcher.FABLE_CHAT?.name);
+  check('and leaves for the collaboration-des-esprits project',
+    ChatSwitcher.FABLE_CHAT?.url === 'https://github.com/s-rakim/collaboration-des-esprits', ChatSwitcher.FABLE_CHAT?.url);
+  let threw = null;
+  try { collect(ChatSwitcher.default({ partnerName: 'Hobi' })); } catch (err) { threw = err.message; }
+  check('the chat row renders', threw === null, threw);
+  const texts = all.filter((e) => e.type === 'Text').map((e) => [].concat(e.props.children).join(''));
+  check('it shows your partner\'s thread and Fable side by side',
+    texts.includes('Hobi') && texts.includes('Fable'), texts.join(' | '));
+  const link = all.find((e) => e.type === 'MorphButton' && e.props.accessibilityRole === 'link');
+  check('Fable is a link, and says it opens outside the app',
+    Boolean(link) && /outside the app/.test(link.props.accessibilityLabel || ''), link?.props.accessibilityLabel);
+  await link?.props.onPress();
+  check('tapping Fable opens the project', openedUrls.at(-1) === ChatSwitcher.FABLE_CHAT?.url, openedUrls.at(-1));
+  check('Fable is not a person: no thread, no messages, no call buttons',
+    !/apiFetch|CallButtons|messages/.test(fs.readFileSync(path.join(root, 'components', 'ChatSwitcher.js'), 'utf8')));
+  const thread = fs.readFileSync(path.join(root, 'app', 'MessagesScreen.js'), 'utf8');
+  check('the message board shows the chat row', /<ChatSwitcher partnerName=\{partnerName\} \/>/.test(thread));
 }
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);

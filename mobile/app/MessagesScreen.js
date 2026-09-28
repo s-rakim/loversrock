@@ -30,6 +30,7 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
+import ChatSwitcher from '../components/ChatSwitcher';
 import { setActiveScreen } from '../services/notifications';
 import Doodle from '../components/Doodle';
 import Wallpaper from '../components/Wallpaper';
@@ -310,6 +311,9 @@ export default function MessagesScreen({ navigation }) {
           <CallButtons compact />
         </View>
       </View>
+
+      {/* The other chats: Fable, the group chat with your AI agents. */}
+      <ChatSwitcher partnerName={partnerName} />
 
       <FlatList
         ref={listRef}
