@@ -459,6 +459,22 @@ console.log('\n=== ONLY ONE BAR OWNS THE BOTTOM OF THE SCREEN ===');
   check('the bar height the clearance uses matches the bar’s own styles',
     tabHeight === 44 && rowPad === 'sm' && border === 1 && declared === '44 + 8 * 2 + 2',
     { tabHeight, rowPad, border, declared });
+
+  // The bar can be resized (Settings > Bottom bar > Size). The styles, the
+  // drawn outline and the clearance must all scale by the same number, or a
+  // bigger bar covers the last row of every screen.
+  check('the bar’s tab height and padding scale with its size',
+    /height: 44 \* scale/.test(bar) && /paddingVertical: spacing\.sm \* scale/.test(bar));
+  check('the clearance screens leave uses the scaled bar',
+    /useBarClearance\(\) \{[\s\S]*?barGeometry\(barScale\)[\s\S]*?g\.height \+ g\.hump/.test(bar));
+  check('the outline and the swell are drawn at the same size',
+    /barOutline\(pillWidth, micCentre, 0, g\)/.test(bar) && /humpOutline\(micCentre, g\)/.test(bar)
+    && /barOutline\(pillWidth, micCentre, 0\.5, g\)/.test(bar));
+  check('and the mic grows with it', /transform: \[\{ scale: barScale \}\]/.test(bar));
+  const metaBlock = bar.match(/const TAB_META = \{([\s\S]*?)\n\};/)?.[1] || '';
+  const tabsWith3d = [...metaBlock.matchAll(/^\s+(\w+): \{[^}]*icon3d: '(\w+)'/gm)].map((m) => m[1]);
+  check('every tab has a 3D icon, like the rest of the app',
+    ['Photos', 'Play', 'Home', 'Cycle', 'Quiz', 'Settings'].every((t) => tabsWith3d.includes(t)), tabsWith3d);
 }
 
 console.log('\n=== THE PARTNER’S CALENDAR IS THEIR PARTNER’S, AND CANNOT WRITE ===');

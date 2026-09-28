@@ -35,6 +35,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import Icon from './Icon';
+import Icon3D from './Icon3D';
 import VoiceMic, { MIC_SIZE } from './voice/VoiceMic';
 import { useGlass } from './GlassContext';
 import { radius, spacing } from '../theme';
@@ -44,13 +45,17 @@ import { useTheme } from './ThemeContext';
 // holds the camera, the wall and the thread; Play holds the drawings and the
 // arcade. Things that are one activity belong behind one button, and six is
 // the point where a floating pill still reads as a pill.
+//
+// Each tab has the same 3D icon as its tile on Home (components/Icon3D.js),
+// so the bar reads as part of the same app. The line glyphs are kept as the
+// fallback for anything without one.
 const TAB_META = {
-  Photos: { icon: 'camera-outline', iconActive: 'camera', label: 'Photos' },
-  Play: { icon: 'color-wand-outline', iconActive: 'color-wand', label: 'Play' },
-  Home: { icon: 'home-outline', iconActive: 'home', label: 'Home' },
-  Cycle: { icon: 'water-outline', iconActive: 'water', label: 'Cycle' },
-  Quiz: { icon: 'help-circle-outline', iconActive: 'help-circle', label: 'Quiz' },
-  Settings: { icon: 'settings-outline', iconActive: 'settings', label: 'Settings' },
+  Photos: { icon: 'camera-outline', iconActive: 'camera', icon3d: 'camera', label: 'Photos' },
+  Play: { icon: 'color-wand-outline', iconActive: 'color-wand', icon3d: 'game', label: 'Play' },
+  Home: { icon: 'home-outline', iconActive: 'home', icon3d: 'house', label: 'Home' },
+  Cycle: { icon: 'water-outline', iconActive: 'water', icon3d: 'calendar', label: 'Cycle' },
+  Quiz: { icon: 'help-circle-outline', iconActive: 'help-circle', icon3d: 'quiz', label: 'Quiz' },
+  Settings: { icon: 'settings-outline', iconActive: 'settings', icon3d: 'gear', label: 'Settings' },
 };
 
 /**
@@ -80,6 +85,24 @@ const HUMP_HALF_WIDTH = 46;
 const MIC_DROP = 16;
 
 /**
+ * The bar's measurements at a size (Settings > Bottom bar size). Everything
+ * above is its designed size, at scale 1; this is the one place that scales
+ * it, so the drawn outline, the swell, the mic and the clearance every screen
+ * leaves for the bar can never disagree about how big it is.
+ */
+export function barGeometry(scale = 1) {
+  return {
+    scale,
+    // The one-pixel border top and bottom does not scale.
+    height: (BAR_HEIGHT - 2) * scale + 2,
+    hump: HUMP * scale,
+    humpHalf: HUMP_HALF_WIDTH * scale,
+    micDrop: MIC_DROP * scale,
+    glow: GLOW * scale,
+  };
+}
+
+/**
  * The bar's outline: the pill, with a smooth swell in the top edge at `cx`.
  *
  * Drawn rather than composed from views, because two overlapping
@@ -87,13 +110,13 @@ const MIC_DROP = 16;
  * circle can only make a keyhole, not a swell. y = 0 is the top of the
  * swell; the pill itself runs from HUMP to HUMP + BAR_HEIGHT.
  */
-export function barOutline(width, cx, inset = 0.5) {
-  const top = HUMP + inset;
-  const bottom = HUMP + BAR_HEIGHT - inset;
+export function barOutline(width, cx, inset = 0.5, g = barGeometry()) {
+  const top = g.hump + inset;
+  const bottom = g.hump + g.height - inset;
   const r = (bottom - top) / 2;
   const left = inset;
   const right = width - inset;
-  const hw = HUMP_HALF_WIDTH;
+  const hw = g.humpHalf;
   return [
     `M ${left + r} ${top}`,
     `L ${cx - hw} ${top}`,
@@ -108,12 +131,13 @@ export function barOutline(width, cx, inset = 0.5) {
 }
 
 /** Just the swell, closed along the pill's top edge — the part the pill does not already cover. */
-export function humpOutline(cx) {
-  const hw = HUMP_HALF_WIDTH;
+export function humpOutline(cx, g = barGeometry()) {
+  const hw = g.humpHalf;
+  const hump = g.hump;
   return [
-    `M ${cx - hw} ${HUMP}`,
-    `C ${cx - hw * 0.5} ${HUMP} ${cx - hw * 0.55} 0.5 ${cx} 0.5`,
-    `C ${cx + hw * 0.55} 0.5 ${cx + hw * 0.5} ${HUMP} ${cx + hw} ${HUMP}`,
+    `M ${cx - hw} ${hump}`,
+    `C ${cx - hw * 0.5} ${hump} ${cx - hw * 0.55} 0.5 ${cx} 0.5`,
+    `C ${cx + hw * 0.55} 0.5 ${cx + hw * 0.5} ${hump} ${cx + hw} ${hump}`,
     'Z',
   ].join(' ');
 }
@@ -143,25 +167,29 @@ function glassFill(intensity, isDark) {
  */
 export function useBarClearance() {
   const insets = useSafeAreaInsets();
+  // At whatever size the bar is set to, so a bigger bar never covers a
+  // screen's last row or its message box.
+  const { barScale } = useGlass();
+  const g = barGeometry(barScale);
   const bottom = Math.max(insets.bottom, spacing.sm);
   return {
     // Where something floating above the bar should sit — above the swell
-    // around the mic too, which rises HUMP past the pill.
-    above: bottom + BAR_HEIGHT + HUMP + BAR_GAP,
+    // around the mic too, which rises past the pill.
+    above: bottom + g.height + g.hump + BAR_GAP,
     // What a scrolling screen should pad its content by, so the last row can
     // be scrolled clear of the bar rather than resting behind it.
-    content: bottom + BAR_HEIGHT + BAR_GAP * 2,
+    content: bottom + g.height + BAR_GAP * 2,
   };
 }
 
 /** The soft light under the active tab, built without a blur filter. */
-function Glow({ colors }) {
+function Glow({ colors, size = GLOW }) {
   return (
     <View pointerEvents="none" style={styles.glowStack}>
       {[
-        { size: GLOW, opacity: 0.18 },
-        { size: GLOW * 0.74, opacity: 0.22 },
-        { size: GLOW * 0.5, opacity: 0.28 },
+        { size, opacity: 0.18 },
+        { size: size * 0.74, opacity: 0.22 },
+        { size: size * 0.5, opacity: 0.28 },
       ].map((ring) => (
         <View
           key={ring.size}
@@ -181,9 +209,10 @@ function Glow({ colors }) {
 
 export default function LumaBar({ state, navigation }) {
   const { colors, font, reduceMotion, isDark } = useTheme();
-  const styles2 = useMemo(() => makeStyles(colors, font), [colors, font]);
   const insets = useSafeAreaInsets();
-  const { intensity } = useGlass();
+  const { intensity, barScale } = useGlass();
+  const g = useMemo(() => barGeometry(barScale), [barScale]);
+  const styles2 = useMemo(() => makeStyles(colors, font, barScale), [colors, font, barScale]);
 
   // Measured, not assumed — see the note on measurement above.
   const [centres, setCentres] = useState([]);
@@ -243,13 +272,13 @@ export default function LumaBar({ state, navigation }) {
         <Svg
           pointerEvents="none"
           width={pillWidth}
-          height={BAR_HEIGHT + HUMP}
-          style={styles.shape}
+          height={g.height + g.hump}
+          style={[styles.shape, { top: -g.hump }]}
         >
           {/* Android draws the whole shape here and the pill stays clear, so
               there is no seam between pill and swell. iOS keeps its real
               blur in the pill and only the swell is painted. */}
-          <Path d={android ? barOutline(pillWidth, micCentre, 0) : humpOutline(micCentre)} fill={fill} />
+          <Path d={android ? barOutline(pillWidth, micCentre, 0, g) : humpOutline(micCentre, g)} fill={fill} />
         </Svg>
       )}
       <BlurView
@@ -263,10 +292,10 @@ export default function LumaBar({ state, navigation }) {
             pointerEvents="none"
             style={[
               styles.glowWrap,
-              { transform: [{ translateX: Animated.subtract(slide, GLOW / 2) }] },
+              { width: g.glow, transform: [{ translateX: Animated.subtract(slide, g.glow / 2) }] },
             ]}
           >
-            <Glow colors={colors} />
+            <Glow colors={colors} size={g.glow} />
           </Animated.View>
         )}
 
@@ -312,12 +341,23 @@ export default function LumaBar({ state, navigation }) {
                 style={styles2.tab}
               >
                 <Animated.View style={focused ? { transform: [{ scale: grow }] } : null}>
-                  <Icon
-                    name={focused ? meta.iconActive : meta.icon}
-                    color={focused ? colors.accent : colors.textMuted}
-                    size={focused ? 24 : 20}
-                    chip={false}
-                  />
+                  {meta.icon3d ? (
+                    // The one you are on is full size and full colour; the
+                    // rest a little smaller and softer, so which tab you are
+                    // on still reads at a glance without the glyphs' tint.
+                    <Icon3D
+                      name={meta.icon3d}
+                      size={(focused ? 30 : 24) * barScale}
+                      style={focused ? null : { opacity: 0.72 }}
+                    />
+                  ) : (
+                    <Icon
+                      name={focused ? meta.iconActive : meta.icon}
+                      color={focused ? colors.accent : colors.textMuted}
+                      size={(focused ? 24 : 20) * barScale}
+                      chip={false}
+                    />
+                  )}
                 </Animated.View>
                 {/* The label only on the active tab. Six labels at once is a
                     bar; one is a caption, and it keeps the pill narrow enough
@@ -334,13 +374,22 @@ export default function LumaBar({ state, navigation }) {
           {/* The outline over everything, so the swell and the pill share
               one continuous edge instead of the pill's own border cutting
               straight through the bottom of the swell. */}
-          <Svg pointerEvents="none" width={pillWidth} height={BAR_HEIGHT + HUMP} style={styles.shape}>
-            <Path d={barOutline(pillWidth, micCentre)} fill="none" stroke={colors.glassBorder} strokeWidth={1} />
+          <Svg pointerEvents="none" width={pillWidth} height={g.height + g.hump} style={[styles.shape, { top: -g.hump }]}>
+            <Path d={barOutline(pillWidth, micCentre, 0.5, g)} fill="none" stroke={colors.glassBorder} strokeWidth={1} />
           </Svg>
+          {/* The mic keeps its own layout size and is scaled about its
+              centre, so it stays centred in the swell at any bar size and
+              its touch area scales with it. */}
           <VoiceMic
             onTap={openVoiceNotes}
-            overlayBottom={MIC_SIZE + (HUMP - (MIC_SIZE / 2 - MIC_DROP)) + BAR_GAP}
-            style={[styles.mic, { left: micCentre - MIC_SIZE / 2, top: MIC_DROP - MIC_SIZE / 2 }]}
+            // The recording hint lives inside the scaled mic, so its offset
+            // is given in the mic's own (unscaled) units.
+            overlayBottom={(MIC_SIZE * barScale + (g.hump - (MIC_SIZE * barScale / 2 - g.micDrop)) + BAR_GAP) / barScale}
+            style={[styles.mic, {
+              left: micCentre - MIC_SIZE / 2,
+              top: g.micDrop - MIC_SIZE / 2,
+              transform: [{ scale: barScale }],
+            }]}
           />
         </>
       )}
@@ -359,14 +408,13 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: GLOW,
     alignItems: 'center',
     justifyContent: 'center',
   },
   glowStack: { alignItems: 'center', justifyContent: 'center' },
   // The drawn outline and fill, lined up with the pill: the swell rises
-  // HUMP above the pill's top edge.
-  shape: { position: 'absolute', left: 0, top: -HUMP },
+  // above the pill's top edge by the bar's hump (set where it is drawn).
+  shape: { position: 'absolute', left: 0 },
   // On Android the drawn shape is the fill, and the drawn outline is the
   // border — the pill keeps its border width (the bar's height depends on it)
   // but paints neither.
@@ -375,7 +423,7 @@ const styles = StyleSheet.create({
   mic: { position: 'absolute' },
 });
 
-const makeStyles = (colors, font) =>
+const makeStyles = (colors, font, scale = 1) =>
   StyleSheet.create({
     wrapper: {
       position: 'absolute',
@@ -402,7 +450,7 @@ const makeStyles = (colors, font) =>
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 6,
-      paddingVertical: spacing.sm,
+      paddingVertical: spacing.sm * scale,
     },
     // Seven tabs have to fit inside a pill that still floats, so each one is
     // a flexible slot rather than a fixed width: on a narrow phone they
@@ -412,12 +460,12 @@ const makeStyles = (colors, font) =>
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: 2,
-      height: 44,
+      height: 44 * scale,
       gap: 1,
     },
     label: {
       ...font.muted,
-      fontSize: 9,
+      fontSize: Math.max(9, 9 * scale),
       fontWeight: '800',
       letterSpacing: 0.3,
       color: colors.accent,

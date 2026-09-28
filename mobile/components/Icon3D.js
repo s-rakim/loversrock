@@ -45,6 +45,7 @@ export const ICONS_3D = {
   heart: require('../assets/icons3d/heart.png'),
   herb: require('../assets/icons3d/herb.png'),
   hourglass: require('../assets/icons3d/hourglass.png'),
+  house: require('../assets/icons3d/house.png'),
   hug: require('../assets/icons3d/hug.png'),
   hundred: require('../assets/icons3d/hundred.png'),
   joystick: require('../assets/icons3d/joystick.png'),
@@ -108,7 +109,7 @@ export const FROM_GLYPH = {
   time: 'stopwatch', settings: 'gear', shirt: 'tshirt', notifications: 'bell', 'color-palette': 'palette',
   person: 'bust', 'cloud-offline': 'cloud', 'heart-half': 'two_hearts', hourglass: 'hourglass',
   navigate: 'pin', bulb: 'bulb', 'finger-print': 'kiss', mic: 'microphone', 'lock-closed': 'lock',
-  body: 'hug', globe: 'globe', 'help-buoy': 'quiz',
+  body: 'hug', globe: 'globe', 'help-buoy': 'quiz', home: 'house',
 };
 
 /** The 3D key for a name that is either one already or an Ionicons name. */

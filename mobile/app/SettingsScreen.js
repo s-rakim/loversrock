@@ -14,7 +14,7 @@ import {
   openLiveUpdateSettings,
   widgetsSupported,
 } from '../services/widgetBridge';
-import { useGlass } from '../components/GlassContext';
+import { useGlass, BAR_SCALE } from '../components/GlassContext';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import ServerAddress from '../components/ServerAddress';
@@ -42,7 +42,7 @@ export default function SettingsScreen() {
     customAccent, setCustomAccent, blobPalette, setBlobPalette, isDark,
   } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { intensity, setIntensity } = useGlass();
+  const { intensity, setIntensity, barScale, setBarScale } = useGlass();
   const {
     preference: languagePreference, setPreference: setLanguagePreference, languages,
   } = useLanguage();
@@ -418,7 +418,28 @@ export default function SettingsScreen() {
 
       <FadeInUp delay={60}>
         <View style={styles.card}>
-          <Text style={font.h2}>Bottom bar glass effect</Text>
+          <Text style={font.h2}>Bottom bar</Text>
+          <Text style={[font.body, { fontWeight: '700', marginTop: spacing.sm }]}>Size</Text>
+          <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.sm }]}>
+            Bigger icons and buttons, or a slimmer bar. Screens make room for it at any size.
+          </Text>
+          <Slider
+            minimumValue={BAR_SCALE.min}
+            maximumValue={BAR_SCALE.max}
+            step={BAR_SCALE.step}
+            value={barScale}
+            onValueChange={setBarScale}
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor={colors.border}
+            thumbTintColor={colors.accent}
+          />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <MorphButton onPress={() => setBarScale(BAR_SCALE.default)}>
+              <Text style={{ color: colors.accent, fontWeight: '600' }}>Reset</Text>
+            </MorphButton>
+            <Text style={font.muted}>{Math.round(barScale * 100)}%</Text>
+          </View>
+          <Text style={[font.body, { fontWeight: '700', marginTop: spacing.md }]}>Glass effect</Text>
           <Text style={[font.muted, { marginTop: spacing.xs, marginBottom: spacing.md }]}>
             Adjust how frosted vs. transparent the bottom navigation bar looks.
           </Text>
