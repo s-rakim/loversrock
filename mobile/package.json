@@ -21,7 +21,8 @@
     "test:nav": "node test/nav.mjs",
     "test:i18n": "node test/i18n.mjs",
     "ship": "node scripts/ship-update.js",
-    "test:runtime": "node test/runtime.mjs"
+    "test:runtime": "node test/runtime.mjs",
+    "test:native-deps": "node test/nativeDeps.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "^9.0.0",

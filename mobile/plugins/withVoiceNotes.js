@@ -17,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   withAndroidManifest,
+  withAppBuildGradle,
   withDangerousMod,
   withMainApplication,
   AndroidConfig,
@@ -134,10 +135,57 @@ function withVoicePackage(config) {
   });
 }
 
+/**
+ * firebase-messaging, on the app's own compile classpath.
+ *
+ * VoiceMessagingService extends expo-notifications' FCM service and takes a
+ * RemoteMessage, so the app module compiles against firebase-messaging
+ * directly. expo-notifications declares it as `implementation`, which keeps
+ * it off every other module's classpath: without this line the release build
+ * fails in compileReleaseKotlin ("Unresolved reference: RemoteMessage").
+ *
+ * The version is read from expo-notifications itself, so the two never
+ * disagree; the fallback is the one SDK 51's expo-notifications pins.
+ */
+const FIREBASE_MESSAGING_FALLBACK = '24.0.1';
+
+function firebaseMessagingVersion(projectRoot) {
+  try {
+    const pkg = require.resolve('expo-notifications/package.json', { paths: [projectRoot] });
+    const gradle = fs.readFileSync(path.join(path.dirname(pkg), 'android', 'build.gradle'), 'utf8');
+    const match = gradle.match(/com\.google\.firebase:firebase-messaging:([\w.-]+)/);
+    if (match) return match[1];
+  } catch { /* not installed where expected: use the fallback */ }
+  return FIREBASE_MESSAGING_FALLBACK;
+}
+
+/** android/app/build.gradle with firebase-messaging added; unchanged if it is already there. */
+function addFirebaseMessagingDependency(gradle, version) {
+  if (/com\.google\.firebase:firebase-messaging/.test(gradle)) return gradle;
+  const line = `    implementation("com.google.firebase:firebase-messaging:${version}") // withVoiceNotes`;
+  const next = gradle.replace(/^dependencies\s*\{/m, (m) => `${m}\n${line}`);
+  if (next === gradle) {
+    throw new Error('[withVoiceNotes] Could not find the dependencies block in android/app/build.gradle.');
+  }
+  return next;
+}
+
+function withFirebaseMessagingDependency(config) {
+  return withAppBuildGradle(config, (cfg) => {
+    cfg.modResults.contents = addFirebaseMessagingDependency(
+      cfg.modResults.contents, firebaseMessagingVersion(cfg.modRequest.projectRoot)
+    );
+    return cfg;
+  });
+}
+
 module.exports = function withVoiceNotes(config) {
   config = withVoiceSources(config);
+  config = withFirebaseMessagingDependency(config);
   config = withVoiceManifest(config);
   config = withVoicePackage(config);
   return config;
 };
 module.exports.PERMISSIONS = PERMISSIONS;
+module.exports.addFirebaseMessagingDependency = addFirebaseMessagingDependency;
+module.exports.firebaseMessagingVersion = firebaseMessagingVersion;
