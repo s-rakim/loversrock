@@ -59,6 +59,17 @@ export function quizLlmConfig(env = process.env) {
   const model = String(env.QUIZ_LLM_MODEL || '').trim()
     || (provider === 'anthropic' ? ANTHROPIC_DEFAULT_MODEL : '');
   if (!model) throw new Error(`QUIZ_LLM_MODEL is needed for ${provider} — the model name from that provider's docs`);
+  // Speech, embedding and image models share names with the chat models
+  // (gemini-…-flash-tts next to gemini-…-flash), and only a chat model can
+  // write questions. Said here, rather than as a provider error later.
+  const notChat = /(^|[-_.])(tts|embed(ding)?|imagen?|image|whisper|transcribe|audio|speech)([-_.]|$)/i.exec(model);
+  if (notChat) {
+    const kind = notChat[2].toLowerCase();
+    const what = kind === 'tts' ? 'a text-to-speech' : kind.startsWith('embed') ? 'an embedding'
+      : kind.startsWith('image') ? 'an image' : 'a speech';
+    throw new Error(`QUIZ_LLM_MODEL "${model}" is ${what} model, not a chat model. `
+      + 'Pick one without that in its name (for Gemini, a plain "...-flash").');
+  }
 
   const baseUrl = String(env.QUIZ_LLM_BASE_URL || '').trim().replace(/\/+$/, '') || PROVIDER_URLS[provider] || null;
   if (provider === 'custom' && !baseUrl) throw new Error('QUIZ_LLM_BASE_URL is needed for a custom provider');
@@ -138,6 +149,31 @@ async function askAnthropic(config, count, avoid) {
   return parseReply(text);
 }
 
+/**
+ * "fetch failed" says nothing; the reason is on err.cause. Turned into a
+ * sentence that says which end to look at: the network, or the address.
+ */
+export function networkError(config, err) {
+  const host = (() => { try { return new URL(config.baseUrl).host; } catch { return config.baseUrl; } })();
+  const code = err?.cause?.code || err?.code || err?.name || '';
+  const why = {
+    ENOTFOUND: 'its address could not be looked up (DNS). The backend container may have no internet access',
+    EAI_AGAIN: 'its address could not be looked up right now (DNS). Check the PC\'s internet connection',
+    ECONNREFUSED: 'the connection was refused. Is the address right, and is the service running?',
+    ECONNRESET: 'the connection was cut off. A firewall or VPN may be blocking it',
+    ETIMEDOUT: 'it did not answer in time. A firewall or VPN may be blocking it',
+    UND_ERR_CONNECT_TIMEOUT: 'it did not answer in time. A firewall or VPN may be blocking it',
+    TimeoutError: `it took longer than ${Math.round(TIMEOUT_MS / 1000)}s to answer`,
+    SELF_SIGNED_CERT_IN_CHAIN: 'its certificate was not trusted. Something on the network is intercepting HTTPS',
+    UNABLE_TO_GET_ISSUER_CERT_LOCALLY: 'its certificate was not trusted. Something on the network is intercepting HTTPS',
+  }[code];
+  const message = `Could not reach ${config.provider} at ${host}: ${why || err?.cause?.message || err?.message || 'unknown network error'}`
+    + (code && !why ? ` (${code})` : '');
+  const wrapped = new Error(message);
+  wrapped.cause = err;
+  return wrapped;
+}
+
 async function askOpenAiCompatible(config, count, avoid) {
   const body = {
     model: config.model,
@@ -156,7 +192,7 @@ async function askOpenAiCompatible(config, count, avoid) {
     },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  }).catch((err) => { throw networkError(config, err); });
 
   let res = await send(body);
   // Not every model behind these APIs accepts a JSON response format; the

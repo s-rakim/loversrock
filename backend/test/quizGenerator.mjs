@@ -143,5 +143,19 @@ await query('DELETE FROM users WHERE id = ANY($1::uuid[])', [users]);
 server.close();
 await pool.end();
 
+console.log('\n=== WRONG MODEL, OR NO ROUTE: SAID PLAINLY ===');
+{
+  const refuse = (model) => { try { quizLlmConfig({ QUIZ_LLM_PROVIDER: 'gemini', QUIZ_LLM_API_KEY: 'k', QUIZ_LLM_MODEL: model }); return null; } catch (e) { return e.message; } };
+  check('a text-to-speech model is refused, with why', /text-to-speech model, not a chat model/.test(refuse('gemini-3.8-flash-tts') || ''), refuse('gemini-3.8-flash-tts'));
+  check('so is an embedding model', /embedding model/.test(refuse('text-embedding-004') || ''));
+  check('but a chat model is fine', refuse('gemini-3.8-flash') === null && refuse('gemini-3.8-flash-lite') === null);
+  let message = '';
+  try {
+    await generateQuizQuestions(3, [], { provider: 'gemini', apiKey: 'k', model: 'gemini-3.8-flash', baseUrl: 'https://no-such-host.invalid/v1' });
+  } catch (e) { message = e.message; }
+  check('an unreachable provider says why, not "fetch failed"',
+    /Could not reach gemini at no-such-host\.invalid: its address could not be looked up/.test(message), message);
+}
+
 console.log(`\nQUIZ GENERATOR RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log('FAILURES:', fails); process.exit(1); }
