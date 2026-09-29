@@ -10,9 +10,14 @@ function loadJson(name) {
   return JSON.parse(readFileSync(join(__dirname, name), 'utf8'));
 }
 
+// Offset 0 is yesterday in UTC, not today. The app asks for "today" in the
+// pair's timezone, and for part of every day a pair west of UTC is still on
+// yesterday's date: a fresh database seeded from UTC today had no prompt and
+// no quiz for them until their midnight. No timezone is more than a day
+// behind UTC, so starting a day early covers everyone.
 function dateWithOffset(days) {
   const d = new Date();
-  d.setUTCDate(d.getUTCDate() + days);
+  d.setUTCDate(d.getUTCDate() + days - 1);
   return d.toISOString().slice(0, 10);
 }
 

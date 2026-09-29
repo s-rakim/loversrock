@@ -18,8 +18,19 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # minio/minio is gone from Docker Hub (MinIO stopped publishing images;
+    # the repository now answers "pull access denied"). Anything that makes
+    # Docker pull again — a crash, a reset, a new PC — then fails, storage
+    # never starts, and the backend, which waits for it, never does either.
+    #
+    # chainguard/minio is the same MinIO server, built from MinIO's source and
+    # kept up to date, so the photos already in the miniodata volume are read
+    # as they are: no migration.
+    image: chainguard/minio:latest
     restart: unless-stopped
+    # This image runs as an unprivileged user; the volume was written by the
+    # old image as root. Root here keeps existing files readable and writable.
+    user: "0:0"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-loversrock}
@@ -30,7 +41,9 @@ services:
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      # No curl or grep in this image, so ask MinIO's health endpoint with
+      # bash alone and check the status line.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /minio/health/live HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *' 200 '* ]]"]
       interval: 5s
       timeout: 5s
       retries: 10
