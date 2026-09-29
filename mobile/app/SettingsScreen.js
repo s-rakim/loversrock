@@ -28,6 +28,7 @@ import ConnectionCard from '../components/ConnectionCard';
 import ColorPicker from '../components/ColorPicker';
 import { useLanguage } from '../components/LanguageContext';
 import Icon3D from '../components/Icon3D';
+import UpdateCard from '../components/UpdateCard';
 import {
   useTheme, THEME_PREFERENCES, ACCENTS, ACCENT_NAMES, BACKGROUND_SPEEDS, TEXT_SCALES,
   BLOB_PALETTES, BLOB_PALETTE_NAMES,
@@ -578,6 +579,10 @@ export default function SettingsScreen() {
             </Text>
           </View>
         </MorphButton>
+      </FadeInUp>
+
+      <FadeInUp delay={92}>
+        <UpdateCard style={styles.actionRow} />
       </FadeInUp>
 
       <FadeInUp delay={94}>

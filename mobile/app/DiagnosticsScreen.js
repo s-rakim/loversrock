@@ -28,6 +28,7 @@ const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcS
 
 // expo-updates, required rather than imported: an APK built before it was
 // added does not contain the native module, and Diagnostics must still open.
+import { checkAndUpdate, explainUpdateError } from '../services/appUpdates';
 let Updates = null;
 try {
   // eslint-disable-next-line global-require
@@ -62,21 +63,14 @@ export default function DiagnosticsScreen() {
   const [updating, setUpdating] = useState(false);
   const [updateNote, setUpdateNote] = useState(null);
 
+  // The same check as Settings → Check for updates (services/appUpdates.js).
   async function checkForUpdate() {
     setUpdating(true);
     setUpdateNote(null);
     try {
-      const found = await Updates.checkForUpdateAsync();
-      if (!found.isAvailable) {
-        setUpdateNote('Already up to date.');
-        return;
-      }
-      setUpdateNote('Downloading the update…');
-      await Updates.fetchUpdateAsync();
-      // Restarts the JavaScript into the new bundle; the app reopens itself.
-      await Updates.reloadAsync();
+      await checkAndUpdate(setUpdateNote);
     } catch (err) {
-      setUpdateNote(`Could not check: ${err.message}`);
+      setUpdateNote(explainUpdateError(err));
     } finally {
       setUpdating(false);
     }

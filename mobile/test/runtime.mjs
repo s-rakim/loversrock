@@ -79,8 +79,16 @@ console.log('\n=== AND THE PHONE CAN SAY WHAT IT IS RUNNING ===');
 const diag = fs.readFileSync(path.join(root, 'app', 'DiagnosticsScreen.js'), 'utf8');
 check('Diagnostics reports built-in code or an update, with channel and runtime',
   /add\('App updates'/.test(diag) && /Updates\.isEmbeddedLaunch/.test(diag));
+const updates = fs.readFileSync(path.join(root, 'services', 'appUpdates.js'), 'utf8');
 check('it can fetch an update now instead of waiting for the next launch',
-  /checkForUpdateAsync/.test(diag) && /reloadAsync/.test(diag));
+  /checkForUpdateAsync/.test(updates) && /fetchUpdateAsync/.test(updates) && /reloadAsync/.test(updates)
+  && /checkAndUpdate/.test(diag));
+const settings = fs.readFileSync(path.join(root, 'app', 'SettingsScreen.js'), 'utf8');
+const card = fs.readFileSync(path.join(root, 'components', 'UpdateCard.js'), 'utf8');
+check('Settings has a Check for updates button that updates in one tap',
+  /<UpdateCard/.test(settings) && /checkAndUpdate\(setStatus\)/.test(card) && /Check for updates/.test(card));
+check('the update helper opens on a build without the module too',
+  /require\('expo-updates'\)/.test(updates) && !/^import .*expo-updates/m.test(updates));
 check('and opens on a build that does not have the module', /require\('expo-updates'\)/.test(diag)
   && !/^import .*expo-updates/m.test(diag));
 
