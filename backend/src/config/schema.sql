@@ -950,3 +950,46 @@ CREATE TABLE IF NOT EXISTS bucket_suggestions (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS bucket_suggestions_title ON bucket_suggestions (lower(title));
+
+-- Fable: the group chat between the two of you and an AI model
+-- (models/fableAi.js). Replaces the relay to an outside room.
+
+-- API keys you add in the app, one per provider, sealed with AES-256-GCM
+-- (key_enc); `hint` is the last four characters, for the setup page.
+CREATE TABLE IF NOT EXISTS ai_keys (
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  provider    TEXT NOT NULL,
+  key_enc     TEXT NOT NULL,
+  hint        TEXT NOT NULL,
+  added_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (pair_id, provider)
+);
+
+-- Which model answers in Fable, and how. `source` is 'key' (your own key for
+-- `provider`, from ai_keys) or 'server' (backend/.env's QUIZ_LLM_*).
+CREATE TABLE IF NOT EXISTS fable_settings (
+  pair_id          UUID PRIMARY KEY REFERENCES pairs(id) ON DELETE CASCADE,
+  source           TEXT NOT NULL DEFAULT 'key' CHECK (source IN ('key', 'server')),
+  provider         TEXT NOT NULL,
+  model            TEXT NOT NULL,
+  base_url         TEXT,
+  bot_name         TEXT NOT NULL DEFAULT 'Fable',
+  persona          TEXT,
+  reply_mode       TEXT NOT NULL DEFAULT 'always' CHECK (reply_mode IN ('always', 'mention')),
+  use_for_content  BOOLEAN NOT NULL DEFAULT true,
+  updated_by       UUID REFERENCES users(id) ON DELETE SET NULL,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- The chat itself. author_kind 'ai' is the model; 'system' is a note from the
+-- app (the model could not answer, and why).
+CREATE TABLE IF NOT EXISTS fable_messages (
+  id           BIGSERIAL PRIMARY KEY,
+  pair_id      UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  author_kind  TEXT NOT NULL CHECK (author_kind IN ('user', 'ai', 'system')),
+  user_id      UUID REFERENCES users(id) ON DELETE SET NULL,
+  body         TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS fable_messages_pair ON fable_messages (pair_id, id);

@@ -1,5 +1,5 @@
 // The chats on the message board: the thread with your partner, and Fable,
-// the group chat between the two of you and your AI agents (app/FableScreen.js).
+// the group chat between the two of you and an AI model (app/FableScreen.js).
 // The chip for the chat you are in is highlighted; the other one switches.
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
@@ -10,7 +10,7 @@ import Icon from './Icon';
 
 export const FABLE_CHAT = {
   name: 'Fable',
-  blurb: 'You two and your AI agents',
+  blurb: 'You two and an AI',
   screen: 'Fable',
 };
 

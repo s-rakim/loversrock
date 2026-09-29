@@ -5,6 +5,7 @@ import { createServer } from 'http';
 
 import { initSockets } from './sockets/index.js';
 import { startCronJobs } from './cron/index.js';
+import { refreshSharedAiConfig } from './models/fableAi.js';
 import { ensureBucket, getObjectStream, statObject } from './config/storage.js';
 import { requireAuthAllowingQuery } from './middleware/auth.js';
 import { wrapAsync } from './lib/asyncRouter.js';
@@ -150,6 +151,8 @@ ensureBucket()
   .finally(() => {
     httpServer.listen(PORT, () => {
       console.log(`[server] listening on :${PORT}`);
-      startCronJobs();
+      // A key added in the app can also write the daily content (aiShared.js);
+      // loaded before the first cron tick needs it.
+      refreshSharedAiConfig().finally(startCronJobs);
     });
   });

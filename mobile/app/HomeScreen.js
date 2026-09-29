@@ -175,7 +175,7 @@ export default function HomeScreen({ navigation }) {
             <Icon3D name="robot" size={44} />
             <View style={{ flex: 1 }}>
               <Text style={[font.body, { fontWeight: '700' }]}>Fable</Text>
-              <Text style={font.muted}>Your group chat with your AI agents</Text>
+              <Text style={font.muted}>Your group chat with an AI</Text>
             </View>
             <Icon name="chevron-forward" chip={false} size={16} color={colors.textMuted} />
           </MorphButton>

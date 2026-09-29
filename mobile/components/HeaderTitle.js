@@ -20,6 +20,7 @@ export const HEADER_ICONS = {
   Wallpaper: 'picture',
   Diagnostics: 'wrench',
   Wardrobe: 'tshirt',
+  FableSetup: 'robot',
   WidgetLook: 'sparkles',
   ThumbKiss: 'kiss',
   DistanceApart: 'pin',

@@ -18,14 +18,15 @@
 // number of choices, a trivia answer that is one of its choices, no repeats of
 // a question already in the bank. Anything that fails is dropped, not fixed.
 import { query } from '../config/db.js';
+import { getSharedAiConfig } from './aiShared.js';
 
 export const QUIZ_TYPES = ['trivia', 'guess_partner', 'this_or_that'];
 const QUESTIONS_PER_DAY = 5;
 const MAX_PER_CALL = 20;
-const TIMEOUT_MS = 90_000;
+export const TIMEOUT_MS = 90_000;
 // The Anthropic default; set QUIZ_LLM_MODEL to use another (claude-haiku-4-5
 // is the cheapest, and plenty for this).
-const ANTHROPIC_DEFAULT_MODEL = 'claude-opus-5';
+export const ANTHROPIC_DEFAULT_MODEL = 'claude-opus-5';
 
 /** Where each provider's OpenAI-compatible API lives. */
 export const PROVIDER_URLS = {
@@ -40,25 +41,53 @@ export const PROVIDER_URLS = {
   ollama: 'http://host.docker.internal:11434/v1',
 };
 
+const ENV_NAMES = {
+  provider: 'QUIZ_LLM_PROVIDER', apiKey: 'QUIZ_LLM_API_KEY', model: 'QUIZ_LLM_MODEL', baseUrl: 'QUIZ_LLM_BASE_URL',
+};
+
 /**
  * The generator's settings from the environment, or null when it is off.
  * Throws with a plain explanation when it is half set up, so a typo is a
  * clear message in the log rather than a silent fall back to recycling.
+ *
+ * With nothing in the environment, a key added in the app (Settings → AI
+ * chat, "also use it for daily content") is used instead; see aiShared.js.
+ * Only for the real environment: a test passing its own env gets exactly
+ * what it passed.
  */
 export function quizLlmConfig(env = process.env) {
   const provider = String(env.QUIZ_LLM_PROVIDER || '').trim().toLowerCase();
-  if (!provider) return null;
+  if (!provider) return env === process.env ? getSharedAiConfig() : null;
+  return buildLlmConfig({
+    provider, apiKey: env.QUIZ_LLM_API_KEY, model: env.QUIZ_LLM_MODEL, baseUrl: env.QUIZ_LLM_BASE_URL,
+  });
+}
 
-  const known = ['anthropic', 'custom', ...Object.keys(PROVIDER_URLS)];
-  if (!known.includes(provider)) {
-    throw new Error(`QUIZ_LLM_PROVIDER "${provider}" is not one of: ${known.join(', ')}`);
+/** backend/.env's own connector, ignoring any key added in the app. */
+export function serverLlmConfig(env = process.env) {
+  if (!String(env.QUIZ_LLM_PROVIDER || '').trim()) return null;
+  return quizLlmConfig(env === process.env ? { ...env } : env);
+}
+
+/** Every provider this connector can reach. */
+export const LLM_PROVIDERS = ['anthropic', 'custom', ...Object.keys(PROVIDER_URLS)];
+
+/**
+ * Checks a provider, key, model and address, and fills in the defaults.
+ * `names` is how each field is called in the error messages: the .env
+ * variable for the server's connector, plain words for the app's setup page.
+ */
+export function buildLlmConfig(raw, names = ENV_NAMES) {
+  const provider = String(raw.provider || '').trim().toLowerCase();
+  if (!LLM_PROVIDERS.includes(provider)) {
+    throw new Error(`${names.provider} "${provider}" is not one of: ${LLM_PROVIDERS.join(', ')}`);
   }
-  const apiKey = String(env.QUIZ_LLM_API_KEY || '').trim();
-  if (!apiKey && provider !== 'ollama') throw new Error(`QUIZ_LLM_API_KEY is needed for ${provider}`);
+  const apiKey = String(raw.apiKey || '').trim();
+  if (!apiKey && provider !== 'ollama') throw new Error(`${names.apiKey} is needed for ${provider}`);
 
-  const model = String(env.QUIZ_LLM_MODEL || '').trim()
+  const model = String(raw.model || '').trim()
     || (provider === 'anthropic' ? ANTHROPIC_DEFAULT_MODEL : '');
-  if (!model) throw new Error(`QUIZ_LLM_MODEL is needed for ${provider} — the model name from that provider's docs`);
+  if (!model) throw new Error(`${names.model} is needed for ${provider} — the model name from that provider's docs`);
   // Speech, embedding and image models share names with the chat models
   // (gemini-…-flash-tts next to gemini-…-flash), and only a chat model can
   // write questions. Said here, rather than as a provider error later.
@@ -67,12 +96,12 @@ export function quizLlmConfig(env = process.env) {
     const kind = notChat[2].toLowerCase();
     const what = kind === 'tts' ? 'a text-to-speech' : kind.startsWith('embed') ? 'an embedding'
       : kind.startsWith('image') ? 'an image' : 'a speech';
-    throw new Error(`QUIZ_LLM_MODEL "${model}" is ${what} model, not a chat model. `
+    throw new Error(`${names.model} "${model}" is ${what} model, not a chat model. `
       + 'Pick one without that in its name (for Gemini, a plain "...-flash").');
   }
 
-  const baseUrl = String(env.QUIZ_LLM_BASE_URL || '').trim().replace(/\/+$/, '') || PROVIDER_URLS[provider] || null;
-  if (provider === 'custom' && !baseUrl) throw new Error('QUIZ_LLM_BASE_URL is needed for a custom provider');
+  const baseUrl = String(raw.baseUrl || '').trim().replace(/\/+$/, '') || PROVIDER_URLS[provider] || null;
+  if (provider === 'custom' && !baseUrl) throw new Error(`${names.baseUrl} is needed for a custom provider`);
 
   return { provider, apiKey, model, baseUrl };
 }

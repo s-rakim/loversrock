@@ -680,7 +680,7 @@ console.log('\n=== THE MOOD PICKER ===');
     /isUnpaired\(err\)[\s\S]{0,120}sends once you are paired/.test(bar) && /\{pickError \?/.test(bar));
 }
 
-console.log('\n=== FABLE: THE GROUP CHAT WITH YOUR AI AGENTS ===');
+console.log('\n=== FABLE: THE GROUP CHAT WITH AN AI ===');
 {
   // Collects every element the tree produces, so things can be found by
   // their props rather than by position.
@@ -746,8 +746,15 @@ console.log('\n=== FABLE: THE GROUP CHAT WITH YOUR AI AGENTS ===');
   const thread = fs.readFileSync(path.join(root, 'app', 'MessagesScreen.js'), 'utf8');
   check('the message board shows the chat chips', /<ChatSwitcher partnerName=\{partnerName\} current="partner" navigation=\{navigation\} \/>/.test(thread));
   const screen = fs.readFileSync(path.join(root, 'app', 'FableScreen.js'), 'utf8');
-  check('Fable talks only to our own server', /apiFetch\(`\/fable\/feed/.test(screen) && /apiFetch\('\/fable\/messages'/.test(screen) && !/\bfetch\(|:4300/.test(screen));
-  check('and stops polling when you leave it', /return \(\) => \{ live = false; clearTimeout\(timer\); \}/.test(screen));
+  check('Fable talks only to our own server', /apiFetch\(`\/fable\/messages/.test(screen) && /apiFetch\('\/fable\/messages'/.test(screen) && !/\bfetch\(|https?:\/\//.test(screen));
+  check('and stops polling and listening when you leave it', /live = false;\s*clearInterval\(timer\);/.test(screen) && /socketRef\?\.off\('fable:message'/.test(screen));
+  const setup = fs.readFileSync(path.join(root, 'app', 'FableSetupScreen.js'), 'utf8');
+  check('the setup page sends keys to our server and never shows one back', /apiFetch\(`\/fable\/keys\/\$\{provider\.id\}`/.test(setup) && /secureTextEntry/.test(setup) && /savedKey\.hint/.test(setup));
+  let setupThrew = null;
+  try { collectAll(load('app/FableSetupScreen.js', stubs).default({ navigation })); } catch (err) { setupThrew = err.message; }
+  check('the setup page renders', setupThrew === null, setupThrew);
+  const appJs = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
+  check('the setup page is reachable from anywhere', /<Stack\.Screen name="FableSetup" component=\{FableSetupScreen\}/.test(appJs));
 }
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);

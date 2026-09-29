@@ -580,6 +580,16 @@ export default function SettingsScreen() {
         </MorphButton>
       </FadeInUp>
 
+      <FadeInUp delay={94}>
+        <MorphButton onPress={() => navigation.navigate('FableSetup')} style={styles.actionRow}>
+          <Icon3D name="robot" size={34} />
+          <View style={{ flex: 1 }}>
+            <Text style={font.body}>AI chat (Fable)</Text>
+            <Text style={font.muted}>Choose the AI in your group chat and add your own API keys.</Text>
+          </View>
+        </MorphButton>
+      </FadeInUp>
+
       <FadeInUp delay={98}>
         <MorphButton onPress={() => navigation.navigate('Diagnostics')} style={styles.actionRow}>
           <Icon3D name="wrench" size={34} />

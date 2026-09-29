@@ -1,108 +1,99 @@
-# Fable: the group chat with your AI agents
+# Fable: the group chat with an AI
 
 Fable is a second chat in the app, next to your partner's thread. Tap
-**Fable** at the top of the chat screen. It holds:
+**Fable** at the top of the chat screen, or the Fable card on Home. Three
+people are in it:
 
 - **the two of you**, each under your own name
-- **your AI agents**, marked with a ✦ and outlined bubbles
+- **an AI model**, under whatever name you give it (Fable by default), in
+  outlined bubbles with a ✦
 
-Write `@name` to tag one of them. Agents' proposals and decisions show up
-with a small label.
+It answers every message, or only when named (`@Fable …` or a message
+starting with `Fable`). You choose which on the setup page.
 
-It is the room from
-[collaboration-des-esprits](https://github.com/s-rakim/collaboration-des-esprits),
-the same one its Telegram bridge talks to. The app does not hold the room's
-token. The phones only talk to the loversrock backend, which lets in only the
-two of you. The backend then relays to the room with the token, which stays on
-your PC.
+Everything stays on your server. The messages, the settings and the API keys
+live in the loversrock database. The phones only talk to the loversrock
+backend, and the backend talks to the AI provider.
 
 ```
-phone ──► loversrock backend (Docker) ──► collaboration-des-esprits room ◄── your agents
-          only the paired couple            http://host.docker.internal:4300   (MCP / API)
+phone ──► loversrock backend (Docker) ──► the AI provider you chose
+          only the paired couple            Gemini, Groq, OpenRouter, OpenAI, Claude, Ollama…
 ```
 
-## Setup (once, on the server PC)
+## Setup (in the app, about a minute)
 
-### 1. Run the room
+1. Get an API key. These have free tiers:
+   - **Google Gemini:** [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then **Create API key**.
+   - **Groq:** [console.groq.com/keys](https://console.groq.com/keys).
+   - **OpenRouter:** [openrouter.ai/keys](https://openrouter.ai/keys). Use models ending in `:free`.
+2. In the app, open **Settings → AI chat (Fable)**, or the ⚙ in the Fable
+   chat.
+3. Under **Who answers**, pick **My own API key**, then pick the provider.
+4. Paste the key and tap **Save key**. The key is sent once and sealed on the
+   server. After that the page only ever shows its last four characters.
+5. Leave the model as suggested, or type another one from that provider.
+6. Give it a name and a personality if you like, then tap **Test**. You should
+   get a one-line hello back.
+7. Tap **Save**.
 
-```powershell
-cd C:\Users\USER\Documents
-git clone https://github.com/s-rakim/collaboration-des-esprits
-cd collaboration-des-esprits
-npm install
-```
+You can save a key for several providers and switch between them. Either of
+you can change anything; the page says who set it up last. **Turn off** stops
+it answering and keeps the keys and the chat. **Clear chat** deletes the
+messages for both of you.
 
-Give it a token. Only the loversrock backend and your agents need to know it:
+### The server's own AI
 
-```powershell
-$t = [guid]::NewGuid().ToString("N")
-[Environment]::SetEnvironmentVariable('ESPRITS_TOKEN', $t, 'User')
-$t
-```
+If `backend/.env` has the AI connector set (`QUIZ_LLM_*`, see
+[QUIZ.md](QUIZ.md)), **The server's AI** uses that instead of a key of your
+own.
 
-Keep the printed token for step 2. Then open a **new** PowerShell window so
-the variable applies, and start the room:
+### Your key for the daily content too
 
-```powershell
-cd C:\Users\USER\Documents\collaboration-des-esprits
-npm start
-```
+With **Also write the daily content** on, a key you add here also writes the
+fresh daily quiz questions, prompts, date ideas and challenges. That only
+happens while `backend/.env` has no `QUIZ_LLM_*`; the server's own setting
+always wins.
 
-Add your models at `http://127.0.0.1:4300/setup`, as its README describes.
-Each one becomes an agent in the room, and so in Fable.
+## Where the keys are kept
 
-### 2. Point the backend at it
+In the `ai_keys` table, sealed with AES-256-GCM. The seal is made from
+`FABLE_KEY_SECRET` in `backend/.env`, or `JWT_REFRESH_SECRET` when that is
+empty. A copy of the database is therefore not a copy of your keys. If you
+change that secret, the saved keys can no longer be opened. The setup page
+then says so and asks for them again.
 
-Add two lines to `backend\.env`, with the token from step 1:
+The API never returns a key, only a hint like `…a1b2`.
 
-```ini
-ESPRITS_URL=http://host.docker.internal:4300
-ESPRITS_TOKEN=the-token-from-step-1
-```
+## When it does not answer
 
-`host.docker.internal` is how the backend, inside Docker, reaches the PC it
-runs on. Then restart the backend:
+The chat shows a red line saying why, and tapping it opens the setup page.
 
-```powershell
-cd C:\Users\USER\Documents\loversrock\docker
-docker compose up -d backend
-```
-
-### 3. Open Fable
-
-In the app, go to **Photos → Chat** and tap **Fable**. The first time you
-open it, you and your partner join the room as people, under your app names.
-The agents then see you in their roster, and anything you post in Fable.
-
-## If Fable says…
-
-| Message | Fix |
+| Message | Meaning |
 |---|---|
-| Fable is not set up yet | `ESPRITS_URL` is empty in `backend\.env` (step 2) |
-| Fable's room is not answering | The room is not running. Start it (`npm start`, step 1). If it is running, see the note below. |
-| The room refused the server | `ESPRITS_TOKEN` in `backend\.env` is not the room's token |
+| *refused the API key* | The key is wrong or was deleted. Paste it again. |
+| *limit was reached* | Free tiers allow a few requests a minute. Wait a moment. |
+| *does not know the model* | Pick another model on the setup page. |
+| *is a text-to-speech model* | Use a plain chat model (for Gemini, one ending in `-flash`). |
+| *Could not reach … (DNS)* | The backend container has no internet. Check Docker's network. |
 
-**If the room is running but still "not answering":** on some Docker Desktop
-setups the backend cannot reach a program that only listens on `127.0.0.1`.
-Let the room listen on the network too. It refuses to do that without a
-token, which you already have:
+## What it knows
 
-```powershell
-[Environment]::SetEnvironmentVariable('ESPRITS_HOST', '0.0.0.0', 'User')
+Each reply is written from:
+- the last 30 messages, each labelled with who wrote it;
+- both of your names;
+- the personality you gave it.
+
+It cannot see photos, set reminders or read anything else in the app.
+
+## Testing
+
+```bash
+cd backend
+npm run test:fable   # needs the backend running (npm start) and its database
 ```
 
-Open a new window and `npm start` again. With the token set, nothing
-without it can read or post.
-
-## What it does and does not do
-
-- **Text only.** Your agents read and write text, so photos and doodles stay
-  in your partner's thread.
-- **Live while open.** New messages appear within a few seconds while Fable
-  is on screen. There are no push notifications for Fable yet.
-- **One room.** Everything in it (every idea, decision and agent) is shared
-  with both of you.
-
-Code: `backend/src/routes/fable.js`, `backend/src/models/fable.js`,
-`mobile/app/FableScreen.js`. Test: `npm run test:fable`, against a running
-room.
+This uses a stand-in AI, so no key is spent. It checks:
+- the keys are sealed and never sent back;
+- who sees what;
+- when the AI replies, and what it is told;
+- that a refused key or a free-tier limit is explained.
