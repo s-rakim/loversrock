@@ -5,7 +5,7 @@
     "owner": "rakimmys-team",
     "scheme": "loversrock",
     "version": "1.12.0",
-    "runtimeVersion": "10",
+    "runtimeVersion": "11",
     "updates": {
       "url": "https://u.expo.dev/ad169659-ec2c-4395-a7c1-3f6e3e9e6e1d",
       "fallbackToCacheTimeout": 0,
@@ -31,7 +31,7 @@
         "WRITE_EXTERNAL_STORAGE",
         "BLUETOOTH_CONNECT"
       ],
-      "versionCode": 24
+      "versionCode": 25
     },
     "plugins": [
       "./plugins/withSplashScreenColor",
@@ -64,7 +64,8 @@
           "microphonePermission": "loversrock uses the microphone to record the voice messages you send to your partner."
         }
       ],
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "./plugins/withResilientRepositories"
     ],
     "extra": {
       "eas": {

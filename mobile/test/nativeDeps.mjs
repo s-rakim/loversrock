@@ -57,6 +57,19 @@ let threw = false;
 try { voice.addFirebaseMessagingDependency('android {\n}\n', version); } catch { threw = true; }
 check('a template with no dependencies block fails loudly, not silently', threw);
 
+// One slow Maven server must not fail the build: jitpack.io timing out once
+// took expo-camera's cameraview down with it (plugins/withResilientRepositories.js).
+console.log('\n=== A SLOW JITPACK CANNOT FAIL THE BUILD ===');
+{
+  const plugins = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8')).expo.plugins;
+  check('the repository guard is one of the app\'s plugins', plugins.includes('./plugins/withResilientRepositories'));
+  const { SNIPPET } = require(path.join(root, 'plugins', 'withResilientRepositories.js'));
+  check('jitpack is only asked for com.github.* (not org.jitsi or com.google.android)',
+    /jitpack\.io[\s\S]*includeGroupByRegex 'com\\\\\.github\\\\\.\.\*'/.test(SNIPPET), SNIPPET);
+  check('and it reaches repositories added after it, as React Native adds jitpack',
+    /repositories\.withType\(MavenArtifactRepository\)\.configureEach/.test(SNIPPET));
+}
+
 console.log(`\nNATIVE DEPS RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 fails.forEach((f) => console.log(`  - ${f}`));
 process.exit(fails.length ? 1 : 0);
