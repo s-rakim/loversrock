@@ -11,7 +11,7 @@ import { colors } from './theme';
 import { GlassProvider } from './components/GlassContext';
 import { ThemeProvider, useTheme } from './components/ThemeContext';
 import { LanguageProvider } from './components/LanguageContext';
-import LavaLamp from './components/LavaLamp';
+import AppBackdrop from './components/AppBackdrop';
 import * as Notifications from 'expo-notifications';
 import { ensureChannels, routeForNotification, syncPushToken } from './services/notifications';
 import LumaBar, { TAB_ROUTES } from './components/LumaBar';
@@ -246,7 +246,7 @@ function Root() {
   if (checkingAuth) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <LavaLamp />
+        <AppBackdrop />
         {/* The two of you, together, hold the loading moment rather than a
             bare spinner — the shipped picture, since nobody is signed in yet
             to have uploaded anything. */}
@@ -262,7 +262,7 @@ function Root() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LavaLamp />
+      <AppBackdrop />
       <NavigationContainer ref={navigationRef} theme={navTheme}>
           <StatusBar style={statusBarStyle} />
           <CallPresenter navigationRef={navigationRef} />

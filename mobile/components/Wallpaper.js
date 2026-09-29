@@ -14,6 +14,9 @@ import Svg, { Path, Circle, Rect, Defs, Pattern, G } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { mediaUrl } from '../services/api';
 import { useTheme } from './ThemeContext';
+import LavaLamp from './LavaLamp';
+import SkyBackground from './SkyBackground';
+import TimelapseBackground from './TimelapseBackground';
 
 export const PHOTO_PREFIX = 'photo:';
 
@@ -27,9 +30,15 @@ export const WALLPAPERS = [
     label: 'None',
     light: { colors: ['#EDE9FB', '#F8E8F1'], tint: null },
     dark: { colors: ['#0B0B1A', '#1A1030'], tint: null },
-    // The lava lamp shows through this one, which is the app's own look.
+    // The app's own background (Settings → Appearance) shows through this one.
     transparent: true,
   },
+  // Live: they move. The lava lamp's soft blobs drift (and follow the tilt of
+  // the phone); the sky follows the time of day over the Golden Gate; the
+  // timelapse runs a day and a night on a loop.
+  { id: 'lava', label: 'Lava lamp', live: 'lava' },
+  { id: 'sky', label: 'Live sky', live: 'sky' },
+  { id: 'timelapse', label: 'Timelapse', live: 'timelapse' },
   {
     id: 'blush',
     label: 'Blush',
@@ -141,7 +150,7 @@ function PatternLayer({ pattern, tint }) {
  * null — an unknown id falls back to 'none' rather than rendering nothing,
  * so a wallpaper removed in a later version degrades instead of breaking.
  */
-export default function Wallpaper({ value, children, style }) {
+export default function Wallpaper({ value, children, style, preview = false }) {
   const { isDark } = useTheme();
 
   const photoKey = photoKeyOf(value);
@@ -164,7 +173,10 @@ export default function Wallpaper({ value, children, style }) {
         </>
       );
     }
-    if (preset?.transparent) return null;   // let the lava lamp through
+    if (preset?.live === 'lava') return <LavaLamp />;
+    if (preset?.live === 'sky') return <SkyBackground still={preview} />;
+    if (preset?.live === 'timelapse') return <TimelapseBackground still={preview} />;
+    if (preset?.transparent) return null;   // let the app's background through
     return (
       <>
         <LinearGradient
@@ -176,7 +188,7 @@ export default function Wallpaper({ value, children, style }) {
         <PatternLayer pattern={preset.pattern} tint={variant.tint} />
       </>
     );
-  }, [photoKey, preset, variant, isDark]);
+  }, [photoKey, preset, variant, isDark, preview]);
 
   return (
     <View style={[{ flex: 1 }, style]}>
@@ -190,7 +202,7 @@ export default function Wallpaper({ value, children, style }) {
 export function WallpaperSwatch({ value, size = 64 }) {
   return (
     <View style={{ width: size, height: size * 1.4, borderRadius: 12, overflow: 'hidden' }}>
-      <Wallpaper value={value} />
+      <Wallpaper value={value} preview />
     </View>
   );
 }

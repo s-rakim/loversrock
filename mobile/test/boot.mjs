@@ -133,7 +133,7 @@ function load(rel) {
     if (id === 'react') return reactStub;
     if (id === 'react-native') return rn;
     if (id.startsWith('.')) {
-      if (/\.(png|jpe?g|gif|webp|svg|json|ttf|otf|mp3|wav)$/i.test(id)) {
+      if (/\.(png|jpe?g|gif|webp|svg|json|ttf|otf|mp3|wav|mp4)$/i.test(id)) {
         const f = path.join(root, path.dirname(rel), id);
         if (id.endsWith('.json')) return JSON.parse(fs.readFileSync(f, 'utf8'));
         return { __asset: true, uri: id, width: 600, height: 990 };

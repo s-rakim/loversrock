@@ -93,9 +93,11 @@ function load(relative, extraStubs = {}) {
     View: host('View'), Text: host('Text'), Pressable: host('Pressable'),
     Image: host('Image'), ScrollView: host('ScrollView'), TextInput: host('TextInput'),
     ActivityIndicator: host('ActivityIndicator'), FlatList: host('FlatList'),
-    Switch: host('Switch'), Animated: { View: host('Animated.View'), Text: host('Animated.Text'), Value: class { constructor(v) { this.v = v; } setValue() {} interpolate() { return this; } }, timing: () => ({ start() {} }), spring: () => ({ start() {} }), parallel: () => ({ start() {} }), sequence: () => ({ start() {} }), loop: () => ({ start() {}, stop() {} }) },
+    Switch: host('Switch'), Animated: { View: host('Animated.View'), Text: host('Animated.Text'), Image: host('Animated.Image'), Value: class { constructor(v) { this.v = v; } setValue() {} interpolate() { return this; } }, timing: () => ({ start() {} }), spring: () => ({ start() {} }), parallel: () => ({ start() {} }), sequence: () => ({ start() {} }), loop: () => ({ start() {}, stop() {} }) },
     StyleSheet: { create: (s) => s, absoluteFill: {}, flatten: (s) => s },
     Dimensions: { get: () => ({ width: 390, height: 844 }) },
+    useWindowDimensions: () => ({ width: 390, height: 844 }),
+    Easing: { inOut: (f) => f, out: (f) => f, sin: (x) => x, back: () => (x) => x },
     Platform: { OS: 'android', select: (o) => o.android },
     Alert: { alert() {} },
     // Records what would have been opened, for the tests that tap a link.
@@ -115,7 +117,7 @@ function load(relative, extraStubs = {}) {
       // An image require() is resolved by Metro into an asset descriptor, not
       // a module. Without this the loader tries to read me-neutral.jpg as
       // JavaScript, which is not a bug in the app.
-      if (/\.(png|jpe?g|gif|webp|svg)$/i.test(id)) {
+      if (/\.(png|jpe?g|gif|webp|svg|mp4)$/i.test(id)) {
         const file = path.join(root, path.dirname(relative), id);
         const [width, height] = imageSize(file);
         return { __asset: true, uri: id, width, height };
@@ -739,6 +741,60 @@ console.log('\n=== FABLE: THE GROUP CHAT WITH AN AI ===');
   check('the setup page renders', setupThrew === null, setupThrew);
   const appJs = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
   check('the setup page is reachable from anywhere', /<Stack\.Screen name="FableSetup" component=\{FableSetupScreen\}/.test(appJs));
+}
+
+console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMELAPSE AS OPTIONS ===');
+{
+  const glass = fs.readFileSync(path.join(root, 'components', 'GlassContext.js'), 'utf8');
+  check('the lava lamp is still the default background', /DEFAULT_BACKDROP = 'lava'/.test(glass));
+  check('and the live sky and the timelapse are there to choose', /id: 'sky'/.test(glass) && /id: 'timelapse'/.test(glass));
+  const settings = fs.readFileSync(path.join(root, 'app', 'SettingsScreen.js'), 'utf8');
+  check('Settings offers the three', /BACKDROPS\.map/.test(settings) && /setBackdrop\(option\.id\)/.test(settings));
+  const wp = fs.readFileSync(path.join(root, 'components', 'Wallpaper.js'), 'utf8');
+  check('the chat wallpapers include the live lava lamp, sky and timelapse',
+    /live: 'lava'/.test(wp) && /live: 'sky'/.test(wp) && /live: 'timelapse'/.test(wp));
+
+  const themeStub2 = { useTheme: () => ({ isDark: true, reduceMotion: false, colors: {} }) };
+  const hooks = {
+    ...React,
+    useState: (v) => [typeof v === 'function' ? v() : v, () => {}],
+    useRef: (v) => ({ current: v }), useEffect: () => {}, useMemo: (f) => f(), useCallback: (f) => f,
+  };
+  const Sky = load('components/SkyBackground.js', { './ThemeContext': themeStub2, react: hooks });
+  const at = (h, m = 0) => Sky.skyAt(new Date(2030, 5, 1, h, m));
+  const show = (x) => `${x.a}${x.a === x.b ? '' : `→${x.b}@${x.t.toFixed(2)}`}`;
+  check('noon is daylight', show(at(12)) === 'day', show(at(12)));
+  check('small hours are the full moon', show(at(2)) === 'moon', show(at(2)));
+  check('mid-evening is a starry night', show(at(21)) === 'night', show(at(21)));
+  check('half past six in the evening is sunset', at(18, 40).a === 'sunset', show(at(18, 40)));
+  const dawnish = at(6, 45);
+  check('dawn comes after the night', dawnish.a === 'dawn' || dawnish.b === 'dawn', show(dawnish));
+  // Seamless: minute by minute through a whole day the blend never jumps.
+  let worst = 0;
+  let prev = null;
+  const weight = (x, p) => (x.a === p ? 1 - x.t : 0) + (x.b === p ? x.t : 0);
+  for (let m = 0; m < 24 * 60; m += 1) {
+    const x = Sky.skyAt(new Date(2030, 5, 1, 0, m));
+    if (prev) {
+      for (const p of ['dawn', 'day', 'sunset', 'night', 'moon']) {
+        worst = Math.max(worst, Math.abs(weight(x, p) - weight(prev, p)));
+      }
+    }
+    prev = x;
+  }
+  check('through a whole day the sky never jumps from one minute to the next', worst < 0.05, worst.toFixed(3));
+  let threw = null;
+  try {
+    const full = Sky.default({});
+    const still = Sky.default({ still: true, at: new Date(2030, 0, 1, 18, 40) });
+    if (!full || !still) throw new Error('rendered nothing');
+  } catch (err) { threw = err.message; }
+  check('the sky renders, full size and as a still preview', threw === null, threw);
+  for (const p of ['dawn', 'day', 'sunset', 'night', 'moon']) {
+    const ok = ['sky.jpg', 'ground.webp'].every((f) => fs.existsSync(path.join(root, 'assets', 'sky', `${p}-${f}`)));
+    check(`the ${p} layers are in the app`, ok);
+  }
+  check('and the timelapse', fs.existsSync(path.join(root, 'assets', 'sky', 'timelapse.mp4')));
 }
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);

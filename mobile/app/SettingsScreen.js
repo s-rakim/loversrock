@@ -14,7 +14,7 @@ import {
   openLiveUpdateSettings,
   widgetsSupported,
 } from '../services/widgetBridge';
-import { useGlass, BAR_SCALE } from '../components/GlassContext';
+import { useGlass, BAR_SCALE, BACKDROPS } from '../components/GlassContext';
 import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import ServerAddress from '../components/ServerAddress';
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
     customAccent, setCustomAccent, blobPalette, setBlobPalette, isDark,
   } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { intensity, setIntensity, barScale, setBarScale } = useGlass();
+  const { intensity, setIntensity, barScale, setBarScale, backdrop, setBackdrop } = useGlass();
   const {
     preference: languagePreference, setPreference: setLanguagePreference, languages,
   } = useLanguage();
@@ -194,6 +194,33 @@ export default function SettingsScreen() {
               onValueChange={(on) => setMotionPreference(on ? 'on' : 'off')}
               trackColor={{ true: colors.accentPink }}
             />
+          </View>
+
+          {/* Behind every screen: the two of you above the Golden Gate under
+              the sky it is outside now, the same scene as a timelapse, or the
+              original lava lamp. */}
+          <Text style={[font.body, { marginTop: spacing.md }]}>Background</Text>
+          <Text style={[font.muted, { marginBottom: spacing.sm }]}>
+            {backdrop === 'sky'
+              ? 'The sky follows the time of day: dawn, day, sunset, stars and the moon.'
+              : backdrop === 'timelapse'
+                ? 'A day and a night on a loop.'
+                : 'The original soft colours.'}
+          </Text>
+          <View style={styles.themeRow}>
+            {BACKDROPS.map((option) => {
+              const active = backdrop === option.id;
+              return (
+                <View key={option.id} style={{ flex: 1 }}>
+                  <MorphButton
+                    onPress={() => setBackdrop(option.id)}
+                    style={[styles.themeOption, active && styles.themeOptionActive]}
+                  >
+                    <Text style={[styles.themeLabel, active && styles.themeLabelActive]}>{option.label}</Text>
+                  </MorphButton>
+                </View>
+              );
+            })}
           </View>
         </View>
       </FadeInUp>
