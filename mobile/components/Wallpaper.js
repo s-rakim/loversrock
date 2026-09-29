@@ -34,11 +34,13 @@ export const WALLPAPERS = [
     transparent: true,
   },
   // Live: they move. The lava lamp's soft blobs drift (and follow the tilt of
-  // the phone); the sky follows the time of day over the Golden Gate; the
-  // timelapse runs a day and a night on a loop.
+  // the phone); the skies follow the time of day over the Golden Gate and New
+  // York; the timelapses run a day and a night on a loop.
   { id: 'lava', label: 'Lava lamp', live: 'lava' },
-  { id: 'sky', label: 'Live sky', live: 'sky' },
-  { id: 'timelapse', label: 'Timelapse', live: 'timelapse' },
+  { id: 'sky', label: 'Golden Gate', live: 'sky', scene: 'goldengate' },
+  { id: 'newyork', label: 'New York', live: 'sky', scene: 'newyork' },
+  { id: 'timelapse', label: 'Golden Gate timelapse', live: 'timelapse', scene: 'goldengate' },
+  { id: 'newyork-timelapse', label: 'New York timelapse', live: 'timelapse', scene: 'newyork' },
   {
     id: 'blush',
     label: 'Blush',
@@ -174,8 +176,8 @@ export default function Wallpaper({ value, children, style, preview = false }) {
       );
     }
     if (preset?.live === 'lava') return <LavaLamp />;
-    if (preset?.live === 'sky') return <SkyBackground still={preview} />;
-    if (preset?.live === 'timelapse') return <TimelapseBackground still={preview} />;
+    if (preset?.live === 'sky') return <SkyBackground scene={preset.scene} still={preview} />;
+    if (preset?.live === 'timelapse') return <TimelapseBackground scene={preset.scene} still={preview} />;
     if (preset?.transparent) return null;   // let the app's background through
     return (
       <>

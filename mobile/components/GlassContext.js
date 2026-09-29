@@ -8,12 +8,16 @@ const BACKDROP_KEY = 'loversrock_backdrop';
 
 /**
  * What is behind every screen: the lava lamp (the app's own look, and the
- * default), the live Golden Gate sky that follows the clock, or its timelapse.
+ * default), or the live sky that follows the clock over the Golden Gate or
+ * New York, each also as a timelapse. ('sky' and 'timelapse' keep their ids
+ * from when the Golden Gate was the only one, so a saved choice still holds.)
  */
 export const BACKDROPS = [
   { id: 'lava', label: 'Lava lamp' },
-  { id: 'sky', label: 'Live sky' },
-  { id: 'timelapse', label: 'Timelapse' },
+  { id: 'sky', label: 'Golden Gate' },
+  { id: 'newyork', label: 'New York' },
+  { id: 'timelapse', label: 'Golden Gate timelapse' },
+  { id: 'newyork-timelapse', label: 'New York timelapse' },
 ];
 export const DEFAULT_BACKDROP = 'lava';
 const isBackdrop = (v) => BACKDROPS.some((b) => b.id === v);

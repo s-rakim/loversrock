@@ -196,22 +196,22 @@ export default function SettingsScreen() {
             />
           </View>
 
-          {/* Behind every screen: the two of you above the Golden Gate under
-              the sky it is outside now, the same scene as a timelapse, or the
-              original lava lamp. */}
+          {/* Behind every screen: the two of you above the Golden Gate or
+              across the river from New York under the sky it is outside now,
+              the same scenes as timelapses, or the original lava lamp. */}
           <Text style={[font.body, { marginTop: spacing.md }]}>Background</Text>
           <Text style={[font.muted, { marginBottom: spacing.sm }]}>
-            {backdrop === 'sky'
-              ? 'The sky follows the time of day: dawn, day, sunset, stars and the moon.'
-              : backdrop === 'timelapse'
-                ? 'A day and a night on a loop.'
+            {backdrop === 'sky' || backdrop === 'newyork'
+              ? 'The sky follows the time of day, changing slowly: dawn, day, sunset, the blue hour, stars and the moon.'
+              : backdrop === 'timelapse' || backdrop === 'newyork-timelapse'
+                ? 'A day and a night on a slow loop.'
                 : 'The original soft colours.'}
           </Text>
-          <View style={styles.themeRow}>
+          <View style={[styles.themeRow, styles.backdropGrid]}>
             {BACKDROPS.map((option) => {
               const active = backdrop === option.id;
               return (
-                <View key={option.id} style={{ flex: 1 }}>
+                <View key={option.id} style={styles.backdropCell}>
                   <MorphButton
                     onPress={() => setBackdrop(option.id)}
                     style={[styles.themeOption, active && styles.themeOptionActive]}
@@ -663,6 +663,9 @@ const makeStyles = (colors) =>
   },
   settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   themeRow: { flexDirection: 'row', gap: spacing.sm },
+  // Five backgrounds: two to a row, so the longer names fit.
+  backdropGrid: { flexWrap: 'wrap' },
+  backdropCell: { flexBasis: '47%', flexGrow: 1 },
   motionRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     marginTop: spacing.lg, paddingTop: spacing.md,

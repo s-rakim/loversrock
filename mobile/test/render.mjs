@@ -751,8 +751,15 @@ console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMEL
   const settings = fs.readFileSync(path.join(root, 'app', 'SettingsScreen.js'), 'utf8');
   check('Settings offers the three', /BACKDROPS\.map/.test(settings) && /setBackdrop\(option\.id\)/.test(settings));
   const wp = fs.readFileSync(path.join(root, 'components', 'Wallpaper.js'), 'utf8');
-  check('the chat wallpapers include the live lava lamp, sky and timelapse',
-    /live: 'lava'/.test(wp) && /live: 'sky'/.test(wp) && /live: 'timelapse'/.test(wp));
+  check('the chat wallpapers include the live lava lamp, both skies and both timelapses',
+    /live: 'lava'/.test(wp) && /live: 'sky', scene: 'goldengate'/.test(wp) && /live: 'sky', scene: 'newyork'/.test(wp)
+    && /live: 'timelapse', scene: 'goldengate'/.test(wp) && /live: 'timelapse', scene: 'newyork'/.test(wp));
+  check('and New York is a background too, live and as a timelapse',
+    /id: 'newyork'/.test(glass) && /id: 'newyork-timelapse'/.test(glass));
+  const backdrop = fs.readFileSync(path.join(root, 'components', 'AppBackdrop.js'), 'utf8');
+  check('each background shows its own scene',
+    /'sky'\) return <SkyBackground scene="goldengate"/.test(backdrop) && /'newyork'\) return <SkyBackground scene="newyork"/.test(backdrop)
+    && /'newyork-timelapse'\) return <TimelapseBackground scene="newyork"/.test(backdrop));
 
   const themeStub2 = { useTheme: () => ({ isDark: true, reduceMotion: false, colors: {} }) };
   const hooks = {
@@ -761,40 +768,75 @@ console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMEL
     useRef: (v) => ({ current: v }), useEffect: () => {}, useMemo: (f) => f(), useCallback: (f) => f,
   };
   const Sky = load('components/SkyBackground.js', { './ThemeContext': themeStub2, react: hooks });
+  const Frames = load('components/skyFrames.js');
   const at = (h, m = 0) => Sky.skyAt(new Date(2030, 5, 1, h, m));
-  const show = (x) => `${x.a}${x.a === x.b ? '' : `→${x.b}@${x.t.toFixed(2)}`}`;
-  check('noon is daylight', show(at(12)) === 'day', show(at(12)));
-  check('small hours are the full moon', show(at(2)) === 'moon', show(at(2)));
-  check('mid-evening is a starry night', show(at(21)) === 'night', show(at(21)));
-  check('half past six in the evening is sunset', at(18, 40).a === 'sunset', show(at(18, 40)));
-  const dawnish = at(6, 45);
-  check('dawn comes after the night', dawnish.a === 'dawn' || dawnish.b === 'dawn', show(dawnish));
-  // Seamless: minute by minute through a whole day the blend never jumps.
+  // How much of each light is on screen: the two pictures' mixes, blended.
+  const lights = (x) => {
+    const out = {};
+    for (const [f, k] of [[x.a, 1 - x.t], [x.b, x.t]]) {
+      for (const [p, w] of Object.entries(Frames.SKY_FRAMES[f].mix)) out[p] = (out[p] || 0) + w * k;
+    }
+    return out;
+  };
+  const main = (x) => Object.entries(lights(x)).sort((p, q) => q[1] - p[1])[0][0];
+  const show = (x) => JSON.stringify(lights(x));
+  check('noon is daylight', at(12).a === at(12).b && main(at(12)) === 'day', show(at(12)));
+  check('small hours are the full moon', main(at(2)) === 'moon', show(at(2)));
+  check('late evening is a starry night', main(at(22)) === 'night' && at(22).stars === 1, show(at(22)));
+  check('twenty past six in the evening is sunset', main(at(18, 20)) === 'sunset', show(at(18, 20)));
+  check('then the blue hour', main(at(20)) === 'twilight', show(at(20)));
+  check('dawn comes after the night', main(at(6, 30)) === 'dawn', show(at(6, 30)));
+  check('no stars in the daytime', at(12).stars === 0 && at(7).stars === 0);
+  check('many pictures, not a handful', Frames.SKY_FRAMES.length >= 30, Frames.SKY_FRAMES.length);
+  // Seamless: wherever the light changes, the two pictures being blended
+  // are twenty minutes apart...
+  const rows = Frames.SKY_TIMELINE;
+  const gaps = rows.slice(1).map((r, i) => (r[1] === rows[i][1] ? 0 : r[0] - rows[i][0]));
+  check('changing light is a picture every twenty minutes', Math.max(...gaps) <= 1 / 3 + 1e-3, Math.max(...gaps));
+  check('and the day ends where it began', rows[0][1] === rows[rows.length - 1][1] && rows[rows.length - 1][0] === 24);
+  // ...and minute by minute through a whole day nothing jumps, not even
+  // where one pair of pictures hands over to the next: slow, and gradual.
   let worst = 0;
+  let worstStars = 0;
   let prev = null;
-  const weight = (x, p) => (x.a === p ? 1 - x.t : 0) + (x.b === p ? x.t : 0);
-  for (let m = 0; m < 24 * 60; m += 1) {
+  for (let m = 0; m <= 24 * 60; m += 1) {
     const x = Sky.skyAt(new Date(2030, 5, 1, 0, m));
     if (prev) {
-      for (const p of ['dawn', 'day', 'sunset', 'night', 'moon']) {
-        worst = Math.max(worst, Math.abs(weight(x, p) - weight(prev, p)));
+      const [now, was] = [lights(x), lights(prev)];
+      for (const p of new Set([...Object.keys(now), ...Object.keys(was)])) {
+        worst = Math.max(worst, Math.abs((now[p] || 0) - (was[p] || 0)));
       }
+      worstStars = Math.max(worstStars, Math.abs(x.stars - prev.stars));
     }
     prev = x;
   }
-  check('through a whole day the sky never jumps from one minute to the next', worst < 0.05, worst.toFixed(3));
+  check('through a whole day the light never changes more than 3% in a minute', worst < 0.03, worst.toFixed(3));
+  check('nor do the stars', worstStars < 0.03, worstStars.toFixed(3));
+  const sky = fs.readFileSync(path.join(root, 'components', 'SkyBackground.js'), 'utf8');
+  check('moving on to the next pair keeps the picture already showing', /key=\{`\$\{kind\}\$\{f\}`\}/.test(sky));
+  check('and every opacity follows one clock that glides in real time, never resetting a blend',
+    /clock\.interpolate\(\{ inputRange: \[h0, h1\]/.test(sky) && /easing: Easing\.linear/.test(sky) && !/blend\.setValue/.test(sky));
+  check('the clock carries on past midnight instead of jumping back', /base: 24 \* Math\.round/.test(sky));
   let threw = null;
   try {
     const full = Sky.default({});
     const still = Sky.default({ still: true, at: new Date(2030, 0, 1, 18, 40) });
-    if (!full || !still) throw new Error('rendered nothing');
+    const ny = Sky.default({ scene: 'newyork', at: new Date(2030, 0, 1, 23, 50) });
+    if (!full || !still || !ny) throw new Error('rendered nothing');
   } catch (err) { threw = err.message; }
-  check('the sky renders, full size and as a still preview', threw === null, threw);
-  for (const p of ['dawn', 'day', 'sunset', 'night', 'moon']) {
-    const ok = ['sky.jpg', 'ground.webp'].every((f) => fs.existsSync(path.join(root, 'assets', 'sky', `${p}-${f}`)));
-    check(`the ${p} layers are in the app`, ok);
-  }
-  check('and the timelapse', fs.existsSync(path.join(root, 'assets', 'sky', 'timelapse.mp4')));
+  check('the sky renders, full size, as a still preview, and in New York', threw === null, threw);
+  const missing = Frames.SKY_FRAMES.flatMap((f, i) => [
+    ...(f.sky?.__asset ? [] : [`${i} sky`]),
+    ...Sky.SCENES.filter((s) => !f.ground?.[s]?.__asset).map((s) => `${i} ${s}`),
+  ]);
+  check('every picture is in the app, for both scenes', missing.length === 0, missing.join(', '));
+  const dir = path.join(root, 'assets', 'sky');
+  const stray = [
+    ...fs.readdirSync(dir).filter((f) => !/^\d\d-sky\.jpg$|^timelapse-(goldengate|newyork)\.mp4$|^(goldengate|newyork)$/.test(f)),
+    ...Sky.SCENES.flatMap((s) => fs.readdirSync(path.join(dir, s)).filter((f) => !/^\d\d\.webp$/.test(f))),
+  ];
+  check('and nothing left over from an older build', stray.length === 0, stray.join(', '));
+  check('and the two timelapses', Sky.SCENES.every((s) => fs.existsSync(path.join(dir, `timelapse-${s}.mp4`))));
 }
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
