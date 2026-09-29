@@ -128,3 +128,25 @@ has to shake out:
 - Echo cancellation in a real room with two phones near each other.
 - iOS needs CallKit for a proper incoming-call screen when the app is
   closed; today it gets a high-importance notification instead.
+
+## Ringing
+
+- **Calling out:** you hear the standard ringback trill. It used to be your
+  own ringtone, because InCallManager's "default" ringback on Android is the
+  phone's ringtone. It now uses `_DTMF_`, the network-style ringing tone.
+- **Being called:** the phone rings with its ringtone, over and over, until
+  you answer, decline, or the caller hangs up. The ringer is
+  `native/android/voice/CallRinger.kt`. It posts the call on its own
+  "Incoming calls (ringing)" channel, whose sound is the ringtone, and marks
+  it insistent. It follows the ringer switch: silent stays silent, vibrate
+  vibrates. The server sends it a data-only `call` push, which works with the
+  app closed. If the caller gives up, a `call_end` push stops the ringing and
+  leaves a missed call. With the app open, the socket starts the same ringer,
+  so the push and the socket ring only once.
+- **Which phones:** only phones whose app says it can ring (`can_ring` in
+  `user_devices`, sent when the app registers for push) get the data-only
+  call. Older builds and iPhones get the ordinary call notification as before.
+
+If it still doesn't ring on ColorOS: in Settings → Apps → loversrock →
+Notifications, allow "Incoming calls (ringing)" and give it sound. Also allow
+the app to run in the background (Battery → the app).

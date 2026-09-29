@@ -21,6 +21,20 @@ class VoiceNotesModule(private val reactContext: ReactApplicationContext) :
 
     override fun getName() = "VoiceNotes"
 
+    /** A call arrived over the socket with the app open: ring like a phone. */
+    @ReactMethod
+    fun ringIncoming(callId: String, from: String, kind: String, promise: Promise) {
+        CallRinger.ring(reactContext, callId, from, kind)
+        promise.resolve(true)
+    }
+
+    /** Answered, declined or hung up: stop ringing. */
+    @ReactMethod
+    fun stopRinging(callId: String?, promise: Promise) {
+        CallRinger.stop(reactContext, callId)
+        promise.resolve(true)
+    }
+
     @ReactMethod
     fun setApiUrl(url: String, promise: Promise) {
         VoicePrefs.setApiUrl(reactContext, url)

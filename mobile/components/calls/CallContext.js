@@ -19,7 +19,7 @@
 import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { Platform, AppState, PermissionsAndroid, Alert } from 'react-native';
+import { Platform, AppState, PermissionsAndroid, Alert, NativeModules } from 'react-native';
 
 /**
  * WebRTC, required rather than imported, for exactly the reason stated below
@@ -68,13 +68,37 @@ try {
 } catch {
   InCallManager = null;
 }
+/**
+ * Ringing on Android is the app's own native ringer
+ * (native/android/voice/CallRinger.kt): your ringtone, repeating, following
+ * the ringer switch — the same one the push starts when the app is closed,
+ * so the socket and the push ring once between them. Builds from before it
+ * existed fall back to InCallManager's ringtone.
+ */
+const nativeRinger = Platform.OS === 'android' && typeof NativeModules.VoiceNotes?.ringIncoming === 'function'
+  ? NativeModules.VoiceNotes
+  : null;
+
 const audio = {
   start: (media) => { try { InCallManager?.start({ media, auto: true }); } catch { /* no native module */ } },
   stop: () => { try { InCallManager?.stop(); } catch { /* */ } },
   speaker: (on) => { try { InCallManager?.setForceSpeakerphoneOn(on); } catch { /* */ } },
-  ring: () => { try { InCallManager?.startRingtone('_DEFAULT_'); } catch { /* */ } },
-  stopRing: () => { try { InCallManager?.stopRingtone(); } catch { /* */ } },
-  ringback: () => { try { InCallManager?.startRingback('_DEFAULT_'); } catch { /* */ } },
+  ring: (callId, from, kind) => {
+    if (nativeRinger) {
+      nativeRinger.ringIncoming(String(callId), from || 'Your partner', kind || 'voice').catch(() => {});
+      return;
+    }
+    try { InCallManager?.startRingtone('_DEFAULT_'); } catch { /* */ }
+  },
+  stopRing: () => {
+    nativeRinger?.stopRinging(null).catch(() => {});
+    try { InCallManager?.stopRingtone(); } catch { /* */ }
+  },
+  // '_DTMF_', not '_DEFAULT_'. InCallManager's "default" ringback on Android
+  // is the phone's own RINGTONE, so making a call rang your phone as if you
+  // were being called. '_DTMF_' is the network-style ringback trill
+  // (ToneGenerator's ringing tone), which is what a caller should hear.
+  ringback: () => { try { InCallManager?.startRingback('_DTMF_'); } catch { /* */ } },
   stopRingback: () => { try { InCallManager?.stopRingback(); } catch { /* */ } },
   screenOn: (on) => { try { InCallManager?.setKeepScreenOn(on); } catch { /* */ } },
 };
@@ -116,6 +140,14 @@ export function CallProvider({ children }) {
   // addIceCandidate throws if it does. They are queued and flushed after.
   const pendingCandidates = useRef([]);
   const callIdRef = useRef(null);
+  // For the ringing notification's "Hobi is calling". Fetched once; a call
+  // arriving before it lands just says "Your partner".
+  const partnerNameRef = useRef(null);
+  useEffect(() => {
+    apiFetch('/profile')
+      .then((d) => { partnerNameRef.current = d?.partner?.displayName || null; })
+      .catch(() => {});
+  }, []);
   const hasTurn = useRef(false);
   // Which end this phone is, and what kind of call: read from event
   // listeners, which would otherwise see the state from when they were added.
@@ -485,7 +517,7 @@ export function CallProvider({ children }) {
         callIdRef.current = payload.callId;
         roleRef.current = 'callee';
         kindRef.current = payload.kind || 'voice';
-        audio.ring();
+        audio.ring(payload.callId, partnerNameRef.current, payload.kind || 'voice');
         setCall({
           phase: 'ringing-in',
           kind: payload.kind || 'voice',

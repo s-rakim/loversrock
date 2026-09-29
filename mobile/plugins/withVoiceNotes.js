@@ -31,6 +31,8 @@ const PERMISSIONS = [
   'android.permission.WAKE_LOCK',
   'android.permission.RECORD_AUDIO',
   'android.permission.POST_NOTIFICATIONS',
+  // The incoming call onto the lock screen, like a phone call (CallRinger.kt).
+  'android.permission.USE_FULL_SCREEN_INTENT',
 ];
 
 function withVoiceSources(config) {

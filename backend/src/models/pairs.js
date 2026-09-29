@@ -31,6 +31,12 @@ export function pairLocalDateString(pair, at = new Date()) {
   return formatter.format(at); // en-CA formats as YYYY-MM-DD
 }
 
+/** Each device's token, and whether its app rings for a call push itself. */
+export async function getUserDevices(userId) {
+  const { rows } = await query('SELECT fcm_token, platform, can_ring FROM user_devices WHERE user_id = $1', [userId]);
+  return rows.map((r) => ({ token: r.fcm_token, platform: r.platform, canRing: r.can_ring }));
+}
+
 export async function getUserDeviceTokens(userId) {
   const { rows } = await query('SELECT fcm_token FROM user_devices WHERE user_id = $1', [userId]);
   return rows.map((r) => r.fcm_token);

@@ -44,6 +44,10 @@ function load(relative, extraStubs = {}) {
     Image: host('Image'), TextInput: host('TextInput'), FlatList: host('FlatList'),
     StyleSheet: { create: (s) => s, absoluteFill: {}, flatten: (s) => s },
     Alert: { alert() {} },
+    Platform: { OS: 'android', select: (o) => o.android ?? o.default },
+    NativeModules: {},
+    AppState: { addEventListener: () => ({ remove() {} }), currentState: 'active' },
+    PermissionsAndroid: { request: async () => 'granted', PERMISSIONS: {}, RESULTS: { GRANTED: 'granted' } },
   };
 
   const module_ = { exports: {} };

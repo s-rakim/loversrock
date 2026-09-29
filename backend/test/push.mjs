@@ -19,6 +19,21 @@ check('calls channel is MAX importance on the client',
   /calls:[\s\S]*?AndroidImportance\.MAX/.test(client));
 check('reminders channel is not MAX', !/reminders:[\s\S]{0,200}?AndroidImportance\.MAX/.test(client));
 
+console.log('\n=== A CALL RINGS LIKE A PHONE ===');
+const callsRoute = readFileSync(new URL('../src/routes/calls.js', import.meta.url), 'utf8');
+const nativeService = readFileSync(new URL('../../mobile/native/android/voice/VoiceMessagingService.kt', import.meta.url), 'utf8');
+const ringer = readFileSync(new URL('../../mobile/native/android/voice/CallRinger.kt', import.meta.url), 'utf8');
+const callContext = readFileSync(new URL('../../mobile/components/calls/CallContext.js', import.meta.url), 'utf8');
+for (const type of ['call', 'call_end']) {
+  check(`the server sends "${type}" and the phone's native service takes it`,
+    new RegExp(`type: '${type}'`).test(callsRoute) && new RegExp(`data\\["type"\\] == "${type}"`).test(nativeService), type);
+}
+check('only phones that say they can ring get the data-only call', /filter\(\(d\) => d\.canRing\)/.test(callsRoute) && /ringer:/.test(client));
+check('everyone else still gets the ordinary call notification', /others\.length && sendNotification/.test(callsRoute));
+check('the ringing uses the phone\'s ringtone, repeating', /TYPE_RINGTONE/.test(ringer) && /FLAG_INSISTENT/.test(ringer) && /USAGE_NOTIFICATION_RINGTONE/.test(ringer));
+check('the caller hears a ringback trill, not their own ringtone', /startRingback\('_DTMF_'\)/.test(callContext) && !/startRingback\('_DEFAULT_'\)/.test(callContext));
+check('answering or hanging up stops the ringing', /stopRinging\(req\.userId, rows\[0\]\.id/.test(callsRoute) && /stopRinging\(call\.callee_id/.test(callsRoute));
+
 console.log('\n=== DEEP LINKS ===');
 check('deepLink carries the type', deepLink('quiz').type === 'quiz');
 check('params are serialised (FCM data must be strings)',

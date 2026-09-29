@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS user_devices (
   last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(user_id, fcm_token)
 );
+-- The app on this phone rings like a phone for a call (CallRinger.kt), so a
+-- call push to it is data-only for the app to ring; to any other phone it is
+-- an ordinary notification.
+ALTER TABLE user_devices ADD COLUMN IF NOT EXISTS can_ring BOOLEAN NOT NULL DEFAULT false;
 
 -- user_b_id is NULL between invite generation and invite acceptance —
 -- the row is created at invite time (user_a_id = inviter) so invite_code /

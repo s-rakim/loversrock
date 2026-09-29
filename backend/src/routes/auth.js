@@ -105,14 +105,15 @@ router.post('/refresh', async (req, res) => {
 });
 
 router.post('/fcm-token', requireAuth, async (req, res) => {
-  const { fcmToken, platform } = req.body;
+  const { fcmToken, platform, ringer } = req.body;
   if (!fcmToken) return res.status(400).json({ error: 'fcmToken is required' });
 
   await query(
-    `INSERT INTO user_devices (user_id, fcm_token, platform, last_seen_at)
-     VALUES ($1, $2, $3, now())
-     ON CONFLICT (user_id, fcm_token) DO UPDATE SET last_seen_at = now(), platform = EXCLUDED.platform`,
-    [req.userId, fcmToken, platform || 'android']
+    `INSERT INTO user_devices (user_id, fcm_token, platform, can_ring, last_seen_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (user_id, fcm_token) DO UPDATE
+       SET last_seen_at = now(), platform = EXCLUDED.platform, can_ring = EXCLUDED.can_ring`,
+    [req.userId, fcmToken, platform || 'android', ringer === true]
   );
 
   res.status(204).end();

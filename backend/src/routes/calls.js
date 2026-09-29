@@ -13,8 +13,9 @@ import crypto from 'node:crypto';
 import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
-import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
-import { getUserDeviceTokens } from '../models/pairs.js';
+import { sendNotification, sendToTokens, deepLink, CHANNELS } from '../config/firebase.js';
+import { getUserDevices } from '../models/pairs.js';
+import { senderName } from './messages.js';
 
 const router = asyncRouter();
 
@@ -182,6 +183,23 @@ router.get('/current', async (req, res) => {
 });
 
 /**
+ * Tells the phones that ring for themselves (CallRinger.kt) to stop ringing
+ * for this call. Fire and forget: a failed push must never fail the hang-up.
+ */
+function stopRinging(userId, callId, { missed, from }) {
+  getUserDevices(userId)
+    .then((devices) => {
+      const tokens = devices.filter((d) => d.canRing).map((d) => d.token);
+      if (!tokens.length) return null;
+      return sendToTokens(tokens, {
+        data: { type: 'call_end', callId, missed: missed ? 'true' : 'false', ...(from ? { from } : {}) },
+        priority: 'high',
+      });
+    })
+    .catch((err) => console.error('[calls] stop-ringing push failed:', err.message));
+}
+
+/**
  * Ring your partner.
  *
  * The row is created before any signalling so a missed call is still a
@@ -236,16 +254,30 @@ router.post('/start', async (req, res) => {
   //
   // A failed push must never fail the call: the socket may well have got
   // through, and the caller's phone should ring out rather than error.
-  const tokens = await getUserDeviceTokens(req.partnerId);
-  await sendNotification(
-    tokens,
-    {
-      title: kind === 'video' ? 'Incoming video call' : 'Incoming call',
-      body: 'Your partner is calling',
-    },
-    deepLink('call', { callId: call.id, kind }),
-    { channel: CHANNELS.calls, priority: 'high' }
-  ).catch((err) => console.error('[calls] push failed:', err.message));
+  //
+  // A phone whose app rings for itself (CallRinger.kt) gets the call as data
+  // only, high priority, so the app — not the system tray — takes it and
+  // rings with the ringtone until answered. Every other phone gets the
+  // ordinary notification it always did.
+  const devices = await getUserDevices(req.partnerId);
+  const from = await senderName(req.pair.id, req.userId, req.partnerId);
+  const ringers = devices.filter((d) => d.canRing).map((d) => d.token);
+  const others = devices.filter((d) => !d.canRing).map((d) => d.token);
+  await Promise.all([
+    ringers.length && sendToTokens(ringers, {
+      data: { type: 'call', callId: call.id, kind, from },
+      priority: 'high',
+    }),
+    others.length && sendNotification(
+      others,
+      {
+        title: kind === 'video' ? 'Incoming video call' : 'Incoming call',
+        body: `${from} is calling`,
+      },
+      deepLink('call', { callId: call.id, kind }),
+      { channel: CHANNELS.calls, priority: 'high' }
+    ),
+  ]).catch((err) => console.error('[calls] push failed:', err.message));
 
   res.status(201).json({ call: view(call, req.userId) });
 });
@@ -259,6 +291,8 @@ router.post('/:id/answer', async (req, res) => {
     [req.params.id, req.pair.id, req.userId]
   );
   if (!rows[0]) return res.status(404).json({ error: 'No ringing call to answer' });
+  // Answered here: any other phone of yours that is ringing for it stops.
+  stopRinging(req.userId, rows[0].id, { missed: false });
   res.json({ call: view(rows[0], req.userId) });
 });
 
@@ -293,6 +327,15 @@ router.post('/:id/end', async (req, res) => {
      WHERE id = $3 RETURNING *`,
     [status, reason, call.id]
   );
+  // The phone being called may be ringing in a pocket, with no socket to hear
+  // the hang-up on. This is what stops it — and, if they gave up before it
+  // was answered, leaves a missed call.
+  if (!call.answered_at) {
+    stopRinging(call.callee_id, call.id, {
+      missed: status === 'missed',
+      from: status === 'missed' ? await senderName(req.pair.id, call.caller_id, call.callee_id) : undefined,
+    });
+  }
   res.json({ call: view(rows[0], req.userId) });
 });
 

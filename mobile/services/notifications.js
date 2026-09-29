@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { apiFetch } from './api';
@@ -166,7 +166,14 @@ export async function registerForPush() {
   try {
     await apiFetch('/auth/fcm-token', {
       method: 'POST',
-      body: { fcmToken: token, platform: Platform.OS },
+      // `ringer`: this build rings like a phone for a call push
+      // (native/android/voice/CallRinger.kt). The server sends the call push
+      // it can ring for only to phones that say so.
+      body: {
+        fcmToken: token,
+        platform: Platform.OS,
+        ringer: Platform.OS === 'android' && typeof NativeModules.VoiceNotes?.ringIncoming === 'function',
+      },
     });
   } catch (err) {
     return { registered: false, reason: `server: ${err.message}` };

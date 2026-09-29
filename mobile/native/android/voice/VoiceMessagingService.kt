@@ -10,7 +10,8 @@ import expo.modules.notifications.service.ExpoFirebaseMessagingService
  * FCM delivers every push to ONE service in the app. expo-notifications
  * registers its own at priority -1 precisely so an app can put one in front of
  * it; this is that one (the plugin registers it at a higher priority). A voice
- * note is taken here; everything else — messages, calls, reminders — goes to
+ * note is taken here, and so is a call (CallRinger); everything else —
+ * messages, reminders — goes to
  * expo-notifications exactly as before, and token refreshes are inherited
  * untouched.
  */
@@ -19,6 +20,19 @@ class VoiceMessagingService : ExpoFirebaseMessagingService() {
         // getData(), not `.data`: the same call compiles against the real Java class
         // and against the stub the typecheck uses.
         val data = remoteMessage.getData()
+        // A call: ring like a phone (CallRinger), rather than leaving it to
+        // an ordinary one-beep notification.
+        if (data["type"] == "call") {
+            val callId = data["callId"] ?: return
+            CallRinger.ring(applicationContext, callId, data["from"] ?: "Your partner", data["kind"] ?: "voice")
+            return
+        }
+        if (data["type"] == "call_end") {
+            val callId = data["callId"] ?: return
+            if (data["missed"] == "true") CallRinger.missed(applicationContext, callId, data["from"] ?: "Your partner")
+            else CallRinger.stop(applicationContext, callId)
+            return
+        }
         if (data["type"] == "voice_text") {
             // The words, a few seconds after the note: the server transcribes
             // after it has sent. Shown in the note's notification.
