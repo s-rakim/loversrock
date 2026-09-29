@@ -3,7 +3,6 @@
 // destination you navigate to, it is something you do from wherever you are.
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { spacing, radius } from '../../theme';
 import { useTheme } from '../ThemeContext';
 import { MorphButton } from '../Motion';
@@ -26,11 +25,11 @@ export default function CallButtons({ compact = false }) {
   if (compact) {
     return (
       <View style={styles.compactRow}>
-        <MorphButton onPress={() => ring('voice')} style={styles.compactButton}>
-          <Ionicons name="call" size={20} color={colors.accentPink} />
+        <MorphButton onPress={() => ring('voice')} style={styles.compactButton} accessibilityLabel="Voice call">
+          <Icon3D name="phone" size={26} />
         </MorphButton>
-        <MorphButton onPress={() => ring('video')} style={styles.compactButton}>
-          <Ionicons name="videocam" size={20} color={colors.accentPink} />
+        <MorphButton onPress={() => ring('video')} style={styles.compactButton} accessibilityLabel="Video call">
+          <Icon3D name="video" size={26} />
         </MorphButton>
       </View>
     );

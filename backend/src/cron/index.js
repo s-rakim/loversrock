@@ -5,12 +5,12 @@ import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
 import { fetchQuestions, pickTopic } from '../services/promptSources.js';
+import { applyPromptBank, BANK_SOURCE } from '../models/promptBank.js';
 import { generatePrompts, growCatalogues } from '../models/contentGenerator.js';
 import { freshenUpcomingDays, quizLlmConfig } from '../models/quizGenerator.js';
 
 const MEMORY_RETENTION_DAYS = 30;
 const QUIZ_BANK_WARNING_DAYS = 7;
-const PROMPTS_PER_FETCH = 6;
 
 // Hard-deletes memories soft-deleted more than 30 days ago, including their
 // MinIO objects. Runs nightly at 03:00 server time.
@@ -203,61 +203,45 @@ export async function pushPeriodReminders() {
 }
 
 /**
- * Tops the daily prompt bank up with freshly fetched questions.
+ * The daily questions for the coming month.
  *
- * Fetches PROMPTS_PER_FETCH questions on a randomly chosen topic and schedules
- * them on the soonest upcoming dates that have no prompt yet. Today is never
- * touched - overwriting the question a couple may already be halfway through
- * answering would be worse than running out.
- *
- * Already-scheduled questions are passed as `exclude` so a source that repeats
- * itself can't schedule a duplicate, and scheduled_date is UNIQUE so a double
- * run is a no-op rather than an error.
+ * First from our own 365-day list (models/promptBank.js): every date gets its
+ * day-of-the-year question, and an upcoming day nobody has answered that
+ * holds anything else goes back to the list's. Only the dates the list cannot
+ * fill go to the backup, fetchQuestions: the AI connector if one is set up,
+ * then the web sources, then the local files. A day either of you has
+ * answered is never touched, and scheduled_date is UNIQUE, so running this
+ * twice is a no-op.
  */
-export async function refreshDailyPrompts(today = new Date()) {
-  const start = toDateString(today);
+export async function refreshDailyPrompts(today = new Date(), { ahead = 30 } = {}) {
+  const { added, restored, backup } = await applyPromptBank({ today, ahead });
+  let scheduled = added;
+  let source = BANK_SOURCE;
+  let topic = null;
 
-  // Candidate dates: tomorrow through tomorrow + PROMPTS_PER_FETCH.
-  const horizon = [];
-  for (let offset = 1; offset <= PROMPTS_PER_FETCH; offset++) {
-    horizon.push(toDateString(new Date(new Date(`${start}T00:00:00Z`).getTime() + offset * 86400000)));
-  }
-
-  const { rows: existing } = await query(
-    'SELECT scheduled_date, content FROM daily_prompts WHERE scheduled_date >= $1',
-    [start]
-  );
-  const taken = new Set(existing.map((row) => row.scheduled_date));
-  const openDates = horizon.filter((date) => !taken.has(date));
-
-  if (openDates.length === 0) {
-    console.log('[cron] daily prompts: bank already full, nothing to fetch');
-    return { scheduled: 0, source: 'skipped' };
-  }
-
-  const { source, topic, questions } = await fetchQuestions({
-    count: openDates.length,
-    exclude: existing.map((row) => row.content),
-  });
-
-  if (questions.length === 0) {
-    console.error('[cron] daily prompts: every source came back empty');
-    return { scheduled: 0, source: 'none' };
-  }
-
-  let scheduled = 0;
-  for (let i = 0; i < Math.min(openDates.length, questions.length); i++) {
-    const { rowCount } = await query(
-      `INSERT INTO daily_prompts (scheduled_date, category, content, source)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (scheduled_date) DO NOTHING`,
-      [openDates[i], topic, questions[i], source]
+  if (backup.length) {
+    const { rows: existing } = await query(
+      `SELECT content FROM daily_prompts WHERE scheduled_date >= $1::date - 180`,
+      [toDateString(today)]
     );
-    scheduled += rowCount;
+    const fetched = await fetchQuestions({ count: backup.length, exclude: existing.map((r) => r.content) });
+    source = fetched.source;
+    topic = fetched.topic;
+    for (let i = 0; i < Math.min(backup.length, fetched.questions.length); i++) {
+      const { rowCount } = await query(
+        `INSERT INTO daily_prompts (scheduled_date, category, content, source)
+         VALUES ($1, $2, $3, $4) ON CONFLICT (scheduled_date) DO NOTHING`,
+        [backup[i], fetched.topic, fetched.questions[i], fetched.source]
+      );
+      scheduled += rowCount;
+    }
   }
 
-  console.log(`[cron] daily prompts: +${scheduled} from "${source}" on topic "${topic}"`);
-  return { scheduled, source, topic };
+  if (scheduled || restored) {
+    console.log(`[cron] daily prompts: +${added} from the list, ${restored} put back to the list`
+      + (backup.length ? `, +${scheduled - added} from "${source}" as backup` : ''));
+  }
+  return { scheduled, restored, fromBank: added, backup: backup.length, source, topic };
 }
 
 /**
@@ -332,16 +316,19 @@ export async function freshenPrompts({ days = 7, includeToday = false, today = n
   return { replaced, preview: [], topic };
 }
 
-/** Nightly: fill the week's prompts, then make them AI-written if a connector is set. */
+/**
+ * Nightly: the coming month's questions, from the 365-day list first.
+ *
+ * It used to go on to replace the week's questions with AI-written ones
+ * whenever a connector was set up; the list is the daily question now, and
+ * the AI only fills what the list cannot (refreshDailyPrompts). freshenPrompts
+ * is still there for `npm run ai:generate -- --only prompts`, on request.
+ */
 export async function freshenDailyPrompts() {
   try {
     await refreshDailyPrompts();
-    const config = aiConfig();
-    if (!config) return;
-    const { replaced, topic } = await freshenPrompts({ config });
-    if (replaced) console.log(`[cron] prompts: ${replaced} AI-written from ${config.provider} on "${topic}"`);
   } catch (err) {
-    console.error(`[cron] prompt freshening failed: ${err.message}`);
+    console.error(`[cron] daily prompts failed: ${err.message}`);
   }
 }
 

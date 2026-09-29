@@ -12,8 +12,8 @@ import { useTheme } from '../components/ThemeContext';
 const Stack = createNativeStackNavigator();
 
 const ITEMS = [
-  { key: 'Drawings', icon: 'brush', label: 'Drawings' },
-  { key: 'Arcade', icon: 'game-controller', label: 'Arcade' },
+  { key: 'Drawings', icon: 'brush', icon3d: 'palette', label: 'Drawings' },
+  { key: 'Arcade', icon: 'game-controller', icon3d: 'game', label: 'Arcade' },
 ];
 
 const Drawings = withSectionBar(CanvasGalleryScreen, ITEMS, 'Drawings');

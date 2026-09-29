@@ -19,6 +19,8 @@ import {
 import { setSharedAiConfig } from './aiShared.js';
 
 const TIMEOUT_MS = 60_000;
+// How long to wait before each retry when the provider says it is busy.
+export const BUSY_RETRY_MS = [2000, 5000];
 export const HISTORY_FOR_AI = 30;
 export const MAX_BODY = 4000;
 
@@ -308,6 +310,9 @@ export function explainFailure(config, status, detail) {
   if (status === 429 || /quota|rate limit|resource[_ ]exhausted/i.test(text)) {
     return `${who}'s limit was reached (free tiers allow a few requests a minute). Try again shortly.`;
   }
+  if (status === 503 || /overloaded|high demand|unavailable/i.test(text)) {
+    return `${who} is busy right now (too many people using it). Try again in a minute.`;
+  }
   if (status === 404 || /model.*(not found|does not exist|not supported)/i.test(text)) {
     return `${who} does not know the model "${config.model}". Pick another on the setup page.`;
   }
@@ -342,7 +347,10 @@ export async function askChat(config, { system, user }) {
     return response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
   }
 
-  const res = await fetch(`${config.baseUrl || PROVIDER_URLS[config.provider]}/chat/completions`, {
+  // "Busy right now" (503, and 500/502 from overloaded gateways) is worth
+  // two more tries a few seconds apart: Gemini's free tier says it often and
+  // usually means it for seconds, not minutes. Anything else is said at once.
+  const send = () => fetch(`${config.baseUrl || PROVIDER_URLS[config.provider]}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -355,6 +363,12 @@ export async function askChat(config, { system, user }) {
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   }).catch((err) => { throw networkError(config, err); });
+  let res = await send();
+  for (const wait of BUSY_RETRY_MS) {
+    if (![500, 502, 503].includes(res.status)) break;
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    res = await send();
+  }
   if (!res.ok) throw new Error(explainFailure(config, res.status, await res.text().catch(() => '')));
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content;

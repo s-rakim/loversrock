@@ -206,7 +206,7 @@ export const SCREEN_FOR_TYPE = {
   // arriving somewhere adjacent is indistinguishable from not arriving.
   memory: { tab: 'Photos', screen: 'Wall' },
   message: { tab: 'Photos', screen: 'Messages' },
-  fable: { tab: 'Photos', screen: 'Fable' },
+  fable: 'Fable',
   // Only iPhones get a notification for a voice note — Android plays it
   // itself (native/android/voice/) — and tapping one opens the list.
   voice: 'VoiceNotes',

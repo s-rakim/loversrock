@@ -1,8 +1,7 @@
 # Fable: the group chat with an AI
 
-Fable is a second chat in the app, next to your partner's thread. Tap
-**Fable** at the top of the chat screen, or the Fable card on Home. Three
-people are in it:
+Fable is a second chat in the app, with its own button on Home, just below
+Thumb Kiss and above the call buttons. Three people are in it:
 
 - **the two of you**, each under your own name
 - **an AI model**, under whatever name you give it (Fable by default), in
@@ -26,8 +25,8 @@ phone ──► loversrock backend (Docker) ──► the AI provider you chose
    - **Google Gemini:** [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then **Create API key**.
    - **Groq:** [console.groq.com/keys](https://console.groq.com/keys).
    - **OpenRouter:** [openrouter.ai/keys](https://openrouter.ai/keys). Use models ending in `:free`.
-2. In the app, open **Settings → AI chat (Fable)**, or the ⚙ in the Fable
-   chat.
+2. In the app, open **Settings → AI chat (Fable)**, or the ⚙ at the top of
+   the Fable chat.
 3. Under **Who answers**, pick **My own API key**, then pick the provider.
 4. Paste the key and tap **Save key**. The key is sent once and sealed on the
    server. After that the page only ever shows its last four characters.

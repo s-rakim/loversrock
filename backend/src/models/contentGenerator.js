@@ -176,6 +176,40 @@ export async function generateChallenges(count, avoid = [], { config = quizLlmCo
   });
 }
 
+// ------------------------------------------------------------ deck questions
+
+/**
+ * Questions for one conversation deck, for a deck that has none: the backup
+ * behind the seeded decks. `deck` is { title, category }.
+ */
+export async function generateDeckQuestions(deck, count = 12, avoid = [], { config = quizLlmConfig() } = {}) {
+  const photo = /photo/i.test(`${deck.category} ${deck.title}`);
+  return generate({
+    config, count, avoid, listKey: 'questions',
+    system: `You write cards for a conversation deck in a couples app. The deck is "${deck.title}" in the "${deck.category}" category; every card must fit it. ${TONE} `
+      + (photo
+        ? 'Each card asks for a photo to send, starting with "Send", 15 to 160 characters.'
+        : 'Each card is one question ending in "?", 15 to 200 characters, that both partners answer.'),
+    user: (n, used) => `Write ${n} new cards for this deck.\n\n`
+      + `Already in the deck, do not repeat or closely paraphrase:\n${avoidBlock(used)}\n\n`
+      + 'Reply with JSON only: {"questions": ["...", "..."]}.',
+    schema: listSchema('questions', { type: 'string' }),
+    check: (raw, used) => {
+      const seen = new Set(used.map(key));
+      const out = [];
+      for (const r of Array.isArray(raw) ? raw : []) {
+        const q = clean(r);
+        if (q.length < 15 || q.length > 220 || /[<>{}]|https?:\/\//i.test(q)) continue;
+        if (!photo && !q.endsWith('?')) continue;
+        if (seen.has(key(q))) continue;
+        seen.add(key(q));
+        out.push(q);
+      }
+      return out;
+    },
+  });
+}
+
 // -------------------------------------------------------- into the database
 
 const slugify = (s) => clean(s).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')

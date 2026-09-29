@@ -2,6 +2,8 @@ import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
 import { inSeason, daysUntilSeason } from '../models/seasons.js';
+import { quizLlmConfig } from '../models/quizGenerator.js';
+import { generateDeckQuestions } from '../models/contentGenerator.js';
 
 const router = asyncRouter();
 
@@ -36,6 +38,26 @@ router.get('/', async (req, res) => {
   res.json({ decksByCategory: grouped, seasonalSoon: soon });
 });
 
+async function backfillDeck(deck) {
+  let config = null;
+  try { config = quizLlmConfig(); } catch { /* misconfigured: no backup */ }
+  if (!config) return [];
+  try {
+    const written = await generateDeckQuestions({ title: deck.title, category: deck.category }, 12, [], { config });
+    for (const [i, text] of written.entries()) {
+      await query(
+        `INSERT INTO deck_questions (deck_id, question_text, sort_order)
+         SELECT $1, $2, $3 WHERE NOT EXISTS (SELECT 1 FROM deck_questions WHERE deck_id = $1 AND question_text = $2)`,
+        [deck.id, text, i + 1]
+      );
+    }
+  } catch (err) {
+    console.error(`[decks] AI backup for "${deck.slug}" failed: ${err.message}`);
+  }
+  const { rows } = await query('SELECT * FROM deck_questions WHERE deck_id = $1 ORDER BY sort_order', [deck.id]);
+  return rows;
+}
+
 router.get('/:slug/questions', async (req, res) => {
   const { rows: deckRows } = await query('SELECT * FROM question_decks WHERE slug = $1', [req.params.slug]);
   const deck = deckRows[0];
@@ -48,10 +70,14 @@ router.get('/:slug/questions', async (req, res) => {
   deck.seasonal = seasonal;
   deck.inSeason = !seasonal || inSeason(deck, undefined, { togetherSince: req.pair.together_since || null });
 
-  const { rows: questions } = await query(
+  let { rows: questions } = await query(
     'SELECT * FROM deck_questions WHERE deck_id = $1 ORDER BY sort_order',
     [deck.id]
   );
+  // Every deck is seeded with questions. The AI connector is the backup for a
+  // deck that still has none: it writes some on the first open, and they are
+  // kept, so it is asked once per deck at most.
+  if (!questions.length) questions = await backfillDeck(deck);
   const questionIds = questions.map((q) => q.id);
 
   const { rows: responses } = questionIds.length

@@ -151,6 +151,19 @@ export default function HomeScreen({ navigation }) {
           </MorphButton>
         </FadeInUp>
 
+        {/* Fable, the group chat with an AI: its own button, one tap from
+            Home, rather than a chip inside your partner's thread. */}
+        <FadeInUp delay={115}>
+          <MorphButton onPress={() => navigation.navigate('Fable')} style={styles.fableCard}>
+            <Icon3D name="robot" size={36} />
+            <View style={{ flex: 1 }}>
+              <Text style={[font.body, { fontWeight: '700' }]}>Fable</Text>
+              <Text style={font.muted}>Group chat: you, your partner and an AI</Text>
+            </View>
+            <Icon name="chevron-forward" chip={false} size={16} color={colors.textMuted} />
+          </MorphButton>
+        </FadeInUp>
+
         <FadeInUp delay={130}>
           <View style={{ marginTop: spacing.md }}>
             <CallButtons />
@@ -167,18 +180,6 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
 
-          {/* Fable lives beside your partner's thread; this is a way in from Home. */}
-          <MorphButton
-            onPress={() => navigation.navigate('Photos', { screen: 'Fable' })}
-            style={styles.fableCard}
-          >
-            <Icon3D name="robot" size={44} />
-            <View style={{ flex: 1 }}>
-              <Text style={[font.body, { fontWeight: '700' }]}>Fable</Text>
-              <Text style={font.muted}>Your group chat with an AI</Text>
-            </View>
-            <Icon name="chevron-forward" chip={false} size={16} color={colors.textMuted} />
-          </MorphButton>
         </FadeInUp>
 
         {/* Decks that are nearly in season. Announced rather than hidden,
@@ -296,7 +297,7 @@ const makeStyles = (colors, font) =>
   thumbKissBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
     backgroundColor: colors.accentSoft, borderRadius: radius.lg, padding: spacing.md,
-    marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.accent,
+    marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.accent,
   },
   thumbKissText: { color: colors.accent, fontWeight: '700' },
   heroIcon: { marginBottom: spacing.xs },
@@ -314,8 +315,9 @@ const makeStyles = (colors, font) =>
   tileLabel: { color: colors.text, fontSize: 13, fontWeight: '600' },
   fableCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md,
-    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg,
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
+    borderWidth: 1, borderColor: colors.border,
   },
   sectionTitle: { ...font.h2, marginBottom: spacing.sm, marginTop: spacing.sm },
   deckCard: {

@@ -588,7 +588,7 @@ function collect(element, wanted, out = [], depth = 0) {
 const sectionSets = ['PhotoSectionScreen', 'PlaySectionScreen'].map((name) => {
   const src = fs.readFileSync(path.join(root, 'app', `${name}.js`), 'utf8');
   const body = src.match(/const ITEMS = \[([\s\S]*?)\];/)[1];
-  const items = [...body.matchAll(/key: '([^']+)', icon: '([^']+)', label: '([^']+)'/g)]
+  const items = [...body.matchAll(/key: '([^']+)', icon: '([^']+)',(?: icon3d: '[^']+',)? label: '([^']+)'/g)]
     .map(([, key, icon, label]) => ({ key, icon, label }));
   return { name, items };
 });
@@ -701,6 +701,7 @@ console.log('\n=== FABLE: THE GROUP CHAT WITH AN AI ===');
   const reactStub = {
     ...React,
     useMemo: (f) => f(), useState: (v) => [v, () => {}], useRef: (v) => ({ current: v }), useCallback: (f) => f,
+    useLayoutEffect: () => {}, useEffect: () => {},
   };
   const stubs = {
     react: reactStub,
@@ -715,24 +716,8 @@ console.log('\n=== FABLE: THE GROUP CHAT WITH AN AI ===');
     '../components/NotPaired': () => null,
   };
 
-  const ChatSwitcher = load('components/ChatSwitcher.js', stubs);
-  check('the chat is called Fable', ChatSwitcher.FABLE_CHAT?.name === 'Fable', ChatSwitcher.FABLE_CHAT?.name);
-
   const went = [];
-  const navigation = { navigate: (to) => went.push(to) };
-  let all = collectAll(ChatSwitcher.default({ partnerName: 'Hobi', current: 'partner', navigation }));
-  const texts = all.filter((e) => e.type === 'Text').map(textOf);
-  check('the thread shows your partner and Fable side by side', texts.includes('Hobi') && texts.includes('Fable'), texts.join(' | '));
-  let buttons = all.filter((e) => e.type === 'MorphButton');
-  check('from your partner\'s thread, only Fable is a button', buttons.length === 1, buttons.length);
-  buttons[0]?.props.onPress();
-  check('and it opens the Fable chat in the app, not a link', went.at(-1) === 'Fable', went);
-
-  all = collectAll(ChatSwitcher.default({ partnerName: 'Hobi', current: 'fable', navigation }));
-  buttons = all.filter((e) => e.type === 'MorphButton');
-  buttons[0]?.props.onPress();
-  check('from Fable, one tap goes back to your partner', buttons.length === 1 && went.at(-1) === 'Messages', went);
-  check('ChatSwitcher never leaves the app', !/Linking|https?:\/\//.test(fs.readFileSync(path.join(root, 'components', 'ChatSwitcher.js'), 'utf8')));
+  const navigation = { navigate: (to) => went.push(to), setOptions: () => {} };
 
   const Fable = load('app/FableScreen.js', stubs);
   let threw = null;
@@ -741,10 +726,9 @@ console.log('\n=== FABLE: THE GROUP CHAT WITH AN AI ===');
   const merged = Fable.mergeFeed([{ id: 2, body: 'b' }, { id: 1, body: 'a' }], [{ id: 3, body: 'c' }, { id: 2, body: 'b2' }]);
   check('new messages merge in order, without duplicates', merged.map((m) => `${m.id}${m.body}`).join(',') === '1a,2b2,3c', merged);
 
-  const nav = fs.readFileSync(path.join(root, 'app', 'PhotoSectionScreen.js'), 'utf8');
-  check('Fable is a screen in the chat section', /<Stack\.Screen name="Fable" component=\{FableThread\} \/>/.test(nav));
   const thread = fs.readFileSync(path.join(root, 'app', 'MessagesScreen.js'), 'utf8');
-  check('the message board shows the chat chips', /<ChatSwitcher partnerName=\{partnerName\} current="partner" navigation=\{navigation\} \/>/.test(thread));
+  check('the chat with your partner has no chip row any more', !/ChatSwitcher/.test(thread));
+  check('Fable\'s gear sits in its title bar', /headerRight/.test(fs.readFileSync(path.join(root, 'app', 'FableScreen.js'), 'utf8')));
   const screen = fs.readFileSync(path.join(root, 'app', 'FableScreen.js'), 'utf8');
   check('Fable talks only to our own server', /apiFetch\(`\/fable\/messages/.test(screen) && /apiFetch\('\/fable\/messages'/.test(screen) && !/\bfetch\(|https?:\/\//.test(screen));
   check('and stops polling and listening when you leave it', /live = false;\s*clearInterval\(timer\);/.test(screen) && /socketRef\?\.off\('fable:message'/.test(screen));

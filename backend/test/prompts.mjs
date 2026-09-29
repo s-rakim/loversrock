@@ -124,29 +124,60 @@ check('fallback still returns questions', viaLocal.questions.length === 6, viaLo
 check('a topic is always reported', TOPICS.includes(viaLocal.topic), viaLocal.topic);
 delete process.env.PROMPT_SOURCE_URL;
 
-console.log('\n=== CRON JOB AGAINST THE REAL DATABASE ===');
+console.log('\n=== THE 365-DAY LIST FIRST, THE BACKUP BEHIND IT ===');
+const { promptBank, bankQuestionFor, BANK_SOURCE } = await import('../src/models/promptBank.js');
+const list = promptBank();
+check('the list has a question for every day of the year', list.length === 365, list.length);
+check('no two days share a question', new Set(list.map((q) => q.content.toLowerCase())).size === 365);
+check('every one is a question', list.every((q) => q.content.endsWith('?')));
+check('the same date gets the same question every year', bankQuestionFor('2027-03-14').content === bankQuestionFor('2031-03-14').content);
+check('a leap year\'s last day still gets one', Boolean(bankQuestionFor('2028-12-31')?.content));
+
 const today = new Date();
 const day = (o) => new Date(today.getTime() + o * 86400000).toISOString().slice(0, 10);
 await query('DELETE FROM daily_prompts WHERE scheduled_date > $1', [day(0)]);
 
+// Something the old nightly job would have left: an AI-written question on a
+// day nobody has answered, and one somebody has.
+const stamp = Date.now();
+const { rows: [u] } = await query(`INSERT INTO users (email, password_hash, name) VALUES ($1, 'x', 'P') RETURNING id`, [`bank-${stamp}@t.dev`]);
+const { rows: [u2] } = await query(`INSERT INTO users (email, password_hash, name) VALUES ($1, 'x', 'Q') RETURNING id`, [`bank2-${stamp}@t.dev`]);
+const { rows: [pair] } = await query(`INSERT INTO pairs (user_a_id, user_b_id, timezone) VALUES ($1, $2, 'UTC') RETURNING id`, [u.id, u2.id]);
+await query(`INSERT INTO daily_prompts (scheduled_date, category, content, source) VALUES ($1, 'x', 'An AI question nobody answered?', 'ai:test')`, [day(2)]);
+const { rows: [answeredRow] } = await query(
+  `INSERT INTO daily_prompts (scheduled_date, category, content, source) VALUES ($1, 'x', 'An AI question somebody answered?', 'ai:test') RETURNING id`, [day(3)]);
+await query(`INSERT INTO prompt_responses (pair_id, prompt_id, user_id, answer_text) VALUES ($1, $2, $3, 'mine')`, [pair.id, answeredRow.id, u.id]);
+
 const run = await refreshDailyPrompts(today);
-check('schedules into empty upcoming days', run.scheduled > 0, run);
 const { rows: after } = await query(
-  'SELECT scheduled_date, content, source, category FROM daily_prompts WHERE scheduled_date > $1 ORDER BY scheduled_date',
-  [day(0)]
+  `SELECT scheduled_date::text AS date, content, source FROM daily_prompts WHERE scheduled_date > $1 AND scheduled_date <= $2 ORDER BY 1`,
+  [day(0), day(30)]
 );
-check('rows landed on future dates only', after.every((r) => r.scheduled_date > day(0)), after.map((r) => r.scheduled_date));
-check('today was not overwritten', !after.some((r) => r.scheduled_date === day(0)));
-check('source is recorded', after.every((r) => r.source && r.source !== 'seed'), after.map((r) => r.source));
-check('category carries the topic', after.every((r) => TOPICS.includes(r.category)), after.map((r) => r.category));
-check('no duplicate questions scheduled', new Set(after.map((r) => r.content)).size === after.length);
+const at = (d) => after.find((r) => r.date === d);
+check('every day of the coming month has a question', after.length === 30, after.length);
+check('from the list, each on its own day of the year',
+  after.filter((r) => r.date !== day(3)).every((r) => r.source === BANK_SOURCE && r.content === bankQuestionFor(r.date).content), after.slice(0, 3));
+check('an unanswered AI question went back to the list', at(day(2))?.content === bankQuestionFor(day(2)).content, at(day(2)));
+check('an answered one is never changed', at(day(3))?.content === 'An AI question somebody answered?', at(day(3)));
+check('it says what it did', run.fromBank > 0 && run.restored >= 1, run);
 
 const second = await refreshDailyPrompts(today);
-check('re-running is a no-op once the bank is full', second.scheduled === 0, second);
+check('running again changes nothing', second.scheduled === 0 && second.restored === 0, second);
 
-await query('DELETE FROM daily_prompts WHERE scheduled_date = $1', [day(3)]);
+await query('DELETE FROM daily_prompts WHERE scheduled_date = $1', [day(5)]);
 const third = await refreshDailyPrompts(today);
-check('a single freed day gets refilled', third.scheduled === 1, third);
+check('a freed day gets its list question back', third.scheduled === 1 && (await query('SELECT content FROM daily_prompts WHERE scheduled_date = $1', [day(5)])).rows[0]?.content === bankQuestionFor(day(5)).content, third);
+
+// The backup: the list's question for a day is already on a date close by,
+// so that day goes to fetchQuestions (AI, then the web, then local files).
+await query('DELETE FROM daily_prompts WHERE scheduled_date = $1', [day(7)]);
+await query(`INSERT INTO daily_prompts (scheduled_date, category, content, source) VALUES ($1, 'x', $2, 'test')`, [day(60), bankQuestionFor(day(7)).content]);
+const fourth = await refreshDailyPrompts(today);
+const { rows: [filled] } = await query('SELECT content, source FROM daily_prompts WHERE scheduled_date = $1', [day(7)]);
+check('a day the list cannot fill comes from the backup', fourth.backup === 1 && filled && filled.source !== BANK_SOURCE && filled.content !== bankQuestionFor(day(7)).content, { fourth, filled });
+
+await query('DELETE FROM daily_prompts WHERE scheduled_date = $1', [day(60)]);
+await query('DELETE FROM users WHERE id = ANY($1)', [[u.id, u2.id]]);
 
 server.close();
 console.log(`\nPROMPT RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);

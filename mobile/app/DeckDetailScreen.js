@@ -58,6 +58,14 @@ export default function DeckDetailScreen({ route, navigation }) {
             </Text>
           </View>
         )}
+        {questions.length === 0 && (
+          <View style={styles.card}>
+            <Text style={font.body}>No questions in this deck yet.</Text>
+            <Text style={[font.muted, { marginTop: spacing.xs }]}>
+              Restart the server to load the latest ones, or set up an AI (Settings → AI chat) to have it write some.
+            </Text>
+          </View>
+        )}
         {questions.map((q, i) => (
           <FadeInUp key={q.id} delay={i * 40}>
             <View style={styles.card}>

@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { pool, query } from '../src/config/db.js';
+import { applyPromptBank } from '../src/models/promptBank.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -21,16 +22,16 @@ function dateWithOffset(days) {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * The daily question for yesterday through a month out, from the 365-day
+ * list (models/promptBank.js), on every start: a database that already has
+ * prompts from elsewhere gets the list's back on every day nobody has
+ * answered yet.
+ */
 async function seedDailyPrompts() {
-  const prompts = loadJson('daily_prompts.json');
-  for (const p of prompts) {
-    await query(
-      `INSERT INTO daily_prompts (scheduled_date, category, content)
-       VALUES ($1, $2, $3) ON CONFLICT (scheduled_date) DO NOTHING`,
-      [dateWithOffset(p.dayOffset), p.category, p.content]
-    );
-  }
-  console.log(`[seed] daily_prompts: ${prompts.length} days`);
+  const { added, restored, backup } = await applyPromptBank({ ahead: 30 });
+  console.log(`[seed] daily_prompts: +${added} from the 365-day list, ${restored} put back to it`
+    + (backup.length ? `, ${backup.length} left for the backup` : ''));
 }
 
 async function seedQuizQuestions() {
@@ -192,14 +193,16 @@ async function isEmpty(table) {
  * where `npm run seed` had not been run by hand since the games list last
  * changed.
  *
- * Daily prompts and quiz days are different: they are dated relative to
- * TODAY, so re-running them on every restart would keep laying the same
- * content onto new dates. They are only filled into an empty database.
+ * Daily prompts follow the calendar (the question for each day of the year),
+ * so they are laid out on every start too. Quiz days are different: they are
+ * dated relative to TODAY, so re-running them on every restart would keep
+ * laying the same content onto new dates. They are only filled into an empty
+ * database.
  */
 async function run() {
   const startup = process.argv.includes('--startup');
 
-  if (!startup || await isEmpty('daily_prompts')) await seedDailyPrompts();
+  await seedDailyPrompts();
   if (!startup || await isEmpty('quiz_questions')) await seedQuizQuestions();
   await seedDateIdeas();
   await seedQuestionDecks();

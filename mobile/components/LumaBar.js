@@ -33,6 +33,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
 import Icon from './Icon';
 import Icon3D from './Icon3D';
@@ -165,13 +166,21 @@ function glassFill(intensity, isDark) {
  * phone with a gesture strip the inset is ~34px, with three-button navigation
  * it can be 48, and a constant is wrong on one of them.
  */
-export function useBarClearance() {
+/**
+ * Screens inside a tab that take the whole screen: the bar steps aside while
+ * one is open. The chat is one — a message box wants the bottom of the screen,
+ * and back from it goes to the camera, where the bar is again.
+ */
+export const BAR_HIDDEN_ON = new Set(['Messages']);
+
+export function useBarClearance({ barHidden = false } = {}) {
   const insets = useSafeAreaInsets();
   // At whatever size the bar is set to, so a bigger bar never covers a
   // screen's last row or its message box.
   const { barScale } = useGlass();
   const g = barGeometry(barScale);
   const bottom = Math.max(insets.bottom, spacing.sm);
+  if (barHidden) return { above: bottom, content: bottom + spacing.lg };
   return {
     // Where something floating above the bar should sit — above the swell
     // around the mic too, which rises past the pill.
@@ -262,6 +271,10 @@ export default function LumaBar({ state, navigation }) {
     anim.start();
     return () => anim.stop();
   }, [state.index, grow, reduceMotion]);
+
+  // After every hook, so hiding never changes the order React sees them in.
+  const inner = getFocusedRouteNameFromRoute(state.routes[state.index]);
+  if (inner && BAR_HIDDEN_ON.has(inner)) return null;
 
   return (
     <View

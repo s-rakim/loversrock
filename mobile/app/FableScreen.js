@@ -8,7 +8,7 @@
 //
 // New messages arrive over the socket the rest of the app already uses; a
 // slow poll while the screen is open covers the moments the socket is down.
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch, isUnpaired, connectSocket } from '../services/api';
@@ -18,7 +18,6 @@ import { useBarClearance } from '../components/LumaBar';
 import { MorphButton, PulsingText } from '../components/Motion';
 import Icon from '../components/Icon';
 import { useTheme } from '../components/ThemeContext';
-import ChatSwitcher from '../components/ChatSwitcher';
 import Icon3D from '../components/Icon3D';
 
 const POLL_MS = 10000;
@@ -38,7 +37,9 @@ const timeOf = (m) => {
 
 export default function FableScreen({ navigation }) {
   const { colors, font } = useTheme();
-  const clearance = useBarClearance();
+  // A screen of its own above the tabs (App.js), so there is no bottom bar
+  // to clear: just the phone's own navigation.
+  const clearance = useBarClearance({ barHidden: true });
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [messages, setMessages] = useState([]);
@@ -115,10 +116,22 @@ export default function FableScreen({ navigation }) {
     }
   };
 
-  if (unpaired) return <NotPaired navigation={navigation} what="Fable" />;
-
   const botName = info?.botName || 'Fable';
-  const openSetup = () => navigation.navigate('FableSetup');
+  const openSetup = useCallback(() => navigation.navigate('FableSetup'), [navigation]);
+
+  // The AI's name in the title, and the setup gear beside it.
+  useLayoutEffect(() => {
+    navigation.setOptions?.({
+      title: botName,
+      headerRight: () => (
+        <MorphButton onPress={openSetup} style={styles.gear} accessibilityLabel="Set up the AI">
+          <Icon name="settings-outline" chip={false} size={18} color={colors.text} />
+        </MorphButton>
+      ),
+    });
+  }, [navigation, botName, openSetup, styles.gear, colors.text]);
+
+  if (unpaired) return <NotPaired navigation={navigation} what="Fable" />;
   const mentionOnly = info?.replyMode === 'mention';
 
   const renderItem = ({ item }) => {
@@ -152,18 +165,7 @@ export default function FableScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Icon3D name="robot" size={34} />
-        <View style={{ flex: 1 }}>
-          <Text style={font.h2}>{botName}</Text>
-          <Text style={styles.subtitle}>You, {partnerName || 'your partner'} and {botName}</Text>
-        </View>
-        <MorphButton onPress={openSetup} style={styles.gear} accessibilityLabel="Set up the AI">
-          <Icon name="settings-outline" chip={false} size={18} color={colors.text} />
-        </MorphButton>
-      </View>
-
-      <ChatSwitcher partnerName={partnerName} current="fable" navigation={navigation} />
+      <Text style={styles.subtitle}>You, {partnerName || 'your partner'} and {botName}</Text>
 
       {notReady ? (
         <View style={styles.card}>
@@ -239,12 +241,8 @@ export default function FableScreen({ navigation }) {
 const makeStyles = (colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
-    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-    subtitle: { color: colors.textMuted, fontSize: 12, marginTop: -2 },
-    gear: {
-      width: 38, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center',
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    },
+    subtitle: { color: colors.textMuted, fontSize: 12, textAlign: 'center', paddingTop: spacing.sm },
+    gear: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
     listContent: { padding: spacing.lg, paddingBottom: 100 },
 
     systemRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginVertical: spacing.xs, paddingHorizontal: spacing.md },

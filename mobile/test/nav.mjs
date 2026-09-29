@@ -42,11 +42,8 @@ for (const [name, why] of [
 // rather than left to the tab name.
 const sections = {
   'app/PhotoSectionScreen.js': {
-    screens: ['Camera', 'Wall', 'Messages', 'Fable'],
-    components: ['PhotoWidgetScreen', 'PhotoHistoryScreen', 'MessagesScreen', 'FableScreen'],
-    // Reached from the chat chips at the top of the thread, not the pill:
-    // Fable is a second chat, so it lives under Chat.
-    viaChips: ['Fable'],
+    screens: ['Camera', 'Wall', 'Messages'],
+    components: ['PhotoWidgetScreen', 'PhotoHistoryScreen', 'MessagesScreen'],
   },
   'app/PlaySectionScreen.js': {
     screens: ['Drawings', 'Arcade'],
@@ -65,13 +62,21 @@ for (const [file, want] of Object.entries(sections)) {
   const onPill = want.screens.filter((n) => !(want.viaChips || []).includes(n));
   check('  every screen is on the section pill',
     JSON.stringify([...pill].sort()) === JSON.stringify([...onPill].sort()), { pill, inner });
-  if (want.viaChips?.length) {
-    const chips = read('components', 'ChatSwitcher.js');
-    for (const name of want.viaChips) {
-      check(`  and ${name} is reached from the chat chips`, new RegExp(`screen: '${name}'`).test(chips));
-    }
-  }
 }
+
+// Fable: its own screen above the tabs, one tap from Home.
+check('Fable is a screen of its own', /<Stack\.Screen name="Fable" component=\{FableScreen\}/.test(app));
+const homeSrc = read('app', 'HomeScreen.js');
+const kissAt = homeSrc.indexOf("navigate('ThumbKiss')");
+const fableAt = homeSrc.indexOf("navigate('Fable')");
+const callsAt = homeSrc.indexOf('<CallButtons />');
+check('Home has a Fable button, below Thumb Kiss and above the calls', kissAt > 0 && fableAt > kissAt && callsAt > fableAt, { kissAt, fableAt, callsAt });
+
+// The chat takes the whole screen, and back from it is the camera.
+const lumaSrc = read('components', 'LumaBar.js');
+check('the bottom bar steps aside in the chat', /BAR_HIDDEN_ON = new Set\(\['Messages'\]\)/.test(lumaSrc) && /BAR_HIDDEN_ON\.has\(inner\)\) return null/.test(lumaSrc));
+const chatSrc = read('app', 'MessagesScreen.js');
+check('back from the chat goes to the camera', /hardwareBackPress/.test(chatSrc) && /navigate\('Camera'\)/.test(chatSrc));
 
 // Home in the middle: with six buttons the thumb reaches the centre.
 check('the tabs open on Home rather than the first one',
@@ -466,7 +471,7 @@ console.log('\n=== ONLY ONE BAR OWNS THE BOTTOM OF THE SCREEN ===');
   check('the bar’s tab height and padding scale with its size',
     /height: 44 \* scale/.test(bar) && /paddingVertical: spacing\.sm \* scale/.test(bar));
   check('the clearance screens leave uses the scaled bar',
-    /useBarClearance\(\) \{[\s\S]*?barGeometry\(barScale\)[\s\S]*?g\.height \+ g\.hump/.test(bar));
+    /useBarClearance\([^)]*\) \{[\s\S]*?barGeometry\(barScale\)[\s\S]*?g\.height \+ g\.hump/.test(bar));
   check('the outline and the swell are drawn at the same size',
     /barOutline\(pillWidth, micCentre, 0, g\)/.test(bar) && /humpOutline\(micCentre, g\)/.test(bar)
     && /barOutline\(pillWidth, micCentre, 0\.5, g\)/.test(bar));

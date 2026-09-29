@@ -45,6 +45,7 @@ import CallScreen from './app/CallScreen';
 import DiagnosticsScreen from './app/DiagnosticsScreen';
 import WardrobeScreen from './app/WardrobeScreen';
 import FableSetupScreen from './app/FableSetupScreen';
+import FableScreen from './app/FableScreen';
 import WidgetLookScreen from './app/WidgetLookScreen';
 import { PAIR_ART } from './assets/mascot';
 import WallpaperScreen from './app/WallpaperScreen';
@@ -293,6 +294,9 @@ function Root() {
             <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Chat Wallpaper' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />
+            {/* Fable: its own screen, opened from its button on Home, with a
+                back arrow rather than living behind chips inside the chat. */}
+            <Stack.Screen name="Fable" component={FableScreen} options={{ title: 'Fable' }} />
             <Stack.Screen name="FableSetup" component={FableSetupScreen} options={{ title: 'AI chat setup' }} />
             <Stack.Screen name="WidgetLook" component={WidgetLookScreen} options={{ title: 'Widget look' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />

@@ -79,15 +79,22 @@ else to set up.
 | What | When | Where it shows up |
 |---|---|---|
 | Daily quiz | nightly, 06:30 | Daily Quiz |
-| Daily prompts | nightly, 04:00 | Today's Prompt |
+| Daily prompts (backup only) | nightly, 04:00 | Today's Prompt, on a day the 365-day list cannot fill |
+| Deck questions (backup only) | when a deck with no questions is opened | that deck |
 | Date ideas | Sundays, 05:15 | Date Ideas **and** Swipe Dates, which share one catalogue |
 | Bucket-list ideas | Sundays, 05:15 | the "Ideas to add" row on the Bucket List |
 | Challenges | Sundays, 05:15 | "Draw a challenge" on Home |
 
-- **Prompts** are asked for on the day's topic. The AI is tried first, then
-  the web pages in `PROMPT_SOURCE_URL`, then the built-in set. Upcoming
-  prompts that came from the web or the built-in set are replaced, but only
-  while nobody has answered them.
+- **Prompts** come from our own list first: `backend/seed/daily_prompts.json`
+  has 365 questions, one for each day of the year (models/promptBank.js).
+  Every start and every night lays out the next month from it, and puts the
+  list's question back on any upcoming day that nobody has answered yet. The
+  AI (then the web pages in `PROMPT_SOURCE_URL`, then the local files) is the
+  backup: it only writes a question for a day the list cannot fill.
+  `ai:generate -- --only prompts` still replaces the coming week with AI ones
+  on request.
+- **Decks** are all seeded with at least 12 questions. The AI only writes
+  some for a deck that has none, the first time it is opened.
 - **Catalogues** grow by a handful a week, and never repeat an idea already
   in them. Each row is marked `source = 'ai'`, so you can always tell which
   ones came from the AI.

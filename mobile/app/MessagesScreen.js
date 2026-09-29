@@ -18,7 +18,7 @@
 // And the thread never showed who said what — every bubble was left-aligned
 // in the same colour, which is most of why it read as unfinished.
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, Image, Alert, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, Image, Alert, Pressable, BackHandler } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { apiFetch, connectSocket, mediaUrl, isUnpaired } from '../services/api';
@@ -30,7 +30,6 @@ import Icon from '../components/Icon';
 import StickerField from '../components/Stickers';
 import { useTheme } from '../components/ThemeContext';
 import CallButtons from '../components/calls/CallButtons';
-import ChatSwitcher from '../components/ChatSwitcher';
 import { setActiveScreen } from '../services/notifications';
 import Doodle from '../components/Doodle';
 import Wallpaper from '../components/Wallpaper';
@@ -84,10 +83,18 @@ const dayLabel = (message) => {
 
 export default function MessagesScreen({ navigation }) {
   const { colors, font } = useTheme();
-  // The message box is the last thing on a screen the tab bar floats over.
-  // It used to guess a fixed 90px margin, which clears the bar on a phone with
-  // button navigation and leaves the box under it on one with a gesture strip.
-  const clearance = useBarClearance();
+  // The chat takes the whole screen: the tab bar steps aside while it is open
+  // (BAR_HIDDEN_ON in LumaBar), so the message box sits just above the
+  // phone's own navigation, not above a bar that is not there.
+  const clearance = useBarClearance({ barHidden: true });
+
+  // Back from the chat is the camera, where the bottom bar is again — not
+  // whichever section screen happened to be before it.
+  const toCamera = useCallback(() => navigation.navigate('Camera'), [navigation]);
+  useFocusEffect(useCallback(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { toCamera(); return true; });
+    return () => sub.remove();
+  }, [toCamera]));
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
@@ -301,20 +308,20 @@ export default function MessagesScreen({ navigation }) {
 
       {/* Calling from the conversation you are already having is the point. */}
       <View style={styles.callBar}>
+        <MorphButton onPress={toCamera} style={styles.backButton} accessibilityLabel="Back to the camera">
+          <Icon name="chevron-back" chip={false} size={22} color={colors.text} />
+        </MorphButton>
         <View style={{ flex: 1 }}>
           <Text style={font.h2}>{partnerName || 'Messages'}</Text>
           {partnerName ? <Text style={styles.subtitle}>Just the two of you</Text> : null}
         </View>
         <View style={styles.barActions}>
-          <MorphButton onPress={() => navigation.navigate('Wallpaper')} style={styles.barButton}>
-            <Icon name="image-outline" chip={false} size={20} color={colors.accent} />
+          <MorphButton onPress={() => navigation.navigate('Wallpaper')} style={styles.barButton} accessibilityLabel="Chat wallpaper">
+            <Icon3D name="picture" size={26} />
           </MorphButton>
           <CallButtons compact />
         </View>
       </View>
-
-      {/* The other chat: Fable, the group chat with an AI. */}
-      <ChatSwitcher partnerName={partnerName} current="partner" navigation={navigation} />
 
       <FlatList
         ref={listRef}
@@ -370,6 +377,7 @@ export default function MessagesScreen({ navigation }) {
 const makeStyles = (colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: 'transparent' },
+    backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs },
     callBar: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       paddingHorizontal: spacing.lg, paddingTop: spacing.md,

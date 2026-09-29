@@ -26,6 +26,7 @@ import { View, Text, Pressable, StyleSheet, Animated, Platform } from 'react-nat
 import { BlurView } from 'expo-blur';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon, { outlineOf } from './Icon';
+import Icon3D from './Icon3D';
 import { useGlass } from './GlassContext';
 import { radius, spacing } from '../theme';
 import { useTheme } from './ThemeContext';
@@ -103,12 +104,20 @@ export function SectionBar({ items, active, onSelect }) {
                 onPress={() => { if (!focused) onSelect(item.key); }}
                 style={styles.item}
               >
-                <Icon
-                  name={focused ? item.icon : outlineOf(item.icon)}
-                  color={focused ? colors.accent : colors.textMuted}
-                  size={focused ? 18 : 16}
-                  chip={false}
-                />
+                {/* The same 3D icons as Home and the bottom bar; the section
+                    you are not in is dimmed rather than drawn in outline. */}
+                {item.icon3d ? (
+                  <View style={{ opacity: focused ? 1 : 0.55 }}>
+                    <Icon3D name={item.icon3d} size={focused ? 24 : 22} />
+                  </View>
+                ) : (
+                  <Icon
+                    name={focused ? item.icon : outlineOf(item.icon)}
+                    color={focused ? colors.accent : colors.textMuted}
+                    size={focused ? 18 : 16}
+                    chip={false}
+                  />
+                )}
                 {/* Unlike LumaBar, every label shows. There are only two or
                     three of them, and inside a section the labels are the
                     only thing telling you what the section contains. */}

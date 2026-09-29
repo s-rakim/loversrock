@@ -5,7 +5,13 @@
     "Would you rather live without music or without TV/movies?",
     "Would you rather be able to fly or be invisible?",
     "Would you rather have unlimited money or unlimited time?",
-    "Would you rather lose all your old memories or be unable to make new ones?"
+    "Would you rather lose all your old memories or be unable to make new ones?",
+    "Would you rather travel to the past or the future for one day?",
+    "Would you rather always be ten minutes early or twenty minutes late?",
+    "Would you rather have a personal chef or a personal driver?",
+    "Would you rather live by the sea or in the mountains?",
+    "Would you rather never use social media again or never watch another film?",
+    "Would you rather be able to talk to animals or speak every language?"
   ],
   "deep-questions-getting-serious": [
     "What does a healthy relationship look like to you?",
@@ -13,7 +19,13 @@
     "How do you know when you feel truly safe with someone?",
     "What's a fear you have about our future that we haven't talked about?",
     "What does 'home' mean to you?",
-    "What's something you're still figuring out about yourself?"
+    "What's something you're still figuring out about yourself?",
+    "What's something you need from me that you've never asked for?",
+    "What's a pattern from past relationships you're determined not to repeat?",
+    "How do you know when you're truly happy with someone?",
+    "What does \"forever\" mean to you?",
+    "What's a hard truth about yourself you've come to accept?",
+    "What would make you feel more secure in us?"
   ],
   "unhinged-chaos-questions": [
     "If you had to fight one animal the size of a house cat but with human intelligence, what would you pick?",
@@ -21,7 +33,13 @@
     "If we swapped bodies for a day, what's the first thing you'd do?",
     "What's a completely irrational fear you have?",
     "If you could get away with one crime, what would it be?",
-    "What conspiracy theory do you secretly half-believe?"
+    "What conspiracy theory do you secretly half-believe?",
+    "If you had to replace your hands with any kitchen utensil, which would you pick?",
+    "What would your villain origin story be?",
+    "If you were a ghost, who would you haunt first and why?",
+    "What's the most useless thing you'd rescue from a burning house?",
+    "If animals could talk, which would be the rudest?",
+    "What conspiracy theory would you start just for fun?"
   ],
   "communication-love-languages": [
     "Which love language do you think you give most naturally?",
@@ -29,7 +47,13 @@
     "When was the last time you felt truly heard by me?",
     "What's something I do that doesn't land the way I probably think it does?",
     "How do you prefer to be comforted when you're upset — advice, silence, or affection?",
-    "What's one small phrase or gesture that always makes you feel loved?"
+    "What's one small phrase or gesture that always makes you feel loved?",
+    "Which do you notice more: when I say something kind or when I do something kind?",
+    "What's a gift from me that meant more than its price?",
+    "How much quality time do you need to feel close to me each week?",
+    "What's a way I could show love that would surprise you?",
+    "Which of your love languages do you think I get most right?",
+    "How did your family show love when you were growing up?"
   ],
   "money-matters-basics": [
     "Are you more of a saver or a spender?",
@@ -37,7 +61,13 @@
     "How did your family talk about money growing up?",
     "What does financial security mean to you?",
     "Would you rather have a strict budget or track loosely and adjust as needed?",
-    "What's a money habit you're proud of?"
+    "What's a money habit you're proud of?",
+    "Are you more of a saver or a spender, honestly?",
+    "What's one purchase you'll never regret?",
+    "What's a money habit you'd like to change?",
+    "What's the most you've ever spent on a treat for yourself?",
+    "How do you feel about sharing a budget someday?",
+    "What's a money mistake you learned the most from?"
   ],
   "wellness-check-in": [
     "On a scale of 1-10, how are you feeling this week, really?",
@@ -45,14 +75,27 @@
     "What's one thing that's been helping you feel grounded?",
     "How do you like to be supported when you're stressed?",
     "What's something you need more of right now — rest, fun, connection, or space?",
-    "What's a small habit that makes a big difference for your mood?"
+    "What's a small habit that makes a big difference for your mood?",
+    "How has your sleep been this week?",
+    "What's something that's drained your energy lately?",
+    "What's something that's recharged you lately?",
+    "How are you really doing, beyond \"fine\"?",
+    "What's one thing your body has been asking for?",
+    "What would make tomorrow feel lighter?"
   ],
   "photo-prompts-throwback": [
     "Share a photo from before we met — tell the story behind it.",
     "Share your favorite photo of the two of us so far.",
     "Share a photo that makes you laugh every time you see it.",
     "Share a photo from a place you'd love to go back to.",
-    "Share a photo of the outfit you feel most like yourself in."
+    "Share a photo of the outfit you feel most like yourself in.",
+    "Send the oldest photo of us you can find.",
+    "Send a childhood photo that sums you up.",
+    "Send a photo from the day you'd most like to relive.",
+    "Send a photo of a place that shaped you.",
+    "Send a photo from your most chaotic phase.",
+    "Send a photo of your favourite outfit from years ago.",
+    "Send a photo of you with your best friend from school."
   ],
   "future-five-year-plan": [
     "Where do you picture us living in five years?",
@@ -60,7 +103,13 @@
     "What does a 'good life' look like to you long-term?",
     "What's something you want to have learned or mastered in five years?",
     "How do you picture our day-to-day routine changing over time?",
-    "What's one tradition you'd like us to start?"
+    "What's one tradition you'd like us to start?",
+    "Where do you want to be living in five years?",
+    "What does your ideal job look like in five years?",
+    "What's one habit you want to have built by then?",
+    "What will we be celebrating five years from now?",
+    "What would make these next five years feel well spent?",
+    "What's a trip we must have taken by then?"
   ],
   "popular-most-asked": [
     "What first made you notice me?",
@@ -68,7 +117,13 @@
     "What's a small thing I do that means more than I know?",
     "What's one thing you hope never changes about us?",
     "What's something you're really proud of me for?",
-    "If you could relive one day of our relationship, which would you pick?"
+    "If you could relive one day of our relationship, which would you pick?",
+    "What do you love most about us?",
+    "What's something you've always wanted to ask me?",
+    "What's your favourite thing about me that others might not notice?",
+    "What made you fall for me?",
+    "What's one word that describes our relationship?",
+    "What do you think we'll be doing in ten years?"
   ],
   "popular-newlywed-game": [
     "What's your partner's order at their favorite coffee shop?",
@@ -76,7 +131,13 @@
     "What would your partner say is your most annoying habit?",
     "What's your partner's go-to karaoke song?",
     "What's the first thing your partner does when they get home?",
-    "What's your partner's biggest pet peeve?"
+    "What's your partner's biggest pet peeve?",
+    "What's my go-to comfort food?",
+    "What's my biggest pet peeve?",
+    "Which of my friends do I talk about most?",
+    "What's my dream job?",
+    "What would I grab first in a fire?",
+    "What's my favourite way to spend a Saturday?"
   ],
   "seasonal-valentines": [
     "What is the least romantic thing I do that you secretly like?",
@@ -86,7 +147,11 @@
     "What is a small thing I did this year that you have not forgotten?",
     "If you had to describe us to a stranger in one sentence, what would you say?",
     "What do you find most attractive about me that has nothing to do with how I look?",
-    "What would make today feel like it mattered, rather than like a date on a calendar?"
+    "What would make today feel like it mattered, rather than like a date on a calendar?",
+    "What's the most romantic thing I've done for you?",
+    "What would your dream Valentine's Day with me look like?",
+    "What's a love song that should play at our wedding or big day?",
+    "What's something about our love story you'd tell our grandkids?"
   ],
   "seasonal-christmas": [
     "What is the one Christmas tradition from your family you want us to keep?",
@@ -96,7 +161,11 @@
     "What does a good Christmas Day look like to you, hour by hour?",
     "Whose family, which year, and how do we decide that without a row?",
     "What is the worst Christmas you have had, and what made it bad?",
-    "If we could spend it anywhere, where would you want to be?"
+    "If we could spend it anywhere, where would you want to be?",
+    "What's the best gift you've ever received?",
+    "What's a holiday tradition you'd love to start with me?",
+    "What's your favourite holiday film?",
+    "What's one holiday food you could eat every day?"
   ],
   "seasonal-new-year": [
     "What is the thing from this year you are most glad happened?",
@@ -106,7 +175,11 @@
     "What is something you want for yourself, separate from us?",
     "Is there anything we have been putting off that next year should be the year for?",
     "What would make next year a good one, in one sentence?",
-    "What do you want to be different about us in twelve months?"
+    "What do you want to be different about us in twelve months?",
+    "What's one thing you want to leave behind in the old year?",
+    "What's a resolution we could keep together?",
+    "What moment from this past year are you proudest of?",
+    "What's one word you want to define our next year?"
   ],
   "seasonal-summer": [
     "Where do you actually want to go this summer, budget aside?",
@@ -116,7 +189,11 @@
     "Are you a plan-everything or figure-it-out-there person, really?",
     "What is your ideal lazy Sunday in July?",
     "What song sounds like summer to you?",
-    "What would you want a photo of us from this summer to look like?"
+    "What would you want a photo of us from this summer to look like?",
+    "What's your perfect summer day, hour by hour?",
+    "What's a summer memory from childhood you still love?",
+    "Ice cream or ice lolly, and which flavour?",
+    "What's one summer adventure we must have this year?"
   ],
   "seasonal-autumn": [
     "What is your idea of a perfect night in when it is dark by five?",
@@ -126,7 +203,11 @@
     "What is one small thing that makes the house feel like home to you?",
     "What do you want more of from me when the evenings get long?",
     "Where would you want to go for a walk on a cold bright morning?",
-    "What is a small comfort you have never told me you love?"
+    "What is a small comfort you have never told me you love?",
+    "What's your favourite cosy autumn activity?",
+    "Warm drink of choice for chilly evenings?",
+    "What's a film that feels like autumn to you?",
+    "What's your ideal rainy-day date?"
   ],
   "seasonal-halloween": [
     "What genuinely scares you — and I mean genuinely?",
@@ -136,7 +217,11 @@
     "What is the strangest thing that has ever happened to you?",
     "Do you believe in any of it, even slightly?",
     "What is the scariest thing about us, if you had to name one?",
-    "What would our haunted house be haunted by?"
+    "What would our haunted house be haunted by?",
+    "What costume would you want us to wear as a couple?",
+    "What's the scariest film you've ever watched?",
+    "Do you believe in ghosts, even a little?",
+    "What's your favourite Halloween sweet?"
   ],
   "seasonal-anniversary": [
     "What do you remember about the first time you saw me?",
@@ -148,6 +233,246 @@
     "What is the hardest thing we have got through, and what got us through it?",
     "What do you want the next year of us to look like?",
     "If you had to keep one memory of us and lose the rest, which one?",
-    "What would you say to us at the very beginning, if you could?"
+    "What would you say to us at the very beginning, if you could?",
+    "What's your favourite thing we did this past year?",
+    "How have we grown since this time last year?"
+  ],
+  "would-you-rather-spicy": [
+    "Would you rather receive a long love letter or a surprise kiss out of nowhere?",
+    "Would you rather have a candlelit dinner at home or a fancy night out dressed up?",
+    "Would you rather I whisper something sweet in your ear or send you a cheeky text at work?",
+    "Would you rather slow dance in the kitchen or cuddle under a blanket watching the rain?",
+    "Would you rather plan a surprise date for me or be surprised by one?",
+    "Would you rather have breakfast in bed together or a midnight snack date?",
+    "Would you rather I wear your favourite outfit of mine or something you pick for me?",
+    "Would you rather have a weekend with no phones or a weekend with no plans?",
+    "Would you rather get a long massage or give one while we talk?",
+    "Would you rather kiss in the rain or under the stars?",
+    "Would you rather flirt in public with a secret code word or leave hidden notes for each other?",
+    "Would you rather relive our first kiss or our best kiss?"
+  ],
+  "would-you-rather-family": [
+    "Would you rather host every holiday or visit family every holiday?",
+    "Would you rather have a big loud family gathering or a small quiet one?",
+    "Would you rather our kids be super sporty or super artistic?",
+    "Would you rather live close to your family or close to mine?",
+    "Would you rather have a family game night every week or a family trip every year?",
+    "Would you rather cook the big holiday meal or do all the washing up?",
+    "Would you rather have a family dog or a family cat?",
+    "Would you rather have Sunday lunch with family every week or once a month?",
+    "Would you rather have one child or a houseful?",
+    "Would you rather start a new family tradition or keep all the old ones?",
+    "Would you rather have your parents move in for a month or go camping with mine for a week?",
+    "Would you rather our home be the one everyone gathers at or a quiet retreat?"
+  ],
+  "deep-questions-life-goals": [
+    "What does a life well lived look like to you?",
+    "What's one goal you've never told anyone about?",
+    "Where do you want to be in your career in five years?",
+    "What's something you want to have achieved by the time you're fifty?",
+    "How do you want to spend your time when work no longer takes most of it?",
+    "What's a skill you want to master in your lifetime?",
+    "Which of your goals do you think I could help with most?",
+    "What would you do if you knew you couldn't fail?",
+    "What's a goal you've given up on that you'd like to pick back up?",
+    "How do you balance ambition with rest?",
+    "What legacy would you like to leave behind?",
+    "What's one goal we should set together this year?"
+  ],
+  "deep-questions-fears": [
+    "What's a fear you had as a child that still lingers a little?",
+    "What scares you most about the future?",
+    "What's something you avoid because it makes you anxious?",
+    "What fear have you overcome that you're proud of?",
+    "What's your biggest fear about our relationship, if you have one?",
+    "How can I help when you're feeling afraid?",
+    "What's a risk you're scared to take but want to?",
+    "What's the worst-case scenario you imagine most often?",
+    "Do you fear failure or success more, and why?",
+    "What's something you used to fear that you now enjoy?",
+    "When do you feel most vulnerable?",
+    "What would you do if fear weren't holding you back?"
+  ],
+  "spicy-heat-check": [
+    "What's the first thing you noticed about me physically?",
+    "What's the most attractive thing I do without realising?",
+    "Where's the most romantic place you've ever been kissed?",
+    "What's something I wear that makes it hard for you to concentrate?",
+    "What's your favourite way to be held?",
+    "What's one flirty thing you've always wanted me to say to you?",
+    "What's the best compliment I've ever given you about your looks?",
+    "What would your perfect romantic evening with me include, start to finish?",
+    "When did you first feel real chemistry between us?",
+    "What's a cheeky text you'd love to get from me today?",
+    "Which part of our reunions do you look forward to most?",
+    "What's the most daring date idea you'd actually try with me?"
+  ],
+  "spicy-truth-or-dare": [
+    "Truth: what's the cheesiest line you've ever thought about using on me?",
+    "Dare: send me the most flattering photo of me on your phone.",
+    "Truth: what's something you've pretended to like to impress me?",
+    "Dare: sing me the chorus of our song, right now.",
+    "Truth: what was your very first thought when you saw me?",
+    "Dare: describe my smile in exactly five words.",
+    "Truth: what's the most romantic dream you've had about us?",
+    "Dare: write me a two-line love poem on the spot.",
+    "Truth: what's something about me you've bragged about to friends?",
+    "Dare: do your best impression of me when I'm sleepy.",
+    "Truth: what's a date you secretly want us to go on?",
+    "Dare: tell me three things you'd do if I were with you right now."
+  ],
+  "unhinged-would-you-rather": [
+    "Would you rather have spaghetti for hair or sweat maple syrup?",
+    "Would you rather narrate your life out loud or hear a laugh track after everything you say?",
+    "Would you rather only whisper or only shout for a whole day?",
+    "Would you rather have a rewind button that only works on awkward moments or a mute button for other people?",
+    "Would you rather fight one horse-sized duck or a hundred duck-sized horses?",
+    "Would you rather have to sing everything you say or dance whenever you walk?",
+    "Would you rather have a pet dinosaur the size of a cat or a cat the size of a dinosaur?",
+    "Would you rather sneeze glitter or burp bubbles?",
+    "Would you rather be followed everywhere by a mariachi band or a dramatic film score?",
+    "Would you rather have fingers as long as your legs or legs as long as your fingers?",
+    "Would you rather know every secret about your neighbours or have them know all of yours?",
+    "Would you rather live in a world with no cheese or no chocolate?"
+  ],
+  "communication-conflict-styles": [
+    "Do you need space or closeness right after an argument?",
+    "What's the best way for me to bring up something that's bothering me?",
+    "How do you know when an argument is really over for you?",
+    "What's something I do during disagreements that helps?",
+    "What's something I do during disagreements that makes it harder?",
+    "How did your family handle conflict when you were a kid?",
+    "Do you prefer to talk things through immediately or sleep on it?",
+    "What does a good apology from me sound like?",
+    "What topic do we avoid that we should talk about?",
+    "How can we disagree without either of us feeling small?",
+    "What's a signal we could use to pause a heated conversation?",
+    "What's one conflict we handled really well together?"
+  ],
+  "money-matters-future": [
+    "What do you want our finances to look like in five years?",
+    "Should we have a joint account, separate ones, or both?",
+    "What's a big purchase you'd like us to save for?",
+    "How much would you want saved before a big life change?",
+    "How do you feel about debt, like loans or credit cards?",
+    "What's your idea of a comfortable life, financially?",
+    "How should we handle it if one of us earns much more?",
+    "What's a money goal that would make you feel secure?",
+    "Would you rather rent in a great area or buy somewhere cheaper?",
+    "How do you feel about investing, and how much risk is okay?",
+    "What's something you'd happily spend on, and something you'd never?",
+    "How often should we check in about money together?"
+  ],
+  "parenting-someday": [
+    "Do you see kids in our future, and if so, when?",
+    "What's one thing you'd love to teach a child?",
+    "What kind of parent do you imagine yourself being?",
+    "What's a name you've always loved?",
+    "What did your parents get right that you'd want to repeat?",
+    "How would we share the work of raising a child?",
+    "What worries you most about becoming a parent?",
+    "Would you want to adopt, foster, or neither, someday?",
+    "What's a family tradition you'd want our kids to grow up with?",
+    "How would you feel about pets before kids?",
+    "What would a perfect family weekend look like?",
+    "What values do you want our kids to have above all?"
+  ],
+  "parenting-values": [
+    "How important is it for kids to have strict rules?",
+    "How would you handle screen time for children?",
+    "What's your view on discipline?",
+    "How much independence should kids have, and when?",
+    "What role should grandparents play?",
+    "How would you talk to kids about money?",
+    "How would we handle it if we disagreed about a parenting choice?",
+    "What's more important to teach: kindness or ambition?",
+    "How would you want kids raised around faith or spirituality?",
+    "What's something you'd never want to say to a child?",
+    "How would you encourage a child's dreams if they were very different from ours?",
+    "What do you think makes a childhood happy?"
+  ],
+  "wellness-self-care": [
+    "What's your favourite way to unwind after a long day?",
+    "What's a self-care habit you've been neglecting?",
+    "What does a perfect rest day look like to you?",
+    "How can I help you take better care of yourself?",
+    "What's a small ritual that always makes you feel better?",
+    "What's something you do just for you, no one else?",
+    "How do you know when you need a break?",
+    "What's a healthy habit we could build together?",
+    "What's your favourite comfort food, and when do you need it?",
+    "What's a place that instantly calms you?",
+    "How do you feel about asking for help when you're overwhelmed?",
+    "What would you do with a whole day off with zero obligations?"
+  ],
+  "wellness-mental-health": [
+    "How have you been feeling in your head lately, honestly?",
+    "What's something that's been weighing on your mind?",
+    "What helps you most when you feel anxious?",
+    "Is there anything you'd like me to check in on more often?",
+    "What's a thought pattern you're working on changing?",
+    "What's something that made you feel proud of yourself recently?",
+    "How do you like me to respond when you're feeling low?",
+    "What's a boundary you've set that protects your peace?",
+    "Who do you talk to when you can't talk to me?",
+    "What would you tell your younger self about hard days?",
+    "What does feeling okay look like for you?",
+    "What's one kind thing you can say to yourself today?"
+  ],
+  "photo-prompts-silly": [
+    "Send your best duck-face selfie, no retakes.",
+    "Send a selfie pulling the face you make when I'm late.",
+    "Send a photo of the weirdest thing within arm's reach.",
+    "Send a selfie with your best impression of a surprised cat.",
+    "Send a photo of your snack right now, styled like a food ad.",
+    "Send a selfie with a household object as a hat.",
+    "Send a photo of your view right now, but upside down.",
+    "Send a selfie doing your best supermodel pose.",
+    "Send a photo of your shoes and describe your day through them.",
+    "Send a selfie with your fanciest pretend accent written in the caption.",
+    "Send a photo of something that looks like a face.",
+    "Send a selfie showing how you'd react if I appeared at your door."
+  ],
+  "future-bucket-dreams": [
+    "What's the wildest thing on your bucket list?",
+    "What's a bucket-list item we could tick off this year?",
+    "Would you rather see the northern lights or swim with dolphins?",
+    "What's a concert or event you must see before you die?",
+    "What's a food you want to try in the place it comes from?",
+    "What's a physical challenge you'd love to complete with me?",
+    "What's a skill on your bucket list?",
+    "Which wonder of the world should we see first?",
+    "What's a small bucket-list item that would make you ridiculously happy?",
+    "What's something you want to do at least once, just to say you did?",
+    "What bucket-list item have you already ticked off that you'd do again?",
+    "What's one bucket-list thing that's just for the two of us?"
+  ],
+  "future-travel-goals": [
+    "What's your dream destination with me?",
+    "Beach holiday, city break or road trip?",
+    "What's a country you'd love to live in for a few months?",
+    "Do you like planning every detail or winging it?",
+    "What's the first trip we should take when we're together?",
+    "What's your favourite travel memory so far?",
+    "What's a place you've been that you'd love to show me?",
+    "Would you rather backpack on a budget or travel in comfort?",
+    "What local food would you travel just to eat?",
+    "How do you feel about long flights and layovers?",
+    "What's a festival somewhere in the world you'd like to go to?",
+    "What would be the perfect honeymoon or big anniversary trip?"
+  ],
+  "popular-late-night": [
+    "What's keeping you awake tonight?",
+    "What's a thought you only have late at night?",
+    "What's the most meaningful conversation you've had at 2am?",
+    "What do you wish you could tell me in person right now?",
+    "What's something you're grateful for as today ends?",
+    "What's a memory that always comes back when you can't sleep?",
+    "If you could fall asleep anywhere tonight, where would it be?",
+    "What's a secret dream you only admit late at night?",
+    "What song would you want playing as you fall asleep next to me?",
+    "What's one thing you want to remember about today?",
+    "What's something that scares you about tomorrow, and something that excites you?",
+    "What would you say to me if this were our last call of the year?"
   ]
 }
