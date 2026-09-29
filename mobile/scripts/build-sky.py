@@ -1,45 +1,46 @@
 #!/usr/bin/env python3
 """Builds the live-sky backgrounds (components/SkyBackground.js) and their
-timelapse loops: the Golden Gate, from pictures, and New York, drawn here.
+timelapse loops, for two scenes: the Golden Gate and New York.
 
     pip install pillow numpy imageio-ffmpeg
-    python3 scripts/build-sky.py <folder with the four pictures> [--video]
+    python3 scripts/build-sky.py <folder with the pictures> [--video]
 
 The pictures (kept out of the repo; only what this makes is committed):
-    triptych.jpg  three framed portrait panels: day, sunset, pink dawn
-    sunset.jpg    wide sunset
+    triptych.jpg  Golden Gate: three framed portrait panels: day, sunset, pink dawn
+    sunset.jpg    Golden Gate: wide sunset
     night.jpg     wide starry night
     moon.jpg      wide night with the full moon
+    newyork.jpg   New York: three framed portrait panels: day, sunset, dawn
 
-Why it is built this way. The pictures were not taken from one spot: the
-panels put the couple beside the tower, the wide shots put them far to the
-right. Crossfading them would move the couple around the screen. So there is
-ONE foreground (the day panel: bridge, hills, water, the bench) with its sky
-cut out, relit for each time of day, and each time of day brings only its
-SKY from its own picture. Nothing in the scene moves; only the light changes,
-and the sky can drift on its own.
+Why it is built this way. The pictures of a scene were not taken from one
+spot, so crossfading them would move the couple around the screen. So each
+scene has ONE foreground (its day panel: the view, the river, the bench) with
+its sky cut out, relit for each light of the day, and each light brings only
+its SKY, from its own picture. Nothing in the scene moves; only the light
+changes, and the sky can drift on its own. New York's sunset and dawn panels
+give it its own sunset and dawn colours; the stars and the moon are shared.
 
 The two on the bench are a silhouette: one dark shape, no skin, no hair
-colour, so they can be anyone. New York is the same bench and the same two,
-on a promenade across the river from a skyline drawn here, under the same
-skies.
+colour, so they can be anyone.
 
-And why there are so many pictures. Six lights — dawn, day, sunset, the blue
-hour after it (made here: there is no picture of it), night and the full
-moon — are mixed along SCHEDULE, a whole day of how much of each there is,
-changing slowly: an hour or two from one light to the next. The day is
-rendered every GRID (twenty minutes) wherever the light is changing, and the
-app glides from each picture to the next over those twenty minutes, so the
-light never visibly steps. Each picture is its own mix, not a crossfade: the
-colour of the sky blends evenly, but the clouds and stars hand over faster in
-the middle, so no picture shows two skies' clouds at once.
+And why there are so many pictures. Seven lights — dawn, day, the golden
+afternoon, sunset, the blue hour after it (made here: there is no picture of
+it), night and the full moon — are mixed along SCHEDULE, a whole day of how
+much of each there is, never quite standing still: an hour or two from one
+light to the next, the morning brightening to noon and warming through the
+afternoon, the moon rising and setting. The day is rendered every GRID
+(twenty minutes), a picture for each, and the app glides from each picture
+to the next over those twenty minutes, so the light never visibly steps. Each
+picture is its own mix, not a crossfade: the colour of the sky blends evenly,
+but the clouds and stars hand over faster in the middle, so no picture shows
+two skies' clouds at once.
 
-Makes, in assets/sky/:
+Makes, in assets/sky/<scene>/ (goldengate, newyork):
     NN-sky.jpg              picture NN's sky, wider than the screen so it can drift
-    <scene>/NN.webp         that scene's foreground lit for picture NN, see-through
-                            where the sky is (scenes: goldengate, newyork)
-    timelapse-<scene>.mp4   with --video: the day rendered frame by frame, looping
-and components/skyFrames.js, which lists them and when in the day each one is.
+    NN-ground.webp          the foreground lit for picture NN, see-through where the sky is
+and in assets/sky/, with --video, timelapse-<scene>.mp4: the day rendered
+frame by frame, looping. And components/skyFrames.js, which lists them and
+when in the day each one is.
 """
 import os
 import shutil
@@ -55,34 +56,40 @@ HORIZON = 690             # the sky never reaches below this row
 TOWER_X = (314, 378)      # the tower's columns in the foreground
 FULL_MOON = (929, 140)    # the full moon's centre in moon.jpg
 NIGHT_MOON = (890, 106)   # the small moon's in night.jpg (the stars are the same)
-PHASES = ['dawn', 'day', 'sunset', 'twilight', 'night', 'moon']
+PHASES = ['dawn', 'day', 'golden', 'sunset', 'twilight', 'night', 'moon']
 SCENES = ['goldengate', 'newyork']
 
 # The day: at each time, how much of each light, and how bright the stars
-# are. Between two rows it eases from one to the other; two equal rows in a
-# row are a stretch where nothing changes. Local time, on the twenty-minute
-# grid, so every row is a picture of its own.
+# are. Between two rows it eases from one to the other. No two rows in a row
+# are the same, so the light never stands still. Local time, on the
+# twenty-minute grid.
 SCHEDULE = [
-    ('00:00', {'moon': 1}, 0.8),
-    ('03:40', {'moon': 1}, 0.8),
+    ('00:00', {'moon': 0.85, 'night': 0.15}, 0.8),
+    ('01:20', {'moon': 1}, 0.75),
+    ('02:40', {'moon': 0.75, 'night': 0.25}, 0.8),      # the moon going down
+    ('03:40', {'moon': 0.4, 'night': 0.6}, 0.9),
     ('04:40', {'night': 1}, 1.0),
     ('05:20', {'night': 0.55, 'twilight': 0.45}, 0.7),
     ('06:00', {'twilight': 0.5, 'dawn': 0.5}, 0.3),
     ('06:40', {'dawn': 1}, 0.0),
     ('07:20', {'dawn': 0.75, 'day': 0.25}, 0.0),
-    ('08:20', {'dawn': 0.3, 'day': 0.7}, 0.0),
-    ('09:00', {'day': 1}, 0.0),
-    ('16:00', {'day': 1}, 0.0),
-    ('16:40', {'day': 0.75, 'sunset': 0.25}, 0.0),
-    ('17:20', {'day': 0.4, 'sunset': 0.6}, 0.0),
-    ('18:00', {'sunset': 1}, 0.0),
-    ('18:40', {'sunset': 1}, 0.05),
+    ('08:20', {'dawn': 0.35, 'day': 0.65}, 0.0),
+    ('09:40', {'dawn': 0.1, 'day': 0.9}, 0.0),
+    ('12:00', {'day': 1}, 0.0),                        # noon
+    ('13:20', {'day': 0.92, 'golden': 0.08}, 0.0),
+    ('14:40', {'day': 0.75, 'golden': 0.25}, 0.0),
+    ('16:00', {'day': 0.4, 'golden': 0.6}, 0.0),
+    ('17:00', {'golden': 0.75, 'sunset': 0.25}, 0.0),
+    ('17:40', {'golden': 0.35, 'sunset': 0.65}, 0.0),
+    ('18:20', {'sunset': 1}, 0.0),
+    ('18:40', {'sunset': 0.9, 'twilight': 0.1}, 0.05),
     ('19:20', {'sunset': 0.45, 'twilight': 0.55}, 0.15),
     ('20:00', {'twilight': 0.75, 'night': 0.25}, 0.45),
     ('20:40', {'twilight': 0.3, 'night': 0.7}, 0.8),
     ('21:20', {'night': 1}, 1.0),
-    ('22:40', {'night': 1}, 1.0),
-    ('24:00', {'moon': 1}, 0.8),
+    ('22:20', {'night': 0.85, 'moon': 0.15}, 0.95),    # the moon coming up
+    ('23:20', {'night': 0.45, 'moon': 0.55}, 0.85),
+    ('24:00', {'moon': 0.85, 'night': 0.15}, 0.8),
 ]
 SCHEDULE = [(int(t[:2]) + int(t[3:]) / 60, w, s) for t, w, s in SCHEDULE]
 GRID = 1 / 3              # hours between pictures: twenty minutes
@@ -148,7 +155,7 @@ def sky_mask(day):
 
 # ------------------------------------------------------------ the couple
 
-# The two of them in the day panel, traced by hand, clockwise from the
+# The two of them in each day panel, traced by hand, clockwise from the
 # bench's back: his arm and shoulder, his head, a notch, her head leaning on
 # his shoulder, her shoulder under his hand, and his arm round her back.
 COUPLE_OUTLINE = [
@@ -162,6 +169,16 @@ COUPLE_OUTLINE = [
 # Their legs below the seat, where they are the only dark thing.
 COUPLE_LEGS = [[(330, 1098), (390, 1098), (392, 1192), (326, 1192)],
                [(396, 1098), (510, 1098), (510, 1174), (396, 1174)]]
+NY_OUTLINE = [
+    (258, 975), (260, 945), (264, 920), (270, 900), (280, 878), (298, 862), (315, 850),
+    (330, 842), (342, 835), (342, 824), (337, 812), (336, 798), (340, 782), (350, 770),
+    (365, 765), (381, 768), (393, 777), (399, 790), (399, 805), (396, 818), (402, 811),
+    (413, 805), (426, 807), (440, 815), (453, 828), (465, 845), (477, 859), (490, 867),
+    (503, 876), (515, 889), (521, 905), (524, 922), (532, 934), (541, 946), (543, 960),
+    (541, 975),
+]
+NY_LEGS = [[(330, 1098), (510, 1098), (510, 1198), (330, 1198)]]
+NY_SHORE = 742            # where the river meets the far bank, in New York
 SILHOUETTE = np.array([30, 28, 36], np.float32)
 
 
@@ -174,15 +191,15 @@ def smooth(points, rounds=3):
     return [tuple(p) for p in pts]
 
 
-def couple_mask(day):
+def couple_mask(day, outline=COUPLE_OUTLINE, legs_at=COUPLE_LEGS):
     """1 where the couple is, antialiased: the traced outline, drawn smooth,
     and the dark of their legs under the seat."""
     k = 4
     layer = Image.new('L', (W * k, H * k), 0)
-    ImageDraw.Draw(layer).polygon([(x * k, y * k) for x, y in smooth(COUPLE_OUTLINE)], fill=255)
+    ImageDraw.Draw(layer).polygon([(x * k, y * k) for x, y in smooth(outline)], fill=255)
     upper = arr(layer.resize((W, H), Image.LANCZOS)) / 255.0
     region = Image.new('L', (W, H), 0)
-    for leg in COUPLE_LEGS:
+    for leg in legs_at:
         ImageDraw.Draw(region).polygon(leg, fill=255)
     dark = arr(day).mean(axis=2) < 70
     legs = img(((arr(region) > 0) & dark).astype(np.float32) * 255, 'L')
@@ -282,6 +299,77 @@ def twilight_sky(sunset):
     return grad[:, None, :] * shade[..., None]
 
 
+def golden_sky(day):
+    """The golden afternoon: the day's sky, deepening overhead and warming
+    towards the horizon."""
+    g = (np.clip(np.arange(SKY_H) / HORIZON, 0, 1) ** 1.6)[:, None, None]
+    warm = day * np.array([1.08, 0.9, 0.7]) + np.array([34, 16, 0])
+    return (day * 0.94) * (1 - g) + warm * g
+
+
+def city_tops(a, start=150, limit=H, threshold=12, confirm=3):
+    """For each column of a city picture, the first row that is not sky.
+
+    Walking down each column, the sky's colour is carried along (with the
+    way every still-sky column is drifting, row by row), and the first place
+    the picture leaves it for good is the top of a building. Glass towers
+    that mirror the sky still have an edge. Below that, it is all city.
+    """
+    est = a[start].copy()
+    top = np.full(a.shape[1], limit, int)
+    sky = np.ones(a.shape[1], bool)
+    for y in range(start + 1, min(limit, a.shape[0] - confirm)):
+        drift = np.median((a[y] - a[y - 1])[sky], axis=0)
+        est = est + drift
+        off = np.minimum.reduce([np.abs(a[y + k] - est - drift * k).max(-1) for k in range(confirm)])
+        hit = sky & (off > threshold)
+        top[hit] = y
+        sky &= ~hit
+        est[sky] = 0.6 * est[sky] + 0.4 * a[y][sky]
+        if not sky.any():
+            break
+    # One stray column is noise, not a building.
+    padded = np.pad(top, 1, mode='edge')
+    return np.median(np.stack([padded[:-2], padded[1:-1], padded[2:]]), axis=0).astype(int)
+
+
+def panel_sky(panel, detail=1.0):
+    """A sky from a city panel: its colour row by row, measured only where it
+    is sky and carried on below the skyline, with the grain of the open sky
+    above the buildings laid over it, mirrored wide enough to drift."""
+    a = arr(panel)
+    top = city_tops(a)
+    profile = np.full((SKY_H, 3), np.nan, np.float32)
+    for y in range(SKY_H):
+        open_sky = top > y + 3
+        if open_sky.sum() > 40:
+            profile[y] = np.median(a[y, open_sky], axis=0)
+    good = np.where(~np.isnan(profile[:, 0]))[0]
+    last = good[-1]
+    slope = (profile[last] - profile[max(0, last - 30)]) / max(1, last - max(0, last - 30))
+    for y in range(last + 1, SKY_H):
+        profile[y] = np.clip(profile[last] + slope * (y - last) * 0.5, 0, 255)
+    clear = max(40, int(top.min()) - 6)       # above the tallest spire: open sky only
+    block = a[:clear] - a[:clear].mean(axis=1, keepdims=True)
+    block = mirror_tile(block, SKY_W)
+    grain = np.concatenate([block, block[::-1]] * (SKY_H // (2 * clear) + 1), axis=0)[:SKY_H]
+    return profile[:, None, :] + grain * detail
+
+
+def new_york_skies(day, sunset, dawn, shared):
+    """New York's own skies from its panels; the stars and the moon shared."""
+    skies = {
+        'day': panel_sky(day),
+        'sunset': panel_sky(sunset, 0.6),
+        'dawn': panel_sky(dawn),
+        'night': shared['night'],
+        'moon': shared['moon'],
+    }
+    skies['golden'] = golden_sky(skies['day'])
+    skies['twilight'] = twilight_sky(skies['sunset'])
+    return skies
+
+
 def move_moon(night, reach=90):
     """The night picture with its small moon moved to where the full moon is.
 
@@ -324,6 +412,7 @@ def build_skies(day, dawn, sunset_w, night_w, moon_w):
     s = fit_width(s, SKY_W)
     skies['sunset'] = extend_vertically(s, height, anchor='bottom')
     skies['twilight'] = twilight_sky(skies['sunset'])
+    skies['golden'] = golden_sky(skies['day'])
 
     # Night and moon: the top of the wide pictures — stars, the Milky Way,
     # the moon — which is all above the tower, scaled to fill the sky, with a
@@ -376,6 +465,9 @@ def grade(a, phase):
     if phase == 'dawn':
         # Soft pink morning light, a little lower.
         return a * np.array([0.92, 0.80, 0.86]) + np.array([14, 4, 12])
+    if phase == 'golden':
+        # Low, warm afternoon sun.
+        return a * np.array([1.04, 0.93, 0.78]) + np.array([14, 6, 0])
     if phase == 'sunset':
         warm = a * 0.55 + lum * 0.25
         return warm * np.array([1.05, 0.66, 0.46])
@@ -424,7 +516,7 @@ CABLES = [
     ((367, 540), (W, 690)),
 ]
 CABLE_COLOUR = {
-    'day': (176, 58, 48), 'dawn': (168, 72, 70), 'sunset': (74, 32, 28),
+    'day': (176, 58, 48), 'dawn': (168, 72, 70), 'golden': (184, 70, 44), 'sunset': (74, 32, 28),
     'twilight': (40, 28, 38), 'night': (22, 22, 32), 'moon': (34, 34, 48),
 }
 # How lit the city, its windows and the aircraft lights are.
@@ -466,175 +558,50 @@ def golden_gate(day, mask):
 
 # ------------------------------------------------------------ new york
 
-NY_SHORE = 700            # the far bank of the river
-NY_RAIL = (880, 973)      # the promenade railing's two bars
-NY_POSTS = (18, 590)
+def new_york(day, top, skies):
+    """The New York scene: the day panel (the couple already a silhouette),
+    see-through above the skyline. At night its windows light up — a scatter
+    on each building, in the rows and columns windows come in — and the
+    river carries them, broken up by the ripples. The river also takes the
+    colour of the sky above it, orange at sunset, pink at dawn."""
+    a = arr(day)
+    rng = np.random.default_rng(5)
+    yy, xx = np.mgrid[0:H, 0:W]
+    city = yy >= top[None, :]
+    alpha = arr(img(city.astype(np.float32) * 255, 'L').filter(ImageFilter.GaussianBlur(0.6)))
 
+    grid = (yy % 4 == 0) & (xx % 3 == 1) & (yy > top[None, :] + 5) & (yy < NY_SHORE - 3)
+    windows = np.zeros((H, W), np.float32)
+    lit = grid & (rng.random((H, W)) < 0.38)
+    windows[lit] = 0.5 + 0.5 * rng.random(int(lit.sum()))
+    windows = arr(img(windows * 255, 'L').filter(ImageFilter.GaussianBlur(0.5))) / 255.0 * 1.8
 
-def new_york(day, couple):
-    """New York: the same bench and the same two, on a promenade across the
-    river from Manhattan — One World Trade, the Empire State and the
-    Chrysler's crown among the blocks — drawn here, at twice the size and
-    scaled down so every edge is smooth. Windows light up as it gets dark,
-    and the river carries the city and its lights."""
-    k = 2
-    rng = np.random.default_rng(11)
-    colour = Image.new('RGB', (W * k, H * k), (0, 0, 0))
-    shape = Image.new('L', (W * k, H * k), 0)
-    lit = Image.new('L', (W * k, H * k), 0)
-    dc, ds, dl = ImageDraw.Draw(colour), ImageDraw.Draw(shape), ImageDraw.Draw(lit)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    water = (yy > NY_SHORE) & (yy < 1070) & (b > r + 6) & (b > 90)
+    water = arr(img(water.astype(np.float32) * 255, 'L').filter(ImageFilter.GaussianBlur(1.0)))[..., None] / 255.0
 
-    def tint(tone, f):
-        return tuple(int(max(0, min(255, c * f))) for c in tone)
-
-    def rect(draw, x0, y0, x1, y1, fill):
-        draw.rectangle([x0 * k, y0 * k, x1 * k - 1, y1 * k - 1], fill=fill)
-
-    def poly(draw, pts, fill):
-        draw.polygon([(x * k, y * k) for x, y in pts], fill=fill)
-
-    def block(x0, y0, x1, y1, tone, windows=0.0, side=True):
-        """One block: its face, a shaded side, and a grid of windows, some of
-        which are lit at night."""
-        rect(dc, x0, y0, x1, y1, tone)
-        rect(ds, x0, y0, x1, y1, 255)
-        if side and x1 - x0 > 8:
-            rect(dc, x1 - (x1 - x0) * 0.28, y0, x1, y1, tint(tone, 0.8))
-        if not windows:
-            return
-        for wy in np.arange(y0 + 3, y1 - 2, 3.5):
-            for wx in np.arange(x0 + 2, x1 - 2, 3.0):
-                rect(dc, wx, wy, wx + 1.5, wy + 1.5, tint(tone, 0.78))
-                if rng.random() < windows:
-                    rect(dl, wx, wy, wx + 1.5, wy + 1.5, int(150 + rng.random() * 105))
-
-    def envelope(x):
-        return 1 + 1.2 * np.exp(-((x - 150) / 80) ** 2) + 0.8 * np.exp(-((x - 470) / 100) ** 2)
-
-    # Glass, concrete, limestone, brick, blue glass: muted, as a city is
-    # from across a river, and hazier the further off.
-    palette = [(128, 138, 156), (150, 147, 140), (164, 153, 134), (130, 110, 98), (112, 128, 150)]
-    haze_colour = np.array([192, 202, 218], np.float32)
-
-    def row(widths, heights, haze, dim, windows, base):
-        x = -12
-        while x < W + 12:
-            w = int(rng.integers(*widths))
-            h = int(rng.integers(*heights) * envelope(x + w / 2))
-            tone = np.array(palette[int(rng.integers(len(palette)))], np.float32) * dim * rng.uniform(0.9, 1.1)
-            t = tuple(int(c) for c in tone * (1 - haze) + haze_colour * haze)
-            block(x, base - h, x + w, base, t, windows)
-            if rng.random() < 0.3:      # a setback on top
-                inset = w * 0.2
-                block(x + inset, base - h - h * 0.15, x + w - inset, base - h, t, windows)
-            if rng.random() < 0.12:     # an antenna
-                rect(dc, x + w / 2 - 0.5, base - h - 14, x + w / 2 + 0.5, base - h, tint(t, 0.7))
-                rect(ds, x + w / 2 - 0.5, base - h - 14, x + w / 2 + 0.5, base - h, 255)
-            x += w + int(rng.integers(-3, 2))
-
-    # Far off, hazy; then the middle distance.
-    row((8, 20), (30, 80), 0.6, 1.0, 0.0, NY_SHORE)
-    row((12, 30), (40, 130), 0.15, 1.0, 0.4, NY_SHORE + 1)
-
-    # One World Trade Center: tapering facets, a parapet, the spire.
-    glass = (134, 156, 182)
-    base, top = NY_SHORE, 380
-    poly(dc, [(132, base), (150, base), (150, top), (141, top)], tint(glass, 1.1))
-    poly(dc, [(150, base), (168, base), (159, top), (150, top)], tint(glass, 0.85))
-    poly(ds, [(132, base), (168, base), (159, top), (141, top)], 255)
-    for y in range(top + 6, base, 7):   # the odd lit floor
-        if rng.random() < 0.5:
-            f = (y - top) / (base - top)
-            rect(dl, 142 - 9 * f, y, 158 + 9 * f, y + 1, int(120 + rng.random() * 100))
-    block(143, top - 8, 157, top, tint(glass, 0.9), 0.0, side=False)
-    block(149.2, top - 78, 150.8, top - 8, (170, 176, 186), 0.0, side=False)
-
-    # The Empire State: stone, in tiers, the mast and the antenna; its top
-    # floodlit at night.
-    stone = (160, 150, 136)
-    for i, (x0, y0, x1, y1) in enumerate([(433, 565, 477, NY_SHORE), (438, 505, 472, 565),
-                                          (444, 478, 466, 505), (449, 462, 461, 478),
-                                          (452, 450, 458, 462)]):
-        block(x0, y0, x1, y1, stone, 0.45 if i < 2 else 0.0)
-        if i >= 2:
-            rect(dl, x0, y0, x1, y1, 190)
-    block(454, 418, 456, 450, tint(stone, 0.9), 0.0, side=False)
-    block(454.6, 392, 455.4, 418, (120, 120, 126), 0.0, side=False)
-
-    # The Chrysler: a slim tower, the crown of stacked arches, the needle.
-    body, crown = (146, 148, 156), (212, 216, 226)
-    block(519, 520, 541, NY_SHORE, body, 0.4)
-    y = 520
-    for w, h in [(20, 14), (15, 12), (10, 10), (6, 8)]:
-        x0, x1 = 530 - w / 2, 530 + w / 2
-        for draw, fill in ((dc, crown), (ds, 255), (dl, 210)):
-            draw.rectangle([x0 * k, (y - h / 2) * k, x1 * k, y * k], fill=fill)
-            draw.pieslice([x0 * k, (y - h) * k, x1 * k, y * k], 180, 360, fill=fill)
-        y -= h * 0.8
-    poly(dc, [(528.8, y), (531.2, y), (530, y - 34)], crown)
-    poly(ds, [(528.8, y), (531.2, y), (530, y - 34)], 255)
-
-    # Nearer, lower blocks along the far bank.
-    row((18, 46), (16, 64), 0.0, 0.8, 0.3, NY_SHORE + 2)
-
-    b = arr(shape.resize((W, H), Image.LANCZOS)) / 255.0
-    city = arr(colour.resize((W, H), Image.LANCZOS))
-    windows = arr(lit.resize((W, H), Image.LANCZOS)) / 255.0
-    city[b > 0] /= b[b > 0][:, None]        # un-premultiply the antialiased edges
-
-    # The river: paler far off, deeper up close, with long low ripples.
-    ys = np.arange(H, dtype=np.float32)
-    t = np.clip((ys - NY_SHORE) / (NY_RAIL[1] - NY_SHORE), 0, 1)[:, None, None] ** 0.7
-    river = np.array([122, 148, 174], np.float32) * (1 - t) + np.array([38, 72, 104], np.float32) * t
-    river = np.broadcast_to(river, (H, W, 3)).copy()
-    ripple = arr(img(rng.random((H // 2, W // 10)) * 255, 'L').resize((W, H), Image.BICUBIC)) / 255.0 - 0.5
-    river += (ripple * (10 + 14 * t[..., 0]))[..., None]
-    # The city upside down in it, broken up by the ripples, fading with distance.
     reflect = np.zeros((H, W), np.float32)
-    for y in range(NY_SHORE, min(H, NY_SHORE + 260)):
+    for y in range(NY_SHORE, min(H, NY_SHORE + 230)):
         d = y - NY_SHORE
         src = NY_SHORE - 1 - d
         if src < 0:
             break
-        shift = int(round(2.5 * np.sin(y * 0.7) + 3 * ripple[y, 0]))
-        fade = (1 - d / 260) ** 2
-        a = np.roll(b[src], shift)[:, None] * 0.38 * fade
-        river[y] = river[y] * (1 - a) + np.roll(city[src], shift, axis=0) * 0.8 * a
-        reflect[y] = np.roll(windows[src], shift) * 0.6 * fade
-    # Lights on water stretch into streaks towards you.
+        shift = int(round(2.5 * np.sin(y * 0.7) + 2 * np.sin(y * 0.23)))
+        reflect[y] = np.roll(windows[src], shift) * 0.6 * (1 - d / 230) ** 2
     streak = sum(np.roll(reflect, dy, axis=0) for dy in range(0, 9, 2)) / 3
-    streak = arr(img(streak * 255, 'L').filter(ImageFilter.GaussianBlur(0.8))) / 255.0
-    rows = (ys >= NY_SHORE)[:, None]
-    image = np.where(rows[..., None], river, city)
-    alpha = np.where(rows, 1.0, b)
-    image[NY_SHORE:NY_SHORE + 4] = (70, 72, 80)          # the far bank's edge
-    lights = np.where(rows, np.clip(streak, 0, 1), windows)
+    lights = np.clip(windows + streak * water[..., 0], 0, 1)[..., None]
 
-    # The promenade railing: two bars on two posts.
-    steel = np.array([150, 152, 158], np.float32)
-    for y0 in NY_RAIL:
-        image[y0 - 3:y0 + 3] = steel
-        image[y0 - 3] = steel * 1.3
-        image[y0 + 2] = steel * 0.6
-        lights[y0 - 3:y0 + 3] = 0
-    for x0 in NY_POSTS:
-        image[NY_RAIL[0] - 3:990, x0:x0 + 6] = steel * np.array([1.2, 1.2, 1.2, 1.0, 0.8, 0.7])[:, None]
-        lights[NY_RAIL[0] - 3:990, x0:x0 + 6] = 0
-
-    # The bench, the ground and the two of them, from the Golden Gate panel.
-    yy, xx = np.mgrid[0:H, 0:W]
-    keep = (yy >= 985) | ((xx >= 192) & (yy >= 978 - (xx - 192) * 15 / 432))
-    keep = arr(img(keep.astype(np.float32) * 255, 'L').filter(ImageFilter.GaussianBlur(0.7)))[..., None] / 255.0
-    keep = np.maximum(keep, couple)
-    image = image * (1 - keep) + arr(day) * keep
-    lights = lights[..., None] * (1 - keep)
-    alpha = np.maximum(alpha, keep[..., 0])
+    # What the river mirrors: the sky just above the skyline, in each light.
+    band = slice(max(0, int(np.median(top)) - 80), int(np.median(top)))
+    tallest = int(np.argmin(top))
     return {
-        'image': image,
-        'alpha': alpha * 255.0,
+        'image': a,
+        'alpha': alpha,
         'lights': lights,
-        'beacons': [(150, 302), (455, 392)],    # the spires' aircraft lights
+        'beacons': [(tallest, int(top[tallest]) + 2)],   # the tallest spire's aircraft light
         'cables': False,
+        'water': water,
+        'mirror': {p: skies[p][band].mean(axis=(0, 1)) for p in PHASES},
     }
 
 
@@ -645,6 +612,13 @@ def build_grounds(scene):
     grounds = {}
     for phase in PHASES:
         g = grade(scene['image'], phase)
+        if 'water' in scene and phase != 'day':
+            # The river takes the colour of the sky, keeping its own ripples.
+            lum = scene['image'].mean(axis=2, keepdims=True)
+            ripple = lum / max(1.0, float((lum * scene['water']).sum() / scene['water'].sum()))
+            sky = scene['mirror'][phase] * (0.55 + 0.45 * ripple) * 0.85
+            k = scene['water'] * 0.6
+            g = g * (1 - k) + sky * k
         on = LIGHTS_ON.get(phase, 0)
         if on:
             glow = np.clip(scene['lights'] * 1.6, 0, 1) * on
@@ -702,16 +676,19 @@ def write_js(pictures, timeline):
         '// Made by scripts/build-sky.py: do not edit by hand, run it again.',
         '//',
         '// SKY_FRAMES are the pictures of the day, each its own mix of lights:',
-        '// the sky, and each scene\'s foreground under it.',
+        '// for each scene, its sky and its foreground under it.',
         '// SKY_TIMELINE is [hour, picture, stars] through the day: between two',
         '// rows the sky blends from one picture to the next.',
         '/* eslint-disable global-require */',
         'export const SKY_FRAMES = [',
     ]
     for i, w in enumerate(pictures):
-        grounds = ', '.join(f"{scene}: require('../assets/sky/{scene}/{i:02d}.webp')" for scene in SCENES)
-        lines.append(f"  {{\n    sky: require('../assets/sky/{i:02d}-sky.jpg'),\n"
-                     f"    ground: {{ {grounds} }},\n    mix: {{ {mix(w)} }},\n  }},")
+        lines.append('  {')
+        for scene in SCENES:
+            lines.append(f"    {scene}: {{ sky: require('../assets/sky/{scene}/{i:02d}-sky.jpg'), "
+                         f"ground: require('../assets/sky/{scene}/{i:02d}-ground.webp') }},")
+        lines.append(f'    mix: {{ {mix(w)} }},')
+        lines.append('  },')
     lines.append('];')
     lines.append('')
     lines.append('export const SKY_TIMELINE = [')
@@ -738,13 +715,14 @@ def stars_layer(t, period, seed=3, count=140):
     return arr(img(layer, 'L').filter(ImageFilter.GaussianBlur(0.7)))[..., None]
 
 
-def video_clock(seconds_per_hour=5.0, hold=2.0):
-    """(second of the video, hour of the day): the light changing at an
-    unhurried, steady pace (five seconds for each hour of it), and the long
-    stretches where it holds still kept short."""
+def video_clock():
+    """(second of the video, hour of the day): an hour and a half a second
+    of the day's slow drift, plus five seconds for each full change of light,
+    so sunrise and sunset take their time and noon does not drag."""
     points = [(0.0, SCHEDULE[0][0])]
     for (h0, w0, _), (h1, w1, _) in zip(SCHEDULE, SCHEDULE[1:]):
-        points.append((points[-1][0] + (hold if w0 == w1 else (h1 - h0) * seconds_per_hour), h1))
+        change = 0.5 * sum(abs(w0.get(p, 0) - w1.get(p, 0)) for p in PHASES)
+        points.append((points[-1][0] + (h1 - h0) * 1.5 + change * 5, h1))
     return np.array([p[0] for p in points]), np.array([p[1] for p in points])
 
 
@@ -795,18 +773,26 @@ def main():
         print(__doc__)
         sys.exit(1)
     src = sys.argv[1]
-    tri = load(os.path.join(src, 'triptych.jpg'))
-    day, _sunset_panel, dawn = panels(tri)
+    gg_day, _sunset_panel, gg_dawn = panels(load(os.path.join(src, 'triptych.jpg')))
+    ny_day, ny_sunset, ny_dawn = panels(load(os.path.join(src, 'newyork.jpg')))
     sunset_w = load(os.path.join(src, 'sunset.jpg'))
     night_w = load(os.path.join(src, 'night.jpg'))
     moon_w = load(os.path.join(src, 'moon.jpg'))
 
-    mask = sky_mask(day)
-    skies = build_skies(day, dawn, sunset_w, night_w, moon_w)
-    parts = {p: split(skies[p]) for p in PHASES}
-    couple = couple_mask(day)
-    day = silhouette(day, couple)
-    scenes = {'goldengate': golden_gate(day, mask), 'newyork': new_york(day, couple)}
+    gg_skies = build_skies(gg_day, gg_dawn, sunset_w, night_w, moon_w)
+    ny_skies = new_york_skies(ny_day, ny_sunset, ny_dawn, gg_skies)
+    parts = {
+        'goldengate': {p: split(gg_skies[p]) for p in PHASES},
+        'newyork': {p: split(ny_skies[p]) for p in PHASES},
+    }
+    mask = sky_mask(gg_day)
+    ny_top = np.minimum(city_tops(arr(ny_day)), NY_SHORE)
+    gg_couple = couple_mask(gg_day)
+    ny_couple = couple_mask(ny_day, NY_OUTLINE, NY_LEGS)
+    scenes = {
+        'goldengate': golden_gate(silhouette(gg_day, gg_couple), mask),
+        'newyork': new_york(silhouette(ny_day, ny_couple), ny_top, ny_skies),
+    }
     grounds = {name: build_grounds(scene) for name, scene in scenes.items()}
 
     # Everything from an earlier build, which may have had more pictures.
@@ -817,16 +803,17 @@ def main():
                 os.remove(os.path.join(folder, name))
     pictures, timeline = plan()
     for i, weights in enumerate(pictures):
-        img(mix_sky(parts, weights)).save(os.path.join(OUT, f'{i:02d}-sky.jpg'), quality=76, optimize=True, progressive=True)
         for name in SCENES:
-            img(mix_ground(grounds[name], weights), 'RGBA').save(os.path.join(OUT, name, f'{i:02d}.webp'), quality=80, method=6)
+            folder = os.path.join(OUT, name)
+            img(mix_sky(parts[name], weights)).save(os.path.join(folder, f'{i:02d}-sky.jpg'), quality=72, optimize=True, progressive=True)
+            img(mix_ground(grounds[name], weights), 'RGBA').save(os.path.join(folder, f'{i:02d}-ground.webp'), quality=76, method=6)
     write_js(pictures, timeline)
-    print(f'{len(pictures)} pictures written to', os.path.normpath(OUT))
+    print(f'{len(pictures)} pictures a scene written to', os.path.normpath(OUT))
 
     if '--video' in sys.argv:
         for name in SCENES:
             path = os.path.join(OUT, f'timelapse-{name}.mp4')
-            video(grounds[name], parts, path)
+            video(grounds[name], parts[name], path)
             shutil.copy(path, os.path.join(src, f'timelapse-{name}.mp4'))
             print('timelapse written to', os.path.normpath(path))
 

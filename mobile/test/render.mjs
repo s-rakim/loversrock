@@ -780,14 +780,16 @@ console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMEL
   };
   const main = (x) => Object.entries(lights(x)).sort((p, q) => q[1] - p[1])[0][0];
   const show = (x) => JSON.stringify(lights(x));
-  check('noon is daylight', at(12).a === at(12).b && main(at(12)) === 'day', show(at(12)));
+  check('noon is daylight', main(at(12)) === 'day', show(at(12)));
+  check('the afternoon turns golden', main(at(16, 40)) === 'golden', show(at(16, 40)));
   check('small hours are the full moon', main(at(2)) === 'moon', show(at(2)));
-  check('late evening is a starry night', main(at(22)) === 'night' && at(22).stars === 1, show(at(22)));
+  check('late evening is a starry night', main(at(22)) === 'night' && at(22).stars > 0.9, show(at(22)));
   check('twenty past six in the evening is sunset', main(at(18, 20)) === 'sunset', show(at(18, 20)));
   check('then the blue hour', main(at(20)) === 'twilight', show(at(20)));
   check('dawn comes after the night', main(at(6, 30)) === 'dawn', show(at(6, 30)));
   check('no stars in the daytime', at(12).stars === 0 && at(7).stars === 0);
-  check('many pictures, not a handful', Frames.SKY_FRAMES.length >= 30, Frames.SKY_FRAMES.length);
+  check('a picture for every twenty minutes of the day', Frames.SKY_FRAMES.length >= 70, Frames.SKY_FRAMES.length);
+  check('and the light never stands still', Frames.SKY_TIMELINE.every((r, i, all) => i === 0 || r[1] !== all[i - 1][1]));
   // Seamless: wherever the light changes, the two pictures being blended
   // are twenty minutes apart...
   const rows = Frames.SKY_TIMELINE;
@@ -826,14 +828,13 @@ console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMEL
   } catch (err) { threw = err.message; }
   check('the sky renders, full size, as a still preview, and in New York', threw === null, threw);
   const missing = Frames.SKY_FRAMES.flatMap((f, i) => [
-    ...(f.sky?.__asset ? [] : [`${i} sky`]),
-    ...Sky.SCENES.filter((s) => !f.ground?.[s]?.__asset).map((s) => `${i} ${s}`),
+    ...Sky.SCENES.flatMap((s) => ['sky', 'ground'].filter((k) => !f[s]?.[k]?.__asset).map((k) => `${i} ${s} ${k}`)),
   ]);
   check('every picture is in the app, for both scenes', missing.length === 0, missing.join(', '));
   const dir = path.join(root, 'assets', 'sky');
   const stray = [
-    ...fs.readdirSync(dir).filter((f) => !/^\d\d-sky\.jpg$|^timelapse-(goldengate|newyork)\.mp4$|^(goldengate|newyork)$/.test(f)),
-    ...Sky.SCENES.flatMap((s) => fs.readdirSync(path.join(dir, s)).filter((f) => !/^\d\d\.webp$/.test(f))),
+    ...fs.readdirSync(dir).filter((f) => !/^timelapse-(goldengate|newyork)\.mp4$|^(goldengate|newyork)$/.test(f)),
+    ...Sky.SCENES.flatMap((s) => fs.readdirSync(path.join(dir, s)).filter((f) => !/^\d\d-(sky\.jpg|ground\.webp)$/.test(f))),
   ];
   check('and nothing left over from an older build', stray.length === 0, stray.join(', '));
   check('and the two timelapses', Sky.SCENES.every((s) => fs.existsSync(path.join(dir, `timelapse-${s}.mp4`))));

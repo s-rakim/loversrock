@@ -4,9 +4,9 @@
 //
 // Each scene is one foreground (the view, the bench, the two of you as a
 // silhouette) and its sky, rendered by scripts/build-sky.py as a picture for
-// every twenty minutes in which the light changes — dawn, day, sunset, the
-// blue hour, night and the full moon, and every mix in between
-// (skyFrames.js). The light glides from each picture to the next over those
+// every twenty minutes of the day — dawn, the morning, noon, the golden
+// afternoon, sunset, the blue hour, night, moonrise and moonset, and every
+// mix in between (skyFrames.js). The light glides from each picture to the next over those
 // twenty minutes, evenly, so it never visibly steps. Nothing in the scene
 // moves; the sky drifts slowly on its own, and stars come out as it darkens.
 //
@@ -202,7 +202,7 @@ export default function SkyBackground({ scene = 'goldengate', still = false, at 
   const layer = (kind, style) => shown.map((f, i) => (
     <Animated.Image
       key={`${kind}${f}`}
-      source={kind === 'sky' ? SKY_FRAMES[f].sky : SKY_FRAMES[f].ground[view]}
+      source={SKY_FRAMES[f][view][kind]}
       style={[style, i ? { opacity: fadeIn } : null]}
       resizeMode="stretch"
       fadeDuration={0}
