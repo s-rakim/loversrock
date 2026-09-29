@@ -4,7 +4,7 @@
 import http from 'node:http';
 import { query, pool } from '../src/config/db.js';
 import {
-  quizLlmConfig, validateQuestions, parseReply, generateQuizQuestions, freshenUpcomingDays,
+  quizLlmConfig, validateQuestions, parseReply, generateQuizQuestions, freshenUpcomingDays, providerSays,
 } from '../src/models/quizGenerator.js';
 
 let pass = 0; const fails = [];
@@ -51,7 +51,9 @@ const makeQuestions = (count) => Array.from({ length: count }, () => {
     ? { type: 'this_or_that', questionText: `Fresh this or that number ${n}?`, choices: ['This', 'That'], correctAnswer: null }
     : { type: 'trivia', questionText: `Fresh trivia question number ${n}?`, choices: ['A', 'B', 'C', 'D'].map((c) => `${c}${n}`), correctAnswer: `B${n}` };
 });
-const seen = { anthropic: [], openai: [] };
+const seen = { anthropic: [], openai: [], busy: 0, down: 0 };
+// What Gemini sends when a model is overloaded.
+const OVERLOADED = JSON.stringify([{ error: { code: 503, message: 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', status: 'UNAVAILABLE' } }], null, 2);
 const server = http.createServer((req, res) => {
   let body = '';
   req.on('data', (c) => { body += c; });
@@ -74,6 +76,12 @@ const server = http.createServer((req, res) => {
       }
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ choices: [{ message: { content: `Here you go:\n${JSON.stringify({ questions: makeQuestions(count) })}` } }] }));
+    } else if (req.url === '/busy/chat/completions' || req.url === '/down/chat/completions') {
+      // Busy twice then fine; or busy the whole time.
+      const busy = req.url.startsWith('/busy') ? (seen.busy += 1) <= 2 : (seen.down += 1) > 0;
+      if (busy) { res.statusCode = 503; return res.end(OVERLOADED); }
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ questions: makeQuestions(count) }) } }] }));
     } else { res.statusCode = 404; res.end(); }
   });
 });
@@ -91,6 +99,19 @@ const viaOpenAi = await generateQuizQuestions(4, [], { provider: 'groq', apiKey:
 check('an OpenAI-style provider returns checked questions', viaOpenAi.length === 4, viaOpenAi.length);
 check('  sending the key as a bearer token', seen.openai.every((s) => s.auth === 'Bearer gsk-test'));
 check('  and retrying without JSON mode when a model refuses it', seen.openai.length === 2 && !seen.openai[1].payload.response_format);
+
+console.log('\n=== A BUSY PROVIDER IS WAITED ON, NOT GIVEN UP ON ===');
+const busyCfg = (path) => ({ provider: 'gemini', apiKey: 'k', model: 'm', baseUrl: `${base}/${path}`, busyWaits: [10, 10, 10] });
+const afterBusy = await generateQuizQuestions(3, [], busyCfg('busy'));
+check('"high demand" twice, then an answer: the questions arrive', afterBusy.length === 3 && seen.busy === 3, { got: afterBusy.length, asked: seen.busy });
+let downErr = null;
+try { await generateQuizQuestions(3, [], busyCfg('down')); } catch (e) { downErr = e; }
+check('busy the whole time: asked once and three more times, then it gives up', seen.down === 4, seen.down);
+check('  saying so in one line, not a page of JSON',
+  downErr?.message === 'gemini answered 503: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', downErr?.message);
+check('  and marked as busy, so the nightly job tries again in an hour', downErr?.busy === true);
+check('OpenAI-style errors are read the same way', providerSays('{"error":{"message":"Rate limit reached"}}') === 'Rate limit reached');
+check('and text that is not JSON is kept, trimmed', providerSays('  Bad\n gateway ') === 'Bad gateway');
 
 const many = await generateQuizQuestions(45, [], { provider: 'anthropic', apiKey: 'k', model: 'm', baseUrl: base });
 check('large requests come in batches, with no repeats between them', many.length === 45 && new Set(many.map((q) => q.questionText)).size === 45);

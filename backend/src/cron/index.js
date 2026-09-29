@@ -251,10 +251,10 @@ export async function refreshDailyPrompts(today = new Date(), { ahead = 30 } = {
  * day rather than re-writing the week every night. Without a model this
  * does nothing, and the recycled bank carries on as before.
  */
-export async function freshenQuiz() {
+export async function freshenQuiz({ retry = false } = {}) {
   let config;
   try {
-    config = quizLlmConfig();
+    config = patient(quizLlmConfig());
   } catch (err) {
     console.error(`[cron] quiz generator is misconfigured: ${err.message}`);
     return;
@@ -266,9 +266,25 @@ export async function freshenQuiz() {
     if (days.length) console.log(`[cron] quiz: ${questions} fresh questions from ${config.provider} for ${days.join(', ')}`);
   } catch (err) {
     // A bad key, a rate limit, an outage: the recycled questions stay, and
-    // tomorrow's run tries again.
+    // tomorrow's run tries again (or, if it was only busy, an hour from now).
     console.error(`[cron] quiz generator failed (${config.provider}): ${err.message}`);
+    if (err.busy && !retry) laterAgain('quiz generator', () => freshenQuiz({ retry: true }));
   }
+}
+
+// The nightly jobs have time: a busy provider is waited on for a while,
+// much longer than a screen someone is looking at could wait.
+const PATIENT_WAITS = [15 * 1000, 60 * 1000, 3 * 60 * 1000];
+function patient(config) {
+  return config ? { ...config, busyWaits: PATIENT_WAITS } : config;
+}
+
+// Still busy after all that: one more go in an hour, instead of leaving it
+// to the next scheduled run (a week away, for the catalogues).
+const RETRY_LATER_MS = 60 * 60 * 1000;
+function laterAgain(what, run) {
+  console.log(`[cron] ${what}: the AI is busy; trying again in an hour`);
+  setTimeout(run, RETRY_LATER_MS).unref?.();
 }
 
 /** The AI connector, or null when there is none (or it is misconfigured). */
@@ -338,8 +354,8 @@ export async function freshenDailyPrompts() {
  * startup run: it does nothing once the AI has ever added anything, so a
  * restart does not ask the provider again.
  */
-export async function growContent({ onlyIfNew = false } = {}) {
-  const config = aiConfig();
+export async function growContent({ onlyIfNew = false, retry = false } = {}) {
+  const config = patient(aiConfig());
   if (!config) return;
   try {
     if (onlyIfNew) {
@@ -351,6 +367,7 @@ export async function growContent({ onlyIfNew = false } = {}) {
       + `+${added.bucketIdeas.length} bucket-list ideas, +${added.challenges.length} challenges`);
   } catch (err) {
     console.error(`[cron] content generation failed (${config.provider}): ${err.message}`);
+    if (err.busy && !retry) laterAgain('content generation', () => growContent({ onlyIfNew, retry: true }));
   }
 }
 

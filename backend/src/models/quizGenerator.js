@@ -213,6 +213,28 @@ export function networkError(config, err) {
   return wrapped;
 }
 
+// The answers that mean "busy, try again": rate limits and overloads.
+export const BUSY_STATUSES = new Set([429, 500, 502, 503, 504]);
+// How long to wait before each retry of a busy provider. Short by default,
+// because someone may be waiting on the answer (a deck opening); the nightly
+// jobs pass longer ones in config.busyWaits (cron/index.js).
+const DEFAULT_BUSY_WAITS = [2000, 5000];
+
+/**
+ * The provider's own explanation, out of whatever JSON it sent: OpenAI-style
+ * { error: { message } }, or Gemini's [{ error: { message } }]. Falls back
+ * to the start of the raw text.
+ */
+export function providerSays(text) {
+  try {
+    const body = JSON.parse(text);
+    const error = (Array.isArray(body) ? body[0] : body)?.error;
+    const message = typeof error === 'string' ? error : error?.message;
+    if (message) return String(message).replace(/\s+/g, ' ').trim().slice(0, 200);
+  } catch { /* not JSON */ }
+  return String(text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
 async function askOpenAiCompatible(config, { system, user }) {
   const body = {
     model: config.model,
@@ -233,16 +255,28 @@ async function askOpenAiCompatible(config, { system, user }) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
   }).catch((err) => { throw networkError(config, err); });
 
-  let res = await send(body);
+  let payload = body;
+  let res = await send(payload);
   // Not every model behind these APIs accepts a JSON response format; the
   // prompt asks for JSON anyway, so try once more without it.
   if (res.status === 400) {
     const { response_format: _dropped, ...plain } = body;
-    res = await send(plain);
+    payload = plain;
+    res = await send(payload);
+  }
+  // Busy (a free tier's rate limit, a model "experiencing high demand"):
+  // that passes, so wait and ask again rather than give up at once.
+  for (const wait of config.busyWaits || DEFAULT_BUSY_WAITS) {
+    if (!BUSY_STATUSES.has(res.status)) break;
+    await res.text().catch(() => '');
+    await new Promise((resolve) => { setTimeout(resolve, wait); });
+    res = await send(payload);
   }
   if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 300);
-    throw new Error(`${config.provider} answered ${res.status}${detail ? `: ${detail}` : ''}`);
+    const detail = providerSays(await res.text().catch(() => ''));
+    const err = new Error(`${config.provider} answered ${res.status}${detail ? `: ${detail}` : ''}`);
+    err.busy = BUSY_STATUSES.has(res.status);
+    throw err;
   }
   const data = await res.json();
   return data?.choices?.[0]?.message?.content ?? '';
