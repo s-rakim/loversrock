@@ -291,7 +291,7 @@ function Root() {
                 point of the two: you arrive wanting to see what is there far
                 more often than with a blank drawing already in mind. */}
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
-            <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Chat Wallpaper' }} />
+            <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Wallpaper' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />
             {/* Fable: its own screen, opened from its button on Home, with a

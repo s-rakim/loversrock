@@ -7,10 +7,13 @@ const SCALE_KEY = 'loversrock_bar_scale';
 const BACKDROP_KEY = 'loversrock_backdrop';
 
 /**
- * What is behind every screen: the lava lamp (the app's own look, and the
- * default), or the live sky that follows the clock over the Golden Gate or
- * New York, each also as a timelapse. ('sky' and 'timelapse' keep their ids
- * from when the Golden Gate was the only one, so a saved choice still holds.)
+ * What is behind every screen. Any wallpaper can be: the lava lamp (the
+ * app's own look, and the default), the live sky over the Golden Gate or New
+ * York, their timelapses, the colours and patterns, or one of your photos —
+ * the same ids as the chat's (components/Wallpaper.js), chosen in the same
+ * picker. These are the quick picks Settings shows as buttons. ('sky' and
+ * 'timelapse' keep their ids from when the Golden Gate was the only one, so
+ * a saved choice still holds.)
  */
 export const BACKDROPS = [
   { id: 'lava', label: 'Lava lamp' },
@@ -20,7 +23,12 @@ export const BACKDROPS = [
   { id: 'newyork-timelapse', label: 'New York timelapse' },
 ];
 export const DEFAULT_BACKDROP = 'lava';
-const isBackdrop = (v) => BACKDROPS.some((b) => b.id === v);
+// A wallpaper id or 'photo:<key>'. Not 'none': that is the chat's "let the
+// app's background through", which behind the app itself would be nothing.
+// An id this version does not know falls back to the lava lamp when drawn
+// (AppBackdrop), so it is not refused here.
+export const isBackdrop = (v) => typeof v === 'string' && v !== 'none'
+  && (/^[a-z0-9-]{1,40}$/.test(v) || (v.startsWith('photo:') && v.length > 6 && v.length < 300));
 
 /** How big the bottom bar can be made, as a multiple of its designed size. */
 export const BAR_SCALE = { min: 0.8, max: 1.3, step: 0.05, default: 1 };

@@ -196,16 +196,17 @@ export default function SettingsScreen() {
             />
           </View>
 
-          {/* Behind every screen: the two of you above the Golden Gate or
-              across the river from New York under the sky it is outside now,
-              the same scenes as timelapses, or the original lava lamp. */}
+          {/* Behind every screen: the quick picks as buttons, and every
+              wallpaper (colours, patterns, your photos) in the picker. */}
           <Text style={[font.body, { marginTop: spacing.md }]}>Background</Text>
           <Text style={[font.muted, { marginBottom: spacing.sm }]}>
             {backdrop === 'sky' || backdrop === 'newyork'
               ? 'The sky follows the time of day, changing slowly: dawn, day, sunset, the blue hour, stars and the moon.'
               : backdrop === 'timelapse' || backdrop === 'newyork-timelapse'
                 ? 'A day and a night on a slow loop.'
-                : 'The original soft colours.'}
+                : backdrop === 'lava'
+                  ? 'The original soft colours.'
+                  : 'A wallpaper from the picker, behind every screen.'}
           </Text>
           <View style={[styles.themeRow, styles.backdropGrid]}>
             {BACKDROPS.map((option) => {
@@ -222,6 +223,13 @@ export default function SettingsScreen() {
               );
             })}
           </View>
+          <MorphButton
+            onPress={() => navigation.navigate('Wallpaper', { target: 'app' })}
+            style={[styles.linkButton, { alignSelf: 'flex-start', marginTop: spacing.sm }]}
+          >
+            <Icon name="image-outline" chip={false} size={16} color={colors.accent} />
+            <Text style={{ color: colors.accent, fontWeight: '600' }}>All wallpapers, colours and photos</Text>
+          </MorphButton>
         </View>
       </FadeInUp>
 
@@ -371,7 +379,7 @@ export default function SettingsScreen() {
               <Text style={font.body}>Chat wallpaper</Text>
               <Text style={font.muted}>Yours alone, behind your message thread.</Text>
             </View>
-            <MorphButton onPress={() => navigation.navigate('Wallpaper')} style={styles.linkButton}>
+            <MorphButton onPress={() => navigation.navigate('Wallpaper', { target: 'chat' })} style={styles.linkButton}>
               <Icon name="image-outline" chip={false} size={16} color={colors.accent} />
               <Text style={{ color: colors.accent, fontWeight: '600' }}>Choose</Text>
             </MorphButton>

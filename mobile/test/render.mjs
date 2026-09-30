@@ -756,10 +756,33 @@ console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMEL
     && /live: 'timelapse', scene: 'goldengate'/.test(wp) && /live: 'timelapse', scene: 'newyork'/.test(wp));
   check('and New York is a background too, live and as a timelapse',
     /id: 'newyork'/.test(glass) && /id: 'newyork-timelapse'/.test(glass));
-  const backdrop = fs.readFileSync(path.join(root, 'components', 'AppBackdrop.js'), 'utf8');
-  check('each background shows its own scene',
-    /'sky'\) return <SkyBackground scene="goldengate"/.test(backdrop) && /'newyork'\) return <SkyBackground scene="newyork"/.test(backdrop)
-    && /'newyork-timelapse'\) return <TimelapseBackground scene="newyork"/.test(backdrop));
+  // Every wallpaper can go behind the whole app, not only the chat.
+  const hostStub = { useTheme: () => ({ isDark: false, reduceMotion: true, colors: {}, font: {} }) };
+  const glassFor = (backdrop) => ({ useGlass: () => ({ backdrop, setBackdrop: () => {} }) });
+  const drawn = (backdrop) => {
+    const Backdrop = load('components/AppBackdrop.js', { './GlassContext': glassFor(backdrop), './ThemeContext': hostStub });
+    const el = Backdrop.default();
+    if (el.type === 'View') {
+      const inner = [].concat(el.props.children)[0];
+      return `wallpaper:${inner.props.value}`;
+    }
+    return typeof el.type === 'function' ? el.type.name || 'component' : String(el.type);
+  };
+  check('the lava lamp by default', /Lava/.test(drawn('lava')), drawn('lava'));
+  check('the Golden Gate and New York behind the app', drawn('sky') === 'wallpaper:sky' && drawn('newyork') === 'wallpaper:newyork', [drawn('sky'), drawn('newyork')]);
+  check('and the timelapses', drawn('newyork-timelapse') === 'wallpaper:newyork-timelapse');
+  check('and the colours, the patterns and your photos', drawn('hearts') === 'wallpaper:hearts' && drawn('blush') === 'wallpaper:blush'
+    && drawn('photo:abc/1.jpg') === 'wallpaper:photo:abc/1.jpg');
+  check('an id this version does not know is the lava lamp, not a blank screen', /Lava/.test(drawn('from-the-future')) && /Lava/.test(drawn('none')));
+  const Glass = load('components/GlassContext.js');
+  check('the app background accepts any wallpaper or photo, but not None',
+    ['sky', 'hearts', 'newyork-timelapse', 'photo:k/1.jpg'].every(Glass.isBackdrop) && !Glass.isBackdrop('none') && !Glass.isBackdrop('photo:') && !Glass.isBackdrop(''));
+  const picker = fs.readFileSync(path.join(root, 'app', 'WallpaperScreen.js'), 'utf8');
+  check('one picker for both, with a switch between the whole app and the chat',
+    /id: 'app', label: 'Whole app'/.test(picker) && /id: 'chat', label: 'Chat'/.test(picker) && /setBackdrop\(value\)/.test(picker));
+  check('None is offered for the chat only', /WALLPAPERS\.filter\(\(w\) => !\(forApp && w\.transparent\)\)/.test(picker));
+  check('Settings opens the picker on the whole app, the chat button on the chat',
+    /navigate\('Wallpaper', \{ target: 'app' \}\)/.test(settings) && /navigate\('Wallpaper', \{ target: 'chat' \}\)/.test(settings));
 
   const themeStub2 = { useTheme: () => ({ isDark: true, reduceMotion: false, colors: {} }) };
   const hooks = {

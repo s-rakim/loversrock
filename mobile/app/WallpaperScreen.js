@@ -1,9 +1,14 @@
-// Choosing what sits behind your message thread.
+// Choosing what sits behind the whole app, or behind your message thread.
+//
+// One picker for both, switched at the top: every wallpaper — the live
+// skies and timelapses, the lava lamp, the colours and patterns, your own
+// photos — can go behind every screen or behind the chat alone. Settings
+// opens it on the app, the chat's button on the chat.
 //
 // Yours alone — the note at the bottom says so, because in a two-person app
 // it is a fair assumption that changing something changes it for both of
 // you, and here it does not.
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Alert, ActivityIndicator,
 } from 'react-native';
@@ -14,12 +19,26 @@ import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { Stagger, MorphButton, Pop } from '../components/Motion';
 import Wallpaper, { WALLPAPERS, WallpaperSwatch, PHOTO_PREFIX, photoKeyOf } from '../components/Wallpaper';
+import { useGlass } from '../components/GlassContext';
 
-export default function WallpaperScreen({ navigation }) {
+export const TARGETS = [
+  { id: 'app', label: 'Whole app' },
+  { id: 'chat', label: 'Chat' },
+];
+
+export default function WallpaperScreen({ navigation, route }) {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { backdrop, setBackdrop } = useGlass();
+  const [target, setTarget] = useState(route?.params?.target === 'app' ? 'app' : 'chat');
+  const forApp = target === 'app';
 
-  const [chosen, setChosen] = useState(null);
+  useLayoutEffect(() => {
+    navigation.setOptions?.({ title: forApp ? 'App background' : 'Chat wallpaper' });
+  }, [navigation, forApp]);
+
+  const [chatChosen, setChosen] = useState(null);
+  const chosen = forApp ? backdrop : chatChosen;
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,6 +54,11 @@ export default function WallpaperScreen({ navigation }) {
   useFocusEffect(load);
 
   async function save(value) {
+    // The app's background is this phone's, kept on the phone: set at once.
+    if (forApp) {
+      setBackdrop(value);
+      return;
+    }
     const previous = chosen;
     // Applied immediately — the preview above is the whole point, and
     // waiting on a round trip to see it would make picking feel broken.
@@ -61,6 +85,19 @@ export default function WallpaperScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Stagger delayStep={55}>
+        <View style={styles.switchRow}>
+          {TARGETS.map((t) => (
+            <MorphButton
+              key={t.id}
+              onPress={() => setTarget(t.id)}
+              style={[styles.switchOption, target === t.id && styles.switchActive]}
+              accessibilityLabel={`Wallpaper for the ${t.label.toLowerCase()}`}
+            >
+              <Text style={[styles.switchLabel, target === t.id && styles.switchLabelActive]}>{t.label}</Text>
+            </MorphButton>
+          ))}
+        </View>
+
         <View style={styles.previewWrap}>
           <Wallpaper value={chosen} style={styles.preview}>
             <View style={styles.previewInner}>
@@ -82,7 +119,9 @@ export default function WallpaperScreen({ navigation }) {
         <View style={styles.card}>
           <Text style={font.h3}>Backgrounds</Text>
           <View style={styles.grid}>
-            {WALLPAPERS.map((w) => (
+            {/* "None" lets the app's background show through the chat;
+                behind the app itself it would be nothing at all. */}
+            {WALLPAPERS.filter((w) => !(forApp && w.transparent)).map((w) => (
               <Pressable key={w.id} onPress={() => save(w.id)} style={styles.cell}>
                 <Pop active={chosen === w.id}>
                   <View style={[styles.swatchWrap, chosen === w.id && styles.selected]}>
@@ -103,8 +142,8 @@ export default function WallpaperScreen({ navigation }) {
         <View style={styles.card}>
           <Text style={font.h3}>One of yours</Text>
           <Text style={[font.muted, { marginTop: 2 }]}>
-            Any photo from your Memories. It's dimmed behind the messages so
-            they stay readable.
+            Any photo from your Memories. It's dimmed so what is on top of it
+            stays readable.
           </Text>
 
           {memories.length === 0 ? (
@@ -142,8 +181,9 @@ export default function WallpaperScreen({ navigation }) {
         <View style={styles.noteRow}>
           <Ionicons name="person-outline" size={16} color={colors.textSecondary} />
           <Text style={[font.muted, { flex: 1, marginLeft: spacing.sm }]}>
-            This is yours alone. Your partner keeps whatever they chose, and
-            it follows you if you sign in on another phone.
+            {forApp
+              ? 'This is yours alone, on this phone. Your partner keeps whatever they chose. With the chat set to None, the chat shows this too.'
+              : 'This is yours alone. Your partner keeps whatever they chose, and it follows you if you sign in on another phone. None shows the app\'s background.'}
           </Text>
         </View>
       </Stagger>
@@ -156,6 +196,15 @@ const makeStyles = (colors) =>
     container: { flex: 1, backgroundColor: 'transparent' },
     content: { padding: spacing.lg, paddingBottom: spacing.xl },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+    switchRow: {
+      flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md,
+      backgroundColor: colors.surface, borderRadius: radius.pill, padding: 4,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    switchOption: { flex: 1, paddingVertical: spacing.sm, borderRadius: radius.pill, alignItems: 'center' },
+    switchActive: { backgroundColor: colors.accentPink },
+    switchLabel: { color: colors.textSecondary, fontWeight: '600' },
+    switchLabelActive: { color: '#fff' },
     previewWrap: {
       height: 190, borderRadius: radius.card, overflow: 'hidden',
       borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md,

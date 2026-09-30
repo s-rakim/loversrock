@@ -1,6 +1,12 @@
 # Backgrounds
 
-**Settings → Appearance → Background** picks what is behind every screen:
+**Settings → Appearance → Background** picks what is behind every screen.
+Five quick picks are buttons there; **All wallpapers, colours and photos**
+opens the wallpaper picker on **Whole app**, where every wallpaper can go
+behind every screen: these five, the colours and patterns, and your own
+photos from Memories. The same picker, switched to **Chat**, sets the chat's
+wallpaper (the picture button at the top of the chat opens it there). With
+the chat on **None**, the chat shows the app's background too.
 
 | Option | What it is |
 |---|---|
@@ -19,8 +25,8 @@ it darkens.
 
 The two of you are a silhouette: one dark shape, with no skin or hair colour.
 
-The chat has the same five as wallpapers (the picture button at the top of
-the chat), alongside the colours, patterns and your own photos.
+The app background is kept on each phone; the chat's wallpaper is kept on
+your account, so it follows you to a new phone.
 
 ## How the skies are made
 
