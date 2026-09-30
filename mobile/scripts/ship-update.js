@@ -41,12 +41,46 @@ if (record[runtimeVersion] !== hash) {
 // inside an update would silently become localhost.
 const env = process.env;
 
+// An update carries every asset it has not sent before: the live skies are a
+// few hundred pictures and two videos. On a home connection one of those
+// uploads can drop ("Failed to upload ... storage.googleapis.com ... failed,
+// reason:"), and that fails the whole command. The files already sent stay
+// on the server and are skipped next time, so trying again carries on where
+// it stopped: a few tries, spaced out, before giving up.
+const ATTEMPTS = 3;
+const PAUSE_S = [15, 45];
+
+function pause(seconds) {
+  // Synchronous on purpose: this is a one-shot command-line script.
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
+}
+
 console.log(`Sending "${message}" to the preview channel (runtime ${runtimeVersion}) ...`);
-const result = spawnSync(
-  'eas',
-  ['update', '--branch', 'preview', '--environment', 'preview', '--platform', 'android',
-    '--message', JSON.stringify(message)],
-  // shell: true so Windows finds eas.cmd.
-  { stdio: 'inherit', env, cwd: root, shell: true },
-);
-process.exit(result.status ?? 1);
+let status = 1;
+for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+  const result = spawnSync(
+    'eas',
+    ['update', '--branch', 'preview', '--environment', 'preview', '--platform', 'android',
+      '--message', JSON.stringify(message)],
+    // shell: true so Windows finds eas.cmd.
+    { stdio: 'inherit', env, cwd: root, shell: true },
+  );
+  status = result.status ?? 1;
+  if (status === 0) break;
+  if (attempt < ATTEMPTS) {
+    const wait = PAUSE_S[attempt - 1];
+    console.log(`\n  That did not go through (try ${attempt} of ${ATTEMPTS}). Files already uploaded are kept;`
+      + ` trying again in ${wait}s ...\n`);
+    pause(wait);
+  }
+}
+if (status !== 0) {
+  console.error(`
+  Not sent after ${ATTEMPTS} tries. If it failed while uploading ("Failed to
+  upload"), it is the connection to Expo's storage: run npm run ship again
+  when the connection is steadier, and it will carry on from what already
+  went up. Anything else (not logged in, a JavaScript error) is in the
+  output above.
+`);
+}
+process.exit(status);
