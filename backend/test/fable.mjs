@@ -44,9 +44,16 @@ const fake = http.createServer((q, s) => {
   let raw = '';
   q.on('data', (c) => { raw += c; });
   q.on('end', () => {
+    s.setHeader('content-type', 'application/json');
+    // The provider's list of models, as every OpenAI-compatible API has.
+    if (q.method === 'GET' && q.url.endsWith('/models')) {
+      return s.end(JSON.stringify({ data: ['test-model', 'busy-model', 'backup-model', 'text-embedding-3-small', 'tts-1'].map((id) => ({ id })) }));
+    }
     const payload = JSON.parse(raw || '{}');
     asked.push({ auth: q.headers.authorization, payload });
-    s.setHeader('content-type', 'application/json');
+    // One model overloaded, one retired: the others answer.
+    if (payload.model === 'busy-model') { s.statusCode = 503; return s.end(JSON.stringify({ error: { message: 'The model is overloaded' } })); }
+    if (payload.model === 'retired-model') { s.statusCode = 404; return s.end(JSON.stringify({ error: { message: 'The model retired-model does not exist' } })); }
     if (behaviour === 'badkey') { s.statusCode = 401; return s.end(JSON.stringify({ error: { message: 'Incorrect API key provided' } })); }
     if (behaviour === 'limit') { s.statusCode = 429; return s.end(JSON.stringify({ error: { message: 'Resource exhausted' } })); }
     const n = asked.length;
@@ -150,6 +157,38 @@ const lead = await req('/fable/messages', { method: 'POST', token: B.token, body
 check('so does starting with its name', lead.data.aiReplying === true, lead.data);
 const notName = await req('/fable/messages', { method: 'POST', token: B.token, body: { body: 'Robotics is fun' } });
 check('but not a word that merely starts with it', notName.data.aiReplying === false, notName.data);
+await waitFor(async () => (await req('/fable/messages', { token: A.token })).data.thinking === false);
+
+console.log('\n=== THE MODELS YOUR KEY CAN USE ===');
+const listed = await req('/fable/models', { method: 'POST', token: A.token, body: { provider: 'custom', baseUrl: FAKE_URL } });
+check('the provider is asked which models there are', listed.status === 200 && listed.data.models.includes('test-model') && listed.data.models.includes('backup-model'), listed.data);
+check('only chat models: no embeddings, no speech', !listed.data.models.some((m) => /embedding|tts/.test(m)), listed.data.models);
+check('with a half-typed model in the box, the list still comes', (await req('/fable/models', { method: 'POST', token: A.token, body: { provider: 'custom', baseUrl: FAKE_URL, model: 'gemini-tts' } })).status === 200);
+
+console.log('\n=== A BUSY OR RETIRED MODEL: ANOTHER ONE ANSWERS ===');
+await req('/fable/settings', { method: 'PUT', token: A.token, body: { model: 'busy-model', replyMode: 'always' } });
+const stoodIn = await req('/fable/test', { method: 'POST', token: A.token, body: {} });
+check('the test still gets a hello when the chosen model is busy', stoodIn.status === 200 && stoodIn.data.ok && /Hello/.test(stoodIn.data.reply), stoodIn.data);
+check('  and says which model stood in, and why', stoodIn.data.fallback?.from === 'busy-model' && stoodIn.data.fallback?.to === 'backup-model'
+  && /busy/.test(stoodIn.data.fallback?.why) && stoodIn.data.model === 'backup-model', stoodIn.data);
+const busyChat = await req('/fable/messages', { method: 'POST', token: A.token, body: { body: 'Are you there?' } });
+const busyAnswer = await waitFor(async () => {
+  const r = await req(`/fable/messages?since=${busyChat.data.message.id}`, { token: A.token });
+  return r.data.messages.find((m) => m.authorKind !== 'user');
+}, 20000);
+check('the chat gets an answer, not "could not answer"', busyAnswer?.authorKind === 'ai', busyAnswer);
+check('  and the busy model stays chosen (it is only busy)', (await req('/fable/settings', { token: A.token })).data.settings.model === 'busy-model');
+
+await req('/fable/settings', { method: 'PUT', token: A.token, body: { model: 'retired-model' } });
+const retiredChat = await req('/fable/messages', { method: 'POST', token: A.token, body: { body: 'Still there?' } });
+const retiredAnswer = await waitFor(async () => {
+  const r = await req(`/fable/messages?since=${retiredChat.data.message.id}`, { token: A.token });
+  return r.data.messages.find((m) => m.authorKind !== 'user');
+}, 20000);
+check('a model that no longer exists: another answers', retiredAnswer?.authorKind === 'ai', retiredAnswer);
+const healed = (await req('/fable/settings', { token: A.token })).data.settings.model;
+check('  and the setup moves onto it, so the next message need not search', healed === 'backup-model', healed);
+await req('/fable/settings', { method: 'PUT', token: A.token, body: { model: 'test-model', replyMode: 'mention' } });
 await waitFor(async () => (await req('/fable/messages', { token: A.token })).data.thinking === false);
 
 console.log('\n=== WHEN THE PROVIDER SAYS NO ===');

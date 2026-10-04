@@ -9,7 +9,8 @@ import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import {
   PROVIDERS, DEFAULT_SETTINGS, HISTORY_FOR_AI, MAX_BODY, FableSetupError,
   listKeys, saveKey, deleteKey, getSettings, saveSettings, deleteSettings, cleanSettings,
-  serverConnector, resolveConfig, wantsReply, systemPrompt, transcript, cleanReply, askChat,
+  serverConnector, resolveConfig, wantsReply, systemPrompt, transcript, cleanReply, askWithFallback,
+  listModels,
 } from '../models/fableAi.js';
 
 const router = asyncRouter();
@@ -95,13 +96,42 @@ router.post('/test', async (req, res) => {
   if (!config) return res.status(400).json({ ok: false, error: problem });
   const started = Date.now();
   try {
-    const reply = await askChat(config, {
+    // Tried the way the chat tries: if the chosen model is busy or gone,
+    // the test says which one stood in, so the page can offer to switch.
+    const got = await askWithFallback(req.pair.id, config, {
       system: `You are ${settings.botName}, an AI in a couple's group chat, being tested.`,
       user: 'Say hello to the couple in one short, friendly sentence.',
     });
-    res.json({ ok: true, reply: cleanReply(reply, settings.botName), provider: config.provider, model: config.model, ms: Date.now() - started });
+    res.json({
+      ok: true,
+      reply: cleanReply(got.text, settings.botName),
+      provider: got.config.provider,
+      model: got.config.model,
+      fallback: got.fallback,
+      ms: Date.now() - started,
+    });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * The chat models a provider offers this key today, best first, for the
+ * setup page to pick from. Uses the key typed on the page, or the saved one.
+ */
+router.post('/models', async (req, res) => {
+  let settings;
+  try {
+    // The model does not matter for a list (and a half-typed one must not stop it).
+    settings = cleanSettings({ ...req.body, source: 'key', model: 'any' }, await getSettings(req.pair.id));
+  } catch (err) { return setupError(res, err); }
+  const { config, problem } = await resolveConfig(req.pair.id, settings, { apiKey: req.body?.apiKey });
+  if (!config) return res.status(400).json({ error: problem });
+  try {
+    const models = await listModels(config);
+    res.json({ provider: config.provider, models: models.slice(0, 60) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -197,10 +227,12 @@ function queueReply(req, settings, names, io, room) {
         authorName: m.author_kind === 'ai' ? settings.botName : (names[m.user_id] || 'Someone'),
         body: m.body,
       }));
-      const text = cleanReply(await askChat(config, {
+      const got = await askWithFallback(pairId, config, {
         system: systemPrompt(settings, [names[req.userId], names[req.partnerId]]),
         user: transcript(labelled, settings, latestAuthor),
-      }), settings.botName);
+      }, { settings });
+      if (got.fallback) console.log(`[fable] ${got.fallback.from} could not answer (${got.fallback.why}); ${got.fallback.to} did`);
+      const text = cleanReply(got.text, settings.botName);
       ({ rows: [row] } = await query(
         `INSERT INTO fable_messages (pair_id, author_kind, body) VALUES ($1, 'ai', $2) RETURNING *`,
         [pairId, text || '…']

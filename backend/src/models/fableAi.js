@@ -321,8 +321,30 @@ export function explainFailure(config, status, detail) {
   return `${who} answered ${status}: ${(message || text).slice(0, 200) || 'no details'}`;
 }
 
-/** One reply from the model: plain text. */
-export async function askChat(config, { system, user }) {
+/** What kind of failure an error is, for deciding whether to try elsewhere. */
+export function failureKind(status, detail = '') {
+  const text = String(detail);
+  if (status === 401 || status === 403 || /api[ _-]?key (not valid|invalid)|invalid[ _-]?api[ _-]?key|incorrect api key|unauthori[sz]ed/i.test(text)) return 'key';
+  if (status === 429 || /quota|rate limit|resource[_ ]exhausted/i.test(text)) return 'limit';
+  if ([500, 502, 503, 504].includes(status) || /overloaded|high demand|unavailable/i.test(text)) return 'busy';
+  if (status === 404 || /model.*(not found|does not exist|not supported|is not available|decommissioned|deprecated)/i.test(text)) return 'model';
+  return 'other';
+}
+
+/** A provider's error, carrying its status and kind as well as the sentence. */
+function providerError(config, status, detail) {
+  const err = new Error(explainFailure(config, status, detail));
+  err.status = status;
+  err.kind = failureKind(status, detail);
+  return err;
+}
+
+/**
+ * One reply from the model: plain text. `busyWaits` is how long to wait
+ * before each retry of a busy model (askWithFallback tries other models
+ * instead, so it asks the alternatives only once each).
+ */
+export async function askChat(config, { system, user }, { busyWaits = BUSY_RETRY_MS } = {}) {
   if (config.provider === 'anthropic') {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({
@@ -340,8 +362,10 @@ export async function askChat(config, { system, user }) {
         messages: [{ role: 'user', content: user }],
       });
     } catch (err) {
-      if (err?.status) throw new Error(explainFailure(config, err.status, err.message));
-      throw networkError(config, err);
+      if (err?.status) throw providerError(config, err.status, err.message);
+      const wrapped = networkError(config, err);
+      wrapped.kind = 'network';
+      throw wrapped;
     }
     if (response.stop_reason === 'refusal') throw new Error('The model declined to answer that.');
     return response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
@@ -362,16 +386,178 @@ export async function askChat(config, { system, user }) {
       temperature: 0.8,
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
-  }).catch((err) => { throw networkError(config, err); });
+  }).catch((err) => {
+    const wrapped = networkError(config, err);
+    wrapped.kind = 'network';
+    throw wrapped;
+  });
   let res = await send();
-  for (const wait of BUSY_RETRY_MS) {
+  for (const wait of busyWaits) {
     if (![500, 502, 503].includes(res.status)) break;
+    await res.text().catch(() => '');
     await new Promise((resolve) => setTimeout(resolve, wait));
     res = await send();
   }
-  if (!res.ok) throw new Error(explainFailure(config, res.status, await res.text().catch(() => '')));
+  if (!res.ok) throw providerError(config, res.status, await res.text().catch(() => ''));
   const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error(`${labelOf(config.provider)} sent back an empty reply.`);
+  const text = replyText(data?.choices?.[0]?.message?.content);
+  if (!text) {
+    const err = new Error(`${labelOf(config.provider)} sent back an empty reply.`);
+    err.kind = 'empty';
+    throw err;
+  }
   return text;
+}
+
+/**
+ * The text of a chat reply. Usually a string; some providers send a list of
+ * parts instead ([{ type: 'text', text }]), and thinking models can put their
+ * notes in parts of their own, which are left out.
+ */
+export function replyText(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((p) => p && (p.type === 'text' || p.type === 'output_text' || (!p.type && typeof p.text === 'string')))
+      .map((p) => p.text || '').join('');
+  }
+  return '';
+}
+
+// -------------------------------------------------------------- the models
+
+// Models that cannot chat: speech, embeddings, images, moderation and the
+// like, which every provider lists alongside the chat models.
+const NOT_CHAT = /(^|[-_./:])(tts|embed(ding)?s?|imagen?|images?|whisper|transcribe|audio|speech|moderation|guard|rerank|dall-e|sora|veo|lyria|native-audio|live|computer-use|robotics|aqa|realtime|search-preview)([-_./:]|$)/i;
+
+/**
+ * A provider's chat models, best first for a chat: quick, generous, current
+ * ones ahead of previews, the big slow ones and the reasoning-only ones.
+ */
+export function chatModels(provider, ids) {
+  const score = (id) => {
+    let n = 0;
+    if (/flash|mini|small|instant|versatile|haiku|sonnet|turbo|chat|latest|:free/i.test(id)) n += 2;
+    if (provider === 'openrouter' && /:free$/.test(id)) n += 3;
+    if (/preview|exp(erimental)?([-_.]|$)|beta|thinking|deep-research|o1|o3|r1|reason/i.test(id)) n -= 3;
+    if (/(^|[-_.])pro([-_.]|$)|large|405b|opus|ultra/i.test(id)) n -= 1;
+    return n;
+  };
+  return [...new Set(ids.map((id) => String(id).replace(/^models\//, '')).filter((id) => id && !NOT_CHAT.test(id)))]
+    .sort((a, b) => score(b) - score(a) || a.localeCompare(b));
+}
+
+const modelCache = new Map();
+const MODEL_CACHE_MS = 30 * 60 * 1000;
+
+/**
+ * The chat models this key can use, asked of the provider itself (its
+ * /models list), so the setup page offers what exists today rather than
+ * names that were current when this was written. Kept for half an hour.
+ */
+export async function listModels(config) {
+  const cacheKey = `${config.provider}|${config.baseUrl}|${crypto.createHash('sha256').update(config.apiKey || '').digest('hex')}`;
+  const hit = modelCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < MODEL_CACHE_MS) return hit.models;
+
+  let ids;
+  if (config.provider === 'anthropic') {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const client = new Anthropic({
+      apiKey: config.apiKey,
+      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
+      timeout: 20_000,
+      maxRetries: 1,
+    });
+    try {
+      const page = await client.models.list({ limit: 100 });
+      ids = page.data.map((m) => m.id);
+    } catch (err) {
+      if (err?.status) throw providerError(config, err.status, err.message);
+      throw networkError(config, err);
+    }
+  } else {
+    const res = await fetch(`${config.baseUrl || PROVIDER_URLS[config.provider]}/models`, {
+      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+      signal: AbortSignal.timeout(20_000),
+    }).catch((err) => { throw networkError(config, err); });
+    if (!res.ok) throw providerError(config, res.status, await res.text().catch(() => ''));
+    const data = await res.json().catch(() => ({}));
+    const list = Array.isArray(data) ? data : data.data || data.models || [];
+    ids = list.map((m) => (typeof m === 'string' ? m : m.id || m.name));
+  }
+  const models = chatModels(config.provider, ids);
+  modelCache.set(cacheKey, { at: Date.now(), models });
+  return models;
+}
+
+// What is worth trying elsewhere: the model busy, out of free quota, or gone.
+const TRY_ANOTHER_MODEL = new Set(['busy', 'limit', 'model', 'empty']);
+
+/**
+ * One reply, trying harder than askChat: when the chosen model is busy, out
+ * of its free quota or no longer exists, a few other models from the same
+ * provider are tried (each has its own quota), then your other saved keys.
+ * Resolves to { text, config, fallback } where fallback says what stood in
+ * and why; throws the first model's error if nothing answers.
+ *
+ * When the chosen model simply no longer exists and another of the same
+ * provider answered, the setup is moved onto that one, so the next message
+ * does not have to find it again.
+ */
+export async function askWithFallback(pairId, config, prompt, { settings = null } = {}) {
+  let first;
+  try {
+    return { text: await askChat(config, prompt), config, fallback: null };
+  } catch (err) {
+    first = err;
+  }
+  const tried = new Set([`${config.provider}|${config.model}`]);
+  const attempt = async (candidate) => {
+    const id = `${candidate.provider}|${candidate.model}`;
+    if (tried.has(id)) return null;
+    tried.add(id);
+    try {
+      return { text: await askChat(candidate, prompt, { busyWaits: [] }), config: candidate };
+    } catch (err) {
+      console.error(`[fable] fallback ${id} failed: ${err.message}`);
+      return null;
+    }
+  };
+
+  // Other models from the same provider.
+  if (TRY_ANOTHER_MODEL.has(first.kind)) {
+    const models = await listModels(config).catch(() => []);
+    for (const model of models.slice(0, 4)) {
+      const got = await attempt({ ...config, model });
+      if (got) {
+        if (first.kind === 'model' && settings?.source === 'key' && settings.provider === config.provider && pairId) {
+          await query('UPDATE fable_settings SET model = $2 WHERE pair_id = $1 AND model = $3', [pairId, model, config.model])
+            .catch(() => {});
+        }
+        return { ...got, fallback: { from: config.model, to: model, provider: config.provider, why: first.message } };
+      }
+    }
+  }
+
+  // Your other saved keys, each with its best model.
+  if (pairId && first.kind !== 'other') {
+    const { rows } = await query('SELECT provider, key_enc FROM ai_keys WHERE pair_id = $1 AND provider <> $2 ORDER BY created_at DESC', [pairId, config.provider]);
+    for (const row of rows) {
+      const preset = PROVIDERS.find((p) => p.id === row.provider);
+      const key = openApiKey(row.key_enc);
+      if (!preset || !key || preset.needsBaseUrl) continue;
+      let candidate;
+      try {
+        candidate = buildLlmConfig({ provider: row.provider, apiKey: key, model: preset.defaultModel }, APP_NAMES);
+      } catch { continue; }
+      const listed = await listModels(candidate).catch(() => []);
+      const models = [...new Set([listed.includes(preset.defaultModel) || !listed.length ? preset.defaultModel : null, ...listed.slice(0, 2)].filter(Boolean))];
+      for (const model of models) {
+        const got = await attempt({ ...candidate, model });
+        if (got) return { ...got, fallback: { from: `${labelOf(config.provider)} ${config.model}`, to: `${labelOf(row.provider)} ${model}`, provider: row.provider, why: first.message } };
+      }
+    }
+  }
+  throw first;
 }

@@ -9,7 +9,7 @@
 // The server's own AI (QUIZ_LLM_* in backend/.env) is offered too, when it has
 // one. And a key added here can also write the daily quiz, prompts and date
 // ideas when backend/.env has none.
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Switch, Alert, Linking, ActivityIndicator,
 } from 'react-native';
@@ -31,8 +31,11 @@ export default function FableSetupScreen({ navigation }) {
   const [form, setForm] = useState(null);       // what is on the page
   const [keyDraft, setKeyDraft] = useState('');
   const [busy, setBusy] = useState(null);       // 'save' | 'test' | 'key' | null
-  const [result, setResult] = useState(null);   // { ok, text }
+  const [result, setResult] = useState(null);   // { ok, text, switchTo }
   const [loadError, setLoadError] = useState(null);
+  // The models the provider offers this key today: { provider, list, error }.
+  const [models, setModels] = useState(null);
+  const [allModels, setAllModels] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -45,6 +48,27 @@ export default function FableSetupScreen({ navigation }) {
     }
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Asks the provider which models this key can use, so the page offers what
+  // exists today instead of a name to guess.
+  const fetchModels = useCallback(async (providerId, { apiKey, baseUrl } = {}) => {
+    setModels({ provider: providerId, list: null, error: null });
+    try {
+      const d = await apiFetch('/fable/models', { method: 'POST', body: { provider: providerId, apiKey, baseUrl } });
+      setModels({ provider: providerId, list: d.models, error: null });
+    } catch (err) {
+      setModels({ provider: providerId, list: null, error: err.message });
+    }
+  }, []);
+  // With a key saved (or Ollama, which needs none), the list loads by itself.
+  const providerId = form?.provider;
+  const hasKey = Boolean(data?.keys?.some((k) => k.provider === providerId)) || providerId === 'ollama';
+  useEffect(() => {
+    if (form?.source !== 'key' || !providerId || !hasKey || providerId === 'custom') return;
+    if (models?.provider === providerId) return;
+    fetchModels(providerId, { baseUrl: form?.baseUrl || undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerId, hasKey, form?.source]);
 
   if (loadError) {
     return (
@@ -79,6 +103,7 @@ export default function FableSetupScreen({ navigation }) {
       setData((old) => ({ ...old, keys: d.keys }));
       setKeyDraft('');
       setResult({ ok: true, text: `${provider.label} key saved. Press Test to try it.` });
+      fetchModels(provider.id, { baseUrl: form.baseUrl || undefined });
     } catch (err) {
       setResult({ ok: false, text: err.message });
     } finally {
@@ -107,7 +132,18 @@ export default function FableSetupScreen({ navigation }) {
     setResult(null);
     try {
       const d = await apiFetch('/fable/test', { method: 'POST', body: { ...form, apiKey: keyDraft.trim() || undefined } });
-      setResult({ ok: true, text: `“${d.reply}”  (${d.model}, ${(d.ms / 1000).toFixed(1)}s)` });
+      if (d.fallback) {
+        // The chosen model did not answer; another one did. Say which, and
+        // offer to switch to it.
+        const label = data.providers.find((p) => p.id === d.provider)?.label || d.provider;
+        setResult({
+          ok: true,
+          text: `“${d.reply}”\n\n${d.fallback.from} could not answer (${d.fallback.why}), so ${d.fallback.to} did.`,
+          switchTo: { provider: d.provider, model: d.model, label: d.provider === form.provider ? d.model : `${label} · ${d.model}` },
+        });
+      } else {
+        setResult({ ok: true, text: `“${d.reply}”  (${d.model}, ${(d.ms / 1000).toFixed(1)}s)` });
+      }
     } catch (err) {
       setResult({ ok: false, text: err.message });
     } finally {
@@ -269,7 +305,48 @@ export default function FableSetupScreen({ navigation }) {
               autoCorrect={false}
               style={styles.input}
             />
-            <Text style={styles.hint}>Any chat model {provider.label} offers. {provider.defaultModel ? `${provider.defaultModel} is a good start.` : ''}</Text>
+            {models?.provider === provider.id && models.list?.length ? (
+              <>
+                <Text style={styles.hint}>{provider.label} offers these to your key. Tap one, or type any other.</Text>
+                <View style={[styles.chips, { marginTop: spacing.xs }]}>
+                  {(allModels ? models.list : models.list.slice(0, 10)).map((m) => {
+                    const active = m === form.model;
+                    return (
+                      <MorphButton key={m} onPress={() => set({ model: m })} style={[styles.chip, active && styles.chipActive]}>
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{m}</Text>
+                      </MorphButton>
+                    );
+                  })}
+                  {models.list.length > 10 ? (
+                    <MorphButton onPress={() => setAllModels((v) => !v)} style={styles.chip}>
+                      <Text style={[styles.chipText, { color: colors.accent }]}>{allModels ? 'Fewer' : `All ${models.list.length}`}</Text>
+                    </MorphButton>
+                  ) : null}
+                </View>
+              </>
+            ) : models?.provider === provider.id && !models.list && !models.error ? (
+              <View style={[styles.linkRow, { marginTop: spacing.xs }]}>
+                <ActivityIndicator size="small" color={colors.accent} />
+                <Text style={styles.hint}>Asking {provider.label} which models your key can use…</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.hint}>
+                  {models?.provider === provider.id && models.error
+                    ? `Could not list the models: ${models.error}`
+                    : `Any chat model ${provider.label} offers. ${provider.defaultModel ? `${provider.defaultModel} is a good start.` : ''}`}
+                </Text>
+                {savedKey || keyDraft.trim() || provider.noKey || provider.needsBaseUrl ? (
+                  <MorphButton
+                    onPress={() => fetchModels(provider.id, { apiKey: keyDraft.trim() || undefined, baseUrl: form.baseUrl || undefined })}
+                    style={styles.linkRow}
+                  >
+                    <Icon name="list-outline" chip={false} size={13} color={colors.accent} />
+                    <Text style={styles.link}>Show the models my key can use</Text>
+                  </MorphButton>
+                ) : null}
+              </>
+            )}
 
             {provider.needsBaseUrl || provider.id === 'ollama' ? (
               <>
@@ -364,7 +441,21 @@ export default function FableSetupScreen({ navigation }) {
       {result ? (
         <View style={[styles.result, { borderColor: result.ok ? colors.success : colors.danger }]}>
           <Icon name={result.ok ? 'checkmark-circle' : 'alert-circle'} chip={false} size={16} color={result.ok ? colors.success : colors.danger} />
-          <Text style={[font.body, { flex: 1 }]}>{result.text}</Text>
+          <View style={{ flex: 1, gap: spacing.sm }}>
+            <Text style={font.body}>{result.text}</Text>
+            {result.switchTo ? (
+              <MorphButton
+                onPress={() => {
+                  const { provider: p, model: m } = result.switchTo;
+                  setForm((f) => ({ ...f, provider: p, model: m }));
+                  setResult({ ok: true, text: `Switched to ${result.switchTo.label}. Press Save to keep it.` });
+                }}
+                style={[styles.smallButton, { alignSelf: 'flex-start' }]}
+              >
+                <Text style={styles.smallButtonText}>Use {result.switchTo.label}</Text>
+              </MorphButton>
+            ) : null}
+          </View>
         </View>
       ) : null}
 

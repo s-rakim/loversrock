@@ -30,7 +30,9 @@ phone ──► loversrock backend (Docker) ──► the AI provider you chose
 3. Under **Who answers**, pick **My own API key**, then pick the provider.
 4. Paste the key and tap **Save key**. The key is sent once and sealed on the
    server. After that the page only ever shows its last four characters.
-5. Leave the model as suggested, or type another one from that provider.
+5. Pick a model. Once a key is saved, the page asks the provider which chat
+   models that key can use today and lists them, best first: tap one. You
+   can still type any other name.
 6. Give it a name and a personality if you like, then tap **Test**. You should
    get a one-line hello back.
 7. Tap **Save**.
@@ -63,9 +65,24 @@ then says so and asks for them again.
 
 The API never returns a key, only a hint like `…a1b2`.
 
+## When the chosen model is busy or gone
+
+Free tiers are often busy ("high demand") or out of their per-minute quota,
+and providers retire model names. Rather than giving up, Fable tries:
+
+1. the chosen model, twice more a few seconds apart if it is busy;
+2. up to four other chat models from the same provider (each has its own
+   free quota);
+3. then your other saved keys, each with its best model.
+
+Whichever answers, answers. If the chosen model no longer exists, the setup
+moves onto the one that answered. **Test** says when another model stood in,
+and offers a button to switch to it.
+
 ## When it does not answer
 
-The chat shows a red line saying why, and tapping it opens the setup page.
+When nothing answers, the chat shows a red line saying why, and tapping it
+opens the setup page.
 
 | Message | Meaning |
 |---|---|
