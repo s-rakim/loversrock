@@ -119,6 +119,8 @@ const CallContext = createContext(null);
 
 // 'idle' | 'ringing-out' | 'ringing-in' | 'connecting' | 'connected' | 'ended'
 const IDLE = { phase: 'idle' };
+// How long a call answered on the private path gets before it widens.
+export const WIDEN_AFTER_MS = 6000;
 
 export function CallProvider({ children }) {
   const [call, setCall] = useState(IDLE);
@@ -159,6 +161,16 @@ export function CallProvider({ children }) {
   const remoteCandidates = useRef([]);
   // A failed connection gets one ICE restart before the call is ended.
   const failTimer = useRef(null);
+  // The call servers from /calls/config, and whether this call has widened
+  // to the internet path: a call starts on Tailscale, the home network and
+  // the relay only, and adds each phone's public address (from STUN), to the
+  // other phone only, when that has not connected within a few seconds.
+  const iceConfig = useRef(null);
+  const widened = useRef(false);
+  // restartIce, for the connection's event listeners, which outlive a render.
+  const restartIceRef = useRef(null);
+  /** An SDP as it may leave this phone: private-only until the call widens. */
+  const outSdp = (sdp) => (widened.current ? sdp : privateSdp(sdp));
 
   const teardown = useCallback(() => {
     pc.current?.getSenders?.().forEach((sender) => {
@@ -184,6 +196,8 @@ export function CallProvider({ children }) {
     clearTimeout(failTimer.current);
     failTimer.current = null;
     restarted.current = false;
+    widened.current = false;
+    iceConfig.current = null;
     setIceState(null);
     setRelayed(false);
     setLocalStream(null);
@@ -248,10 +262,12 @@ export function CallProvider({ children }) {
   }, []);
 
   /** Why a call that was answered never connected. */
-  const failureMessage = () => (hasTurn.current
-    ? 'Could not connect, even through the relay. Check that both phones can reach the server.'
-    : 'Could not find a path between the two phones, and the server has no relay: '
-      + 'TURN_PUBLIC_IP is not set (see docker/turnserver.conf).');
+  const failureMessage = () => {
+    const tried = widened.current ? ' It tried Tailscale, your home network and the internet.' : '';
+    return hasTurn.current
+      ? `Could not connect, even through the relay.${tried} Check that both phones are online and Tailscale is on.`
+      : `Could not find a path between the two phones.${tried} Check that both phones are online and Tailscale is on.`;
+  };
 
   /** Which networks each phone offered, from the SDPs and trickled candidates. */
   const pathSummary = (connection) => describePaths(
@@ -262,6 +278,7 @@ export function CallProvider({ children }) {
   const buildPeerConnection = useCallback(async (kind, stream) => {
     const config = await apiFetch('/calls/config');
     hasTurn.current = Boolean(config?.hasTurn);
+    iceConfig.current = config;
     const connection = new RTCPeerConnection({
       iceServers: config.iceServers,
       // Bundling everything on one transport means one ICE negotiation
@@ -281,8 +298,9 @@ export function CallProvider({ children }) {
 
     connection.addEventListener('icecandidate', (event) => {
       if (!event.candidate) return; // null means gathering finished
-      // A public address stays on this phone (see paths.js).
-      if (!isPrivateCandidate(event.candidate.candidate)) return;
+      // A public address stays on this phone (see paths.js), unless the
+      // call has widened to the internet path because nothing private worked.
+      if (!widened.current && !isPrivateCandidate(event.candidate.candidate)) return;
       const candidate = {
         candidate: scrubCandidate(event.candidate.candidate),
         sdpMid: event.candidate.sdpMid,
@@ -309,7 +327,9 @@ export function CallProvider({ children }) {
       if (state === 'failed' && !failTimer.current) {
         failTimer.current = setTimeout(() => {
           failTimer.current = null;
-          if (pc.current !== connection || connection.connectionState === 'connected') return;
+          // Recovered, or a restart is still trying: the overall deadline
+          // (below) covers a restart that never gets anywhere.
+          if (pc.current !== connection || connection.connectionState !== 'failed') return;
           setError(`${failureMessage()}\n\n${pathSummary(connection)}`);
           setCall((c) => ({ ...c, phase: 'ended' }));
           teardown();
@@ -321,22 +341,19 @@ export function CallProvider({ children }) {
       const state = connection.iceConnectionState;
       setIceState(state);
 
-      // One ICE restart before giving up. A candidate set gathered while the
+      // Before giving up: widen to the internet path if the call has not
+      // yet, then one plain ICE restart. A candidate set gathered while the
       // phone was switching from Wi-Fi to mobile data is stale rather than
       // wrong, and re-gathering fixes it without dropping the call.
       // Only the caller restarts. Both ends restarting at once would each
       // send an offer while holding one of their own, and both would fail.
-      if (state === 'failed' && !restarted.current && pc.current && roleRef.current === 'caller') {
-        restarted.current = true;
-        (async () => {
-          try {
-            const offer = await pc.current.createOffer({ iceRestart: true });
-            await pc.current.setLocalDescription(offer);
-            getSocket()?.emit('call:renegotiate', {
-              callId: callIdRef.current, sdp: privateSdp(offer.sdp), type: offer.type,
-            });
-          } catch { /* the failure handler above still runs */ }
-        })();
+      if (state === 'failed' && pc.current && roleRef.current === 'caller') {
+        if (!widened.current && iceConfig.current?.fallbackStun?.length) {
+          restartIceRef.current?.({ widen: true });
+        } else if (!restarted.current) {
+          restarted.current = true;
+          restartIceRef.current?.({ widen: false });
+        }
       }
     });
 
@@ -350,6 +367,43 @@ export function CallProvider({ children }) {
     pc.current = connection;
     return connection;
   }, [teardown]);
+
+  /**
+   * Adds the fallback STUN servers to a connection and lets public addresses
+   * out. Returns false when the server has the fallback turned off.
+   */
+  const widen = useCallback((connection) => {
+    const stun = iceConfig.current?.fallbackStun || [];
+    if (!connection || !stun.length) return false;
+    widened.current = true;
+    try {
+      connection.setConfiguration({
+        iceServers: [...(iceConfig.current.iceServers || []), { urls: stun }],
+        bundlePolicy: 'max-bundle',
+        iceCandidatePoolSize: 4,
+      });
+    } catch {
+      // A build that cannot change servers mid-call still re-gathers on
+      // the old ones, and now sends its public IPv6 addresses, if any.
+    }
+    return true;
+  }, []);
+
+  /** An ICE restart, the caller's: optionally widening to the internet path. */
+  const restartIce = useCallback(async ({ widen: wider = false } = {}) => {
+    const connection = pc.current;
+    if (!connection || roleRef.current !== 'caller') return;
+    const widening = wider && !widened.current && widen(connection);
+    try {
+      const offer = await connection.createOffer({ iceRestart: true });
+      await connection.setLocalDescription(offer);
+      getSocket()?.emit('call:renegotiate', {
+        callId: callIdRef.current, sdp: outSdp(offer.sdp), type: offer.type, widen: widening,
+      });
+    } catch { /* the deadlines below still end a call that cannot connect */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widen]);
+  restartIceRef.current = restartIce;
 
   const flushCandidates = useCallback(async () => {
     const queued = pendingCandidates.current;
@@ -391,7 +445,7 @@ export function CallProvider({ children }) {
       // other phone simply never rings. Wait for a live socket, and say so
       // if there isn't one.
       const socket = await waitForSocket();
-      socket.emit('call:offer', { callId: record.id, kind, sdp: privateSdp(offer.sdp), type: offer.type });
+      socket.emit('call:offer', { callId: record.id, kind, sdp: outSdp(offer.sdp), type: offer.type });
       audio.ringback();   // so the caller hears that it is ringing
     } catch (err) {
       const message = err.body?.call ? 'A call is already in progress.' : err.message;
@@ -428,7 +482,7 @@ export function CallProvider({ children }) {
       await connection.setLocalDescription(answer);
 
       await apiFetch(`/calls/${call.id}/answer`, { method: 'POST' });
-      getSocket()?.emit('call:answer', { callId: call.id, sdp: privateSdp(answer.sdp), type: answer.type });
+      getSocket()?.emit('call:answer', { callId: call.id, sdp: outSdp(answer.sdp), type: answer.type });
       setCall((c) => ({ ...c, phase: 'connecting' }));
     } catch (err) {
       // A 404 here means the caller gave up (or their call failed) before
@@ -532,12 +586,15 @@ export function CallProvider({ children }) {
       socket.on('call:renegotiate', async (payload) => {
         if (!pc.current || !payload?.sdp) return;
         try {
+          // The caller widened to the internet path: this end widens too,
+          // or only one side would be offering its public address.
+          if (payload.widen && !widened.current) widen(pc.current);
           await pc.current.setRemoteDescription(new RTCSessionDescription({
             type: payload.type || 'offer', sdp: payload.sdp,
           }));
           const answer = await pc.current.createAnswer();
           await pc.current.setLocalDescription(answer);
-          socket.emit('call:answer', { callId: payload.callId, sdp: privateSdp(answer.sdp), type: answer.type });
+          socket.emit('call:answer', { callId: payload.callId, sdp: outSdp(answer.sdp), type: answer.type });
         } catch (err) {
           setError(err.message);
         }
@@ -587,7 +644,7 @@ export function CallProvider({ children }) {
         if (!connection || roleRef.current !== 'caller' || payload?.callId !== callIdRef.current) return;
         const sdp = connection.localDescription?.sdp;
         if (!sdp || connection.remoteDescription) return; // not offered yet, or already answered
-        socket.emit('call:offer', { callId: callIdRef.current, kind: kindRef.current, sdp: privateSdp(sdp), type: 'offer' });
+        socket.emit('call:offer', { callId: callIdRef.current, kind: kindRef.current, sdp: outSdp(sdp), type: 'offer' });
         localCandidates.current.forEach((candidate) => {
           socket.emit('call:ice', { callId: callIdRef.current, candidate });
         });
@@ -605,7 +662,21 @@ export function CallProvider({ children }) {
         .forEach((event) => live?.off(event));
       live?.off('connect', askForRingingCall);
     };
-  }, [flushCandidates, teardown, askForRingingCall]);
+  }, [flushCandidates, teardown, askForRingingCall, widen]);
+
+  // Answered, and not connected within a few seconds: Tailscale, the home
+  // network and the relay have had their chance, which on a working tailnet
+  // takes about a second. Widen to the internet path, the way calls used to
+  // connect, without hanging up.
+  useEffect(() => {
+    if (call.phase !== 'connecting' || call.role !== 'caller') return undefined;
+    const timer = setTimeout(() => {
+      const connection = pc.current;
+      if (!connection || widened.current || connection.connectionState === 'connected') return;
+      restartIce({ widen: true });
+    }, WIDEN_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [call.phase, call.role, restartIce]);
 
   // Answered, but never actually connected.
   //
@@ -618,7 +689,7 @@ export function CallProvider({ children }) {
     const timer = setTimeout(() => {
       setError(`${failureMessage()}\n\n${pathSummary(pc.current)}`);
       endCall('ice-timeout');
-    }, 30000);
+    }, 45000);
     return () => clearTimeout(timer);
   }, [call.phase, endCall]);
 

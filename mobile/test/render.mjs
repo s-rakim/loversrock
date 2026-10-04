@@ -863,5 +863,21 @@ console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMEL
   check('and the two timelapses', Sky.SCENES.every((s) => fs.existsSync(path.join(dir, `timelapse-${s}.mp4`))));
 }
 
+console.log('\n=== CALLS: PRIVATE FIRST, THE INTERNET IF THAT DOES NOT CONNECT ===');
+{
+  const ctx = fs.readFileSync(path.join(root, 'components', 'calls', 'CallContext.js'), 'utf8');
+  const after = Number((ctx.match(/WIDEN_AFTER_MS = (\d+)/) || [])[1]);
+  check('an answered call that has not connected widens after a few seconds', after >= 3000 && after <= 10000, after);
+  check('until then, a public address never leaves the phone',
+    /if \(!widened\.current && !isPrivateCandidate\(event\.candidate\.candidate\)\) return;/.test(ctx));
+  check('every description sent goes through the same rule',
+    !/emit\('call:(offer|answer|renegotiate)'[^)]*privateSdp\(/.test(ctx) && (ctx.match(/sdp: outSdp\(/g) || []).length >= 5,
+    (ctx.match(/sdp: outSdp\(/g) || []).length);
+  check('widening adds the fallback STUN servers to the live connection',
+    /setConfiguration\(\{\s*iceServers: \[\.\.\.\(iceConfig\.current\.iceServers \|\| \[\]\), \{ urls: stun \}\]/.test(ctx));
+  check('and the other phone widens too when asked', /if \(payload\.widen && !widened\.current\) widen\(pc\.current\);/.test(ctx));
+  check('an ICE failure widens before it gives up', /if \(!widened\.current && iceConfig\.current\?\.fallbackStun\?\.length\) \{\s*restartIceRef\.current\?\.\(\{ widen: true \}\)/.test(ctx));
+}
+
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

@@ -78,6 +78,27 @@ function stunUrls() {
   return String(process.env.STUN_URLS || '').split(',').map((u) => u.trim()).filter(Boolean);
 }
 
+/**
+ * The fallback, for when the private path does not connect.
+ *
+ * A call first offers only Tailscale, home-network and relay addresses. When
+ * that has not connected within a few seconds (one phone's Tailscale does
+ * not reach the other, no relay is set up, or the relay cannot carry media),
+ * the phones widen it: they ask these STUN servers for their public address
+ * and offer that too, to each other only, which is how calls connected
+ * before. The private path still wins whenever it works.
+ *
+ * STUN_FALLBACK=off turns the fallback off (Tailscale or the relay only);
+ * STUN_FALLBACK=stun:… replaces Google's servers with your own.
+ */
+const DEFAULT_FALLBACK_STUN = ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'];
+export function fallbackStunUrls(env = process.env) {
+  const raw = String(env.STUN_FALLBACK || '').trim();
+  if (/^(off|false|no|0|none)$/i.test(raw)) return [];
+  if (raw) return raw.split(',').map((u) => u.trim()).filter(Boolean);
+  return DEFAULT_FALLBACK_STUN;
+}
+
 router.get('/config', async (req, res) => {
   const iceServers = [];
   const stun = stunUrls();
@@ -107,6 +128,8 @@ router.get('/config', async (req, res) => {
     iceServers,
     hasTurn,
     turnExpiresAt: expiresAt,
+    // Added to the connection only if the private path does not connect.
+    fallbackStun: fallbackStunUrls(),
   });
 });
 

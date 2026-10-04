@@ -33,16 +33,34 @@ What the server does:
     |        (direct, never through the server)          |
 ```
 
-## Connectivity, and the one case that needs more
+## Connectivity: private first, the internet if that does not connect
 
-WebRTC needs the two devices to find a path to each other. `GET /calls/config`
-serves Google's public STUN, which is enough whenever a direct path exists —
-and for a couple on the same **Tailscale tailnet, that is the normal case**,
-because Tailscale has already solved the NAT problem.
+WebRTC needs the two phones to find a path to each other. A call tries in
+two steps:
 
-The case STUN cannot solve is both ends behind symmetric NAT (some mobile
-carriers, some corporate networks). That needs a **TURN server**, which
-relays the media. It is configured only if you have one:
+1. **Private.** Each phone offers only its Tailscale address, its home
+   network address and the relay (when one is set up). Nobody outside the
+   tailnet learns anything, and on a working tailnet this connects in about a
+   second.
+2. **The internet, if step 1 has not connected six seconds after the call is
+   answered** (or as soon as ICE reports failure). The caller widens the call
+   without hanging up: both phones ask a public STUN server (Google's) for
+   their internet address and offer it to each other, which is how calls
+   always connected before the private step existed. The other phone is the
+   only one told; the STUN server sees the address the way any website does.
+
+`GET /calls/config` serves the private servers (`iceServers`) and the
+fallback separately (`fallbackStun`). In `backend/.env`:
+
+```bash
+STUN_FALLBACK=off                # never widen: Tailscale or the relay only
+STUN_FALLBACK=stun:my.stun:3478  # widen, with your own STUN server
+STUN_URLS=stun:...               # use STUN from the start instead
+```
+
+The case neither step solves is both phones behind symmetric NAT (some mobile
+carriers, some corporate networks) with no working Tailscale path. That needs
+a **TURN server**, which relays the media:
 
 ```bash
 # backend/.env
@@ -51,10 +69,9 @@ TURN_USERNAME=user
 TURN_PASSWORD=secret
 ```
 
-Without it, calls work in the common case and fail honestly in the uncommon
-one, with a message that says what would fix it. `hasTurn` in the config
-response tells the client which situation it is in. Running your own is a
-`coturn` container; there are also hosted ones.
+`hasTurn` in the config response tells the client whether it has one. The
+bundled `coturn` container is the other option (below); there are also
+hosted ones.
 
 ### When a call cannot connect
 
@@ -62,7 +79,7 @@ The error under a failed call lists which networks each phone offered:
 
 - **Tailscale:** an address on the tailnet (100.64.x.x to 100.127.x.x).
 - **local network:** Wi-Fi or LAN.
-- **internet:** the public address STUN found.
+- **internet:** the public address STUN found (only after the call widened).
 - **relay:** the TURN server.
 
 If both phones list **Tailscale**, they can reach each other over the tailnet
@@ -75,8 +92,9 @@ first:
 A relay is the fallback when that is not possible. For the bundled coturn,
 set `TURN_PUBLIC_IP` and `TURN_SECRET` in `docker/.env`.
 
-A failed connection is given one ICE restart by the caller and fifteen
-seconds to recover before the call is ended.
+A failed connection is widened to the internet (above), then given one plain
+ICE restart by the caller. A call that has not connected 45 seconds after it
+was answered is ended, with the networks each phone offered.
 
 If the callee's app was closed when the call came in, the original offer went
 nowhere. When the app opens (from the call notification, or just by being

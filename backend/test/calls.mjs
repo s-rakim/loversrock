@@ -52,6 +52,14 @@ check('whether TURN is configured is stated plainly',
   typeof config.data.hasTurn === 'boolean', config.data.hasTurn);
 check('no credentials are served when there is no TURN',
   config.data.hasTurn || !JSON.stringify(config.data).includes('credential'), config.data);
+check('a fallback STUN list comes separately, for when the private path does not connect',
+  Array.isArray(config.data.fallbackStun) && (process.env.STUN_FALLBACK ? true : config.data.fallbackStun.every((u) => u.startsWith('stun:')) && config.data.fallbackStun.length > 0),
+  config.data.fallbackStun);
+{
+  const { fallbackStunUrls } = await import('../src/routes/calls.js');
+  check('STUN_FALLBACK=off turns the fallback off', fallbackStunUrls({ STUN_FALLBACK: 'off' }).length === 0);
+  check('and STUN_FALLBACK can name your own servers', fallbackStunUrls({ STUN_FALLBACK: 'stun:a:1, stun:b:2' }).join() === 'stun:a:1,stun:b:2');
+}
 check('an unpaired user cannot read call config',
   (await req('/calls/config', { token: C.token })).status === 403);
 
