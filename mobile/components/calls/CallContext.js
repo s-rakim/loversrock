@@ -19,7 +19,7 @@
 import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { Platform, AppState, PermissionsAndroid, Alert, NativeModules } from 'react-native';
+import { Platform, AppState, PermissionsAndroid, Alert, NativeModules, Linking } from 'react-native';
 
 /**
  * WebRTC, required rather than imported, for exactly the reason stated below
@@ -40,9 +40,10 @@ try {
   WebRTC = null;
 }
 const {
-  RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices,
+  RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices, MediaStream,
 } = WebRTC || {};
 import { apiFetch, connectSocket, getSocket, waitForSocket } from '../../services/api';
+import { SfuSession, newClientId } from './sfu';
 import {
   candidateLines, describePaths, isPrivateCandidate, privateSdp, scrubCandidate,
 } from './paths';
@@ -169,6 +170,10 @@ export function CallProvider({ children }) {
   const widened = useRef(false);
   // restartIce, for the connection's event listeners, which outlive a render.
   const restartIceRef = useRef(null);
+  // A call through the media server (sfu.js, docker/calls) rather than
+  // phone to phone: its session, and whether this call is one.
+  const sfuRef = useRef(null);
+  const sfuModeRef = useRef(false);
   /** An SDP as it may leave this phone: private-only until the call widens. */
   const outSdp = (sdp) => (widened.current ? sdp : privateSdp(sdp));
 
@@ -198,6 +203,9 @@ export function CallProvider({ children }) {
     restarted.current = false;
     widened.current = false;
     iceConfig.current = null;
+    sfuRef.current?.close();
+    sfuRef.current = null;
+    sfuModeRef.current = false;
     setIceState(null);
     setRelayed(false);
     setLocalStream(null);
@@ -405,6 +413,40 @@ export function CallProvider({ children }) {
   }, [widen]);
   restartIceRef.current = restartIce;
 
+  /**
+   * Joins this call's room on the media server: this phone's camera and
+   * microphone go up, the other phone's come back down. Both phones only
+   * ever need to reach the server, which they already do for everything
+   * else, so no path between the two phones is needed at all.
+   */
+  const joinSfu = useCallback((sfu, stream) => {
+    if (sfuRef.current) return sfuRef.current;
+    const session = new SfuSession({
+      url: sfu.url,
+      room: sfu.room,
+      clientId: newClientId(roleRef.current || 'p'),
+      nickname: roleRef.current || '',
+      stream,
+      iceServers: sfu.iceServers || [],
+      webrtc: { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, MediaStream },
+      onIceState: (state) => setIceState(state),
+      onRemoteStream: (remote) => {
+        // The other phone's media has arrived: that is the call connected.
+        setRemoteStream(remote);
+        audio.stopRingback();
+        audio.stopRing();
+        setCall((c) => (c.phase === 'connecting' || c.phase === 'ringing-out' ? { ...c, phase: 'connected' } : c));
+      },
+      onClosed: (reason) => {
+        if (sfuRef.current !== session) return;
+        setError(`The call server hung up (${reason}). Check that the calls service is running (docker compose ps).`);
+      },
+    });
+    sfuRef.current = session;
+    session.start();
+    return session;
+  }, []);
+
   const flushCandidates = useCallback(async () => {
     const queued = pendingCandidates.current;
     pendingCandidates.current = [];
@@ -431,6 +473,18 @@ export function CallProvider({ children }) {
       roleRef.current = 'caller';
       kindRef.current = kind;
       setCall({ phase: 'ringing-out', kind, id: record.id, role: 'caller' });
+
+      // Through the media server when there is one: ring now, and both
+      // phones join its room when the call is answered.
+      const config = await apiFetch('/calls/config');
+      if (config?.sfu?.url) {
+        sfuModeRef.current = true;
+        iceConfig.current = config;
+        const socket = await waitForSocket();
+        socket.emit('call:offer', { callId: record.id, kind, sfu: true, sdp: null, type: 'offer' });
+        audio.ringback();
+        return;
+      }
 
       const connection = await buildPeerConnection(kind, stream);
       const offer = await connection.createOffer({
@@ -462,6 +516,31 @@ export function CallProvider({ children }) {
   /** Pick up. */
   const answerCall = useCallback(async () => {
     if (call.phase !== 'ringing-in' || !call.offer) return;
+    if (call.offer.sfu) {
+      // Through the media server: say yes, and join the room.
+      setError(null);
+      if (!(await ensurePermissions(call.kind))) return;
+      try {
+        audio.stopRing();
+        audio.start(call.kind === 'video' ? 'video' : 'audio');
+        audio.screenOn(true);
+        if (call.kind === 'video') { audio.speaker(true); setSpeakerOn(true); }
+        const stream = await getMedia(call.kind);
+        const config = await apiFetch('/calls/config');
+        if (!config?.sfu?.url) throw new Error('The call server is not available right now.');
+        sfuModeRef.current = true;
+        iceConfig.current = config;
+        await apiFetch(`/calls/${call.id}/answer`, { method: 'POST' });
+        getSocket()?.emit('call:answer', { callId: call.id, sfu: true });
+        setCall((c) => ({ ...c, phase: 'connecting' }));
+        joinSfu({ ...config.sfu, room: `call-${call.id}` }, stream);
+      } catch (err) {
+        setError(err.status === 404 ? 'That call already ended before you picked up.' : err.message);
+        setCall(IDLE);
+        teardown();
+      }
+      return;
+    }
     setError(null);
     if (!(await ensurePermissions(call.kind))) return;
     try {
@@ -491,7 +570,7 @@ export function CallProvider({ children }) {
       setCall(IDLE);
       teardown();
     }
-  }, [call, ensurePermissions, getMedia, buildPeerConnection, flushCandidates, teardown]);
+  }, [call, ensurePermissions, getMedia, buildPeerConnection, flushCandidates, teardown, joinSfu]);
 
   /** Hang up, decline, or give up — the server works out which it was. */
   const endCall = useCallback(async (reason = 'hangup') => {
@@ -564,7 +643,7 @@ export function CallProvider({ children }) {
 
       socket.on('call:offer', async (payload) => {
         // Already busy: tell them rather than silently ignoring it.
-        if (pc.current) {
+        if (pc.current || sfuRef.current) {
           socket.emit('call:decline', { callId: payload.callId, reason: 'busy' });
           return;
         }
@@ -577,7 +656,7 @@ export function CallProvider({ children }) {
           kind: payload.kind || 'voice',
           id: payload.callId,
           role: 'callee',
-          offer: { sdp: payload.sdp },
+          offer: { sdp: payload.sdp, sfu: Boolean(payload.sfu) },
         });
       });
 
@@ -601,6 +680,15 @@ export function CallProvider({ children }) {
       });
 
       socket.on('call:answer', async (payload) => {
+        // Answered, through the media server: join the room too.
+        if (payload?.sfu && sfuModeRef.current && roleRef.current === 'caller') {
+          setCall((c) => ({ ...c, phase: 'connecting' }));
+          const config = iceConfig.current;
+          if (config?.sfu?.url && localStreamRef.current) {
+            joinSfu({ ...config.sfu, room: `call-${callIdRef.current}` }, localStreamRef.current);
+          }
+          return;
+        }
         if (!pc.current) return;
         try {
           await pc.current.setRemoteDescription(new RTCSessionDescription({
@@ -640,6 +728,10 @@ export function CallProvider({ children }) {
       // callee asks for the offer again, and the caller, still ringing,
       // sends it again with every candidate gathered so far.
       socket.on('call:want-offer', (payload) => {
+        if (sfuModeRef.current && roleRef.current === 'caller' && payload?.callId === callIdRef.current && !sfuRef.current) {
+          socket.emit('call:offer', { callId: callIdRef.current, kind: kindRef.current, sfu: true, sdp: null, type: 'offer' });
+          return;
+        }
         const connection = pc.current;
         if (!connection || roleRef.current !== 'caller' || payload?.callId !== callIdRef.current) return;
         const sdp = connection.localDescription?.sdp;
@@ -662,14 +754,14 @@ export function CallProvider({ children }) {
         .forEach((event) => live?.off(event));
       live?.off('connect', askForRingingCall);
     };
-  }, [flushCandidates, teardown, askForRingingCall, widen]);
+  }, [flushCandidates, teardown, askForRingingCall, widen, joinSfu]);
 
   // Answered, and not connected within a few seconds: Tailscale, the home
   // network and the relay have had their chance, which on a working tailnet
   // takes about a second. Widen to the internet path, the way calls used to
   // connect, without hanging up.
   useEffect(() => {
-    if (call.phase !== 'connecting' || call.role !== 'caller') return undefined;
+    if (call.phase !== 'connecting' || call.role !== 'caller' || sfuModeRef.current) return undefined;
     const timer = setTimeout(() => {
       const connection = pc.current;
       if (!connection || widened.current || connection.connectionState === 'connected') return;
@@ -687,11 +779,37 @@ export function CallProvider({ children }) {
   useEffect(() => {
     if (call.phase !== 'connecting') return undefined;
     const timer = setTimeout(() => {
-      setError(`${failureMessage()}\n\n${pathSummary(pc.current)}`);
+      setError(sfuModeRef.current
+        ? `Could not connect through the call server (${iceConfig.current?.sfu?.url || 'not configured'}). `
+          + 'Check that the calls service is running on the server PC and that both phones are online.'
+        : `${failureMessage()}\n\n${pathSummary(pc.current)}`);
       endCall('ice-timeout');
     }, 45000);
     return () => clearTimeout(timer);
   }, [call.phase, endCall]);
+
+  // Answer or Decline, tapped on the ringing notification (CallRinger.kt):
+  // loversrock://call?answer=<id> or ?decline=<id> opens the app. The call
+  // itself arrives a moment later (askForRingingCall), and is answered or
+  // declined as soon as it does.
+  const pendingAction = useRef(null);
+  useEffect(() => {
+    const take = (url) => {
+      const m = /^loversrock:\/\/call\?(answer|decline)=([\w-]+)/.exec(String(url || ''));
+      if (m) pendingAction.current = { action: m[1], callId: m[2], at: Date.now() };
+    };
+    Linking.getInitialURL().then(take).catch(() => {});
+    const sub = Linking.addEventListener('url', ({ url }) => take(url));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    const want = pendingAction.current;
+    if (!want || Date.now() - want.at > 60000) return;
+    if (call.phase !== 'ringing-in' || call.id !== want.callId) return;
+    pendingAction.current = null;
+    if (want.action === 'answer') answerCall();
+    else endCall('declined');
+  }, [call.phase, call.id, answerCall, endCall]);
 
   // Nobody picks up forever. Without this the caller stares at "Calling…"
   // until they kill the app, and the row stays 'ringing' in the history.

@@ -24,7 +24,7 @@ class VoiceMessagingService : ExpoFirebaseMessagingService() {
         // an ordinary one-beep notification.
         if (data["type"] == "call") {
             val callId = data["callId"] ?: return
-            CallRinger.ring(applicationContext, callId, data["from"] ?: "Your partner", data["kind"] ?: "voice")
+            CallRinger.ring(applicationContext, callId, data["from"] ?: "Your partner", data["kind"] ?: "voice", data["declineToken"])
             return
         }
         if (data["type"] == "call_end") {

@@ -244,6 +244,11 @@ caption, send. It lands on your partner's widget and, because every widget
 photo is mirrored into Memories with `source='widget'`, it is never lost
 even if native delivery fails.
 
+Each phone's widget shows the **other** person's latest photo, never your
+own: `/widget/photo` and `/widget/summary` pick the newest photo whose
+`sender_id` is not you, and the Home card asks for `?from=partner`. Sending
+a photo changes your partner's widget, not yours.
+
 The chain, and where each part is proven:
 
 | Hop | Proven by |

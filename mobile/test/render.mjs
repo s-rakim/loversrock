@@ -879,5 +879,64 @@ console.log('\n=== CALLS: PRIVATE FIRST, THE INTERNET IF THAT DOES NOT CONNECT =
   check('an ICE failure widens before it gives up', /if \(!widened\.current && iceConfig\.current\?\.fallbackStun\?\.length\) \{\s*restartIceRef\.current\?\.\(\{ widen: true \}\)/.test(ctx));
 }
 
+console.log('\n=== CALLS THROUGH THE MEDIA SERVER (peer-calls) ===');
+{
+  const { SfuSession, SERVER_PEER } = load('components/calls/sfu.js');
+  const sent = [];
+  class FakeSocket {
+    constructor(url) { this.url = url; this.readyState = 1; FakeSocket.last = this; }
+    send(m) { sent.push(JSON.parse(m)); }
+    close() { this.readyState = 3; }
+  }
+  const calls = [];
+  class FakePC {
+    constructor(cfg) { this.cfg = cfg; this.remoteDescription = null; calls.push(['new', cfg]); FakePC.last = this; }
+    addTrack(t) { calls.push(['addTrack', t.kind]); }
+    async setRemoteDescription(d) { this.remoteDescription = d; calls.push(['remote', d.type]); }
+    async addIceCandidate(c) { calls.push(['candidate', c.candidate]); }
+    async createAnswer() { return { type: 'answer', sdp: 'v=0 answer' }; }
+    async setLocalDescription(d) { calls.push(['local', d.type]); }
+    close() { calls.push(['close']); }
+  }
+  const webrtc = { RTCPeerConnection: FakePC, RTCSessionDescription: function D(x) { return x; }, RTCIceCandidate: function C(x) { return x; }, MediaStream: class {} };
+  const stream = { getTracks: () => [{ kind: 'audio' }, { kind: 'video' }] };
+  const s = new SfuSession({ url: 'ws://h:4100/ws/', room: 'call-1', clientId: 'me-1', nickname: 'me', stream, webrtc, WebSocketImpl: FakeSocket }).start();
+  check('it connects to /ws/<room>/<client>, as peer-calls expects', FakeSocket.last.url === 'ws://h:4100/ws/call-1/me-1', FakeSocket.last.url);
+  FakeSocket.last.onopen();
+  check('and says it is ready', sent[0]?.type === 'ready' && sent[0].room === 'call-1' && sent[0].payload.nickname === 'me', sent[0]);
+  s.handle({ type: 'ping' });
+  check('answers the server\'s ping, or it would hang up', sent.at(-1)?.type === 'pong');
+  // A candidate before the offer waits for it.
+  await s.handle({ type: 'signal', payload: { peerId: SERVER_PEER, signal: { type: 'candidate', candidate: { candidate: 'cand-1', sdpMid: '0', sdpMLineIndex: 0 } } } });
+  s.handle({ type: 'users', payload: { initiator: SERVER_PEER } });
+  await s.handle({ type: 'signal', payload: { peerId: SERVER_PEER, signal: { type: 'offer', sdp: 'v=0 offer' } } });
+  await s.queue;
+  check('publishes its microphone and camera before answering', calls.filter((c) => c[0] === 'addTrack').length === 2, calls);
+  const order = calls.map((c) => c[0]).filter((c) => ['remote', 'candidate', 'local'].includes(c));
+  check('takes the server\'s offer, then the candidate that came early, then answers', order.join() === 'remote,candidate,local', order);
+  const answer = sent.find((m) => m.type === 'signal' && m.payload.signal.type === 'answer');
+  check('the answer goes to the server peer', answer?.payload.peerId === SERVER_PEER && answer.payload.signal.sdp === 'v=0 answer', answer);
+  s.handle({ type: 'pubTrack', payload: { trackId: { id: 't1', streamId: 's1' }, pubClientId: 'partner', kind: 'video', type: 1 } });
+  s.handle({ type: 'pubTrack', payload: { trackId: { id: 't2', streamId: 's2' }, pubClientId: 'me-1', kind: 'video', type: 1 } });
+  s.handle({ type: 'pubTrack', payload: { trackId: { id: 't1', streamId: 's1' }, pubClientId: 'partner', kind: 'video', type: 1 } });
+  const subs = sent.filter((m) => m.type === 'subTrack');
+  check('subscribes to the other phone\'s tracks, once each, never its own', subs.length === 1 && subs[0].payload.pubClientId === 'partner' && subs[0].payload.type === 3, subs);
+  s.close();
+  check('hanging up tells the server and closes', sent.at(-1)?.type === 'hangUp' && calls.at(-1)[0] === 'close');
+
+  const ctx = fs.readFileSync(path.join(root, 'components', 'calls', 'CallContext.js'), 'utf8');
+  check('a call uses the media server whenever the backend offers one',
+    /if \(config\?\.sfu\?\.url\) \{\s*sfuModeRef\.current = true;/.test(ctx) && /joinSfu\(\{ \.\.\.config\.sfu, room: `call-\$\{call\.id\}` \}/.test(ctx));
+  check('answering from the notification answers the call when it arrives',
+    /loversrock:\\\/\\\/call\\\?\(answer\|decline\)=/.test(ctx) && /if \(want\.action === 'answer'\) answerCall\(\);/.test(ctx));
+  const ringer = fs.readFileSync(path.join(root, 'native', 'android', 'voice', 'CallRinger.kt'), 'utf8');
+  check('the ringing notification has Answer and Decline, as the phone\'s own call style',
+    /Notification\.CallStyle\.forIncomingCall\(caller, decline, answer\)/.test(ringer) && /"Decline"/.test(ringer) && /"Answer"/.test(ringer));
+  const plugin = fs.readFileSync(path.join(root, 'plugins', 'withVoiceNotes.js'), 'utf8');
+  check('and Decline works without opening the app (its receiver is in the manifest)', /\.voice\.CallActionReceiver/.test(plugin));
+  const settingsSrc = fs.readFileSync(path.join(root, 'app', 'SettingsScreen.js'), 'utf8');
+  check('Settings says what stops a call ringing with the app closed', /<CallReadinessCard \/>/.test(settingsSrc));
+}
+
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }

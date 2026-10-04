@@ -1,0 +1,68 @@
+diff --git a/server/webrtctransport.go b/server/webrtctransport.go
+index ffc8bc8..1de52b1 100644
+--- a/server/webrtctransport.go
++++ b/server/webrtctransport.go
+@@ -2,6 +2,7 @@ package server
+ 
+ import (
+ 	"net"
++	"os"
+ 	"strings"
+ 	"sync"
+ 
+@@ -91,6 +92,21 @@ func NewWebRTCTransportFactory(
+ 		}
+ 	}
+ 
++	// loversrock: inside Docker the server only sees its container address,
++	// which no phone can reach. PEERCALLS_NAT1TO1_IPS (comma-separated) is the
++	// address the phones should use instead, e.g. the host's Tailscale IP;
++	// the published ports carry the traffic in.
++	if ips := strings.TrimSpace(os.Getenv("PEERCALLS_NAT1TO1_IPS")); ips != "" {
++		list := []string{}
++		for _, ip := range strings.Split(ips, ",") {
++			if ip = strings.TrimSpace(ip); ip != "" {
++				list = append(list, ip)
++			}
++		}
++		settingEngine.SetNAT1To1IPs(list, webrtc.ICECandidateTypeHost)
++		log.Info("Advertise NAT 1:1 addresses", logger.Ctx{"ips": list})
++	}
++
+ 	registry := codecs.NewRegistryDefault()
+ 
+ 	if len(allowedInterfaces) > 0 {
+diff --git a/server/wssub.go b/server/wssub.go
+index 3da613b..85195f6 100644
+--- a/server/wssub.go
++++ b/server/wssub.go
+@@ -2,7 +2,9 @@ package server
+ 
+ import (
+ 	"net/http"
++	"os"
+ 	"path"
++	"strings"
+ 	"sync"
+ 	"time"
+ 
+@@ -81,8 +83,19 @@ func (w *WebsocketContext) Close(statusCode websocket.StatusCode, reason string)
+ // remember to call WebsocketContext.Close after they are done with the
+ // connection.
+ func (wss *WSS) NewWebsocketContext(w http.ResponseWriter, r *http.Request) (*WebsocketContext, error) {
++	// loversrock: the phones are the client, not a page served from here, so
++	// which origins may connect is configurable (PEERCALLS_WS_ORIGIN_PATTERNS,
++	// comma-separated, e.g. "*"). Unset, only the same origin, as before.
++	var originPatterns []string
++	for _, pattern := range strings.Split(os.Getenv("PEERCALLS_WS_ORIGIN_PATTERNS"), ",") {
++		if pattern = strings.TrimSpace(pattern); pattern != "" {
++			originPatterns = append(originPatterns, pattern)
++		}
++	}
++
+ 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+ 		CompressionMode: websocket.CompressionDisabled,
++		OriginPatterns:  originPatterns,
+ 	})
+ 	if err != nil {
+ 		prometheusWSConnErrTotal.Inc()

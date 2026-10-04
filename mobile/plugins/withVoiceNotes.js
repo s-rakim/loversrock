@@ -33,6 +33,9 @@ const PERMISSIONS = [
   'android.permission.POST_NOTIFICATIONS',
   // The incoming call onto the lock screen, like a phone call (CallRinger.kt).
   'android.permission.USE_FULL_SCREEN_INTENT',
+  // "Allow loversrock to run in the background", asked from Settings, so a
+  // call can ring a phone that has put the app to sleep.
+  'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
 ];
 
 function withVoiceSources(config) {
@@ -78,6 +81,14 @@ function withVoiceManifest(config) {
           'android:exported': 'false',
           'android:foregroundServiceType': 'mediaPlayback',
         },
+      });
+    }
+
+    // The Decline button on the ringing notification (CallActionReceiver.kt).
+    application.receiver = application.receiver || [];
+    if (!application.receiver.some((r) => r.$?.['android:name'] === '.voice.CallActionReceiver')) {
+      application.receiver.push({
+        $: { 'android:name': '.voice.CallActionReceiver', 'android:exported': 'false' },
       });
     }
 

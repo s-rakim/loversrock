@@ -120,6 +120,19 @@ check("A's widget fetches the newest photo", aPhoto.status === 200, aPhoto.statu
 check('the latest always wins, so the widget is never stale by design',
   (await req('/widget-photos/latest', { token: A.token })).data.widgetPhoto.caption === 'goodnight');
 
+console.log('\n=== EACH WIDGET SHOWS THE OTHER ONE\'S PHOTO, NEVER YOUR OWN ===');
+{
+  // B has just sent the newest photo. B's own widget must still show A's,
+  // and A's widget B's: the Locket is what your partner sent you.
+  const bSummary = await req('/widget/summary', { widgetToken: bWidget });
+  const bPhoto = await req(`/widget/photo?token=${bWidget}`, { raw: true });
+  const aSummary = await req('/widget/summary', { widgetToken: aToken.data.widgetToken });
+  check("B's widget shows A's photo, not the one B just sent",
+    bSummary.data.latestPhotoUrl === sent.data.widgetPhoto.image_url, bSummary.data.latestPhotoUrl);
+  check('and fetches that one', bPhoto.status === 200, bPhoto.status);
+  check("A's widget shows B's", aSummary.data.latestPhotoUrl === sentBack.data.widgetPhoto.image_url, aSummary.data.latestPhotoUrl);
+}
+
 console.log('\n=== THE WALL: EVERY LOCKET EVER SENT ===');
 const wall = await req('/widget-photos', { token: A.token });
 check('the history loads', wall.status === 200, wall.status);

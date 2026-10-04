@@ -2,21 +2,79 @@
 
 ## The shape of it
 
-Calls are **peer to peer**. Once the two phones have found each other, audio
-and video travel directly between them; the server is not in the media path
-and could not record a call if it wanted to — there is no column for it.
+Calls go **through a call server on the PC** when it is running, and
+**peer to peer** when it is not.
 
-What the server does:
+### Through the call server (the default)
+
+The `calls` container is [peer-calls](https://github.com/peer-calls/peer-calls)
+(Apache-2.0, Go and pion), pinned to one commit and built from source by
+`docker/calls/Dockerfile`. It is an SFU: each phone sends its audio and video
+to the server, and the server forwards it to the other phone. It does not
+record or store anything.
+
+This is why it connects where peer to peer did not. Peer to peer needs the
+two phones to reach *each other*, which carrier NAT, Tailscale on one side
+only, or a relay that cannot carry media under Docker Desktop all break
+("No path found"). Through the server, each phone only needs to reach the
+PC, which it already does for everything else in the app.
+
+```
+  Caller                 Backend                  Callee
+    |  POST /calls/start    |                        |
+    |---------------------->|  row + FCM push ------>|  (rings, app closed or not)
+    |  call:offer {sfu}     |----------------------->|
+    |                       |  POST /calls/:id/answer|
+    |  call:answer {sfu}    |<-----------------------|
+    |<----------------------|                        |
+    |                                                |
+    |====== media =====> calls :4100 <===== media ====|
+    |        both phones join room  call-<id>         |
+```
+
+The phone side is `mobile/components/calls/sfu.js`, which speaks
+peer-calls' websocket protocol (`/ws/<room>/<clientId>`: `ready`, `users`,
+the server's offer and the phone's answer, candidates both ways, `pubTrack`
+and `subTrack`, `ping`, `hangUp`). The two patches in
+`docker/calls/loversrock.patch` make the server advertise the PC's address
+instead of the container's (`PEERCALLS_NAT1TO1_IPS`) and accept the app's
+websocket, which has no browser origin (`PEERCALLS_WS_ORIGIN_PATTERNS`).
+
+Setup, once, in `docker/.env`:
+
+```bash
+CALLS_PUBLIC_IP=        # the PC's Tailscale address: tailscale ip -4
+```
+
+Then `docker compose up -d --build` from `docker/`. Ports: 4100/tcp (the
+websocket), 4101/tcp and 4110-4130/udp (media).
+
+`GET /calls/config` returns `sfu: { url }` only when the backend can reach
+the server's health check (`CALLS_SFU_HEALTH`). The websocket address is the
+one the phone used to reach the backend, on port `CALLS_SFU_PORT`, or
+`CALLS_SFU_URL` if that is set. With the server down, `sfu` is null and calls
+fall back to peer to peer, as below.
+
+Verified by `mobile/test/render.mjs` (the protocol, against a fake socket),
+`backend/test/calls.mjs` (the config), and an end-to-end run of the patched
+server with two Chromium pages: voice and video both connected in about 1.5
+seconds, and a hang-up reached the other side. **Not yet verified on two
+real phones.**
+
+### Peer to peer (the fallback)
+
+Once the two phones have found each other, audio and video travel directly
+between them; the server is not in the media path.
+
+What the backend does in both modes:
 
 1. **Records the call.** `call_sessions` holds who rang whom, when, how it
    ended and how long it lasted. The row is created *before* any signalling,
    so a missed call is still a recorded call even if the caller's phone dies.
 2. **Rings the other phone.** A socket only reaches an app that is open, so
-   `/calls/start` also sends an FCM push on the `calls` channel — the one
-   channel at MAX importance, which is what lets it interrupt.
+   `/calls/start` also sends an FCM push (see **Ringing**).
 3. **Relays the handshake.** SDP offers, answers and ICE candidates go over
-   the pair's socket room. They are relayed and never stored: an ICE
-   candidate is worthless a second late and meaningless out of context.
+   the pair's socket room. They are relayed and never stored.
 
 ```
   Caller                    Server                     Callee
@@ -119,7 +177,7 @@ eas build --profile preview --platform android --clear-cache
 
 ## Verified vs. unverified
 
-**Tested against a live stack** — `backend/test/calls.mjs` (46 assertions):
+**Tested against a live stack** — `backend/test/calls.mjs` (58 assertions):
 
 - The call state machine, including the distinction the client cannot make
   for itself: a call that ends unanswered is **declined** if the callee hung
@@ -165,6 +223,25 @@ has to shake out:
   `user_devices`, sent when the app registers for push) get the data-only
   call. Older builds and iPhones get the ordinary call notification as before.
 
-If it still doesn't ring on ColorOS: in Settings → Apps → loversrock →
-Notifications, allow "Incoming calls (ringing)" and give it sound. Also allow
-the app to run in the background (Battery → the app).
+- **Answer and Decline on the notification.** On Android 12 and later the
+  ringing notification is the system's own call style
+  (`Notification.CallStyle.forIncomingCall`), with Answer and Decline
+  buttons; older phones get plain buttons. Answer opens
+  `loversrock://call?answer=<id>`, and the app answers the call as soon as it
+  sees it ringing. Decline works without opening the app:
+  `CallActionReceiver.kt` stops the ringing and posts to
+  `/calls/:id/decline-from-notification` with the `declineToken` the push
+  carried (an HMAC of that call id, good for declining that one call only).
+
+### When the app is closed and it does not ring
+
+The push arrives, but the phone decides whether it may wake the app.
+Instagram and WhatsApp ring because the phone makers allow-list them;
+loversrock has to be allowed by hand, once per phone. Settings → **Calls
+when the app is closed** checks what the app can see (notifications, the
+ringing channel, battery optimisation, full-screen calls on Android 14) with
+a Fix button for each, and opens the maker's auto-launch screen.
+
+On OPPO (ColorOS): turn on **Auto launch** for loversrock, and set Battery →
+**Allow background activity**. Without these, swiping the app away stops it
+hearing calls.

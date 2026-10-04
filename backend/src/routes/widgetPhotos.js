@@ -41,10 +41,13 @@ router.post('/', async (req, res) => {
 });
 
 // Pull-based fallback for when the push/data-message delivery doesn't land.
+// ?from=partner: only what your partner sent you, as the Locket widget shows.
 router.get('/latest', async (req, res) => {
+  const fromPartner = req.query.from === 'partner';
   const { rows } = await query(
-    'SELECT * FROM widget_photos WHERE pair_id = $1 ORDER BY created_at DESC LIMIT 1',
-    [req.pair.id]
+    `SELECT * FROM widget_photos WHERE pair_id = $1 ${fromPartner ? 'AND sender_id <> $2' : ''}
+      ORDER BY created_at DESC LIMIT 1`,
+    fromPartner ? [req.pair.id, req.userId] : [req.pair.id]
   );
   res.json({ widgetPhoto: rows[0] || null });
 });

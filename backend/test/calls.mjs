@@ -108,6 +108,34 @@ check('the caller giving up before it is answered is a miss',
   missed.data.call.status === 'missed', missed.data.call);
 check('a missed call has no duration', missed.data.call.durationSeconds === null, missed.data.call);
 
+console.log('\n=== DECLINE FROM THE NOTIFICATION, WITHOUT OPENING THE APP ===');
+{
+  // The same secret the server signs with (backend/.env).
+  await import('dotenv/config');
+  const { declineToken, sfuUrl } = await import('../src/routes/calls.js');
+  const ringing = await req('/calls/start', { method: 'POST', token: A.token, body: { kind: 'voice' } });
+  const id = ringing.data.call.id;
+  const forged = await req(`/calls/${id}/decline-from-notification`, { method: 'POST', body: { token: 'not-the-token' } });
+  check('a made-up token cannot decline a call', forged.status === 403, forged.status);
+  const otherCall = await req(`/calls/${id}/decline-from-notification`, { method: 'POST', body: { token: declineToken('00000000-0000-0000-0000-000000000000') } });
+  check("another call's token cannot either", otherCall.status === 403, otherCall.status);
+  const ok = await req(`/calls/${id}/decline-from-notification`, { method: 'POST', body: { token: declineToken(id) } });
+  check('the token from the push declines that call', ok.status === 200 && ok.data.declined === true, ok.data);
+  const after = await req('/calls/current', { token: A.token });
+  check('and the call is over for the caller', !after.data.call, after.data);
+  const again = await req(`/calls/${id}/decline-from-notification`, { method: 'POST', body: { token: declineToken(id) } });
+  check('declining it twice changes nothing', again.status === 200 && again.data.declined === false, again.data);
+
+  console.log('\n=== THE CALL MEDIA SERVER (peer-calls SFU) ===');
+  check('offered on the address the phone reached the backend on',
+    sfuUrl({ hostname: 'pc.example' }, { CALLS_SFU_PORT: '4100' }) === 'ws://pc.example:4100/ws');
+  check('or wherever CALLS_SFU_URL says', sfuUrl({ hostname: 'x' }, { CALLS_SFU_URL: 'ws://calls.example:9/ws/' }) === 'ws://calls.example:9/ws');
+  check('and not at all when it is not set up', sfuUrl({ hostname: 'x' }, {}) === null);
+  const cfg = await req('/calls/config', { token: A.token });
+  check('config says whether calls go through it',
+    'sfu' in cfg.data && (process.env.CALLS_SFU_HEALTH || process.env.CALLS_SFU_URL ? true : cfg.data.sfu === null), cfg.data.sfu);
+}
+
 console.log('\n=== HISTORY ===');
 const history = await req('/calls/history', { token: B.token });
 check('history lists the calls', history.data.calls.length >= 3, history.data.calls.length);

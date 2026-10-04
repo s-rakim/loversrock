@@ -19,6 +19,38 @@ import { senderName } from './messages.js';
 
 const router = asyncRouter();
 
+/**
+ * A one-call token for declining from the notification: the Decline button
+ * works without opening the app, so it has no session to send. It is good
+ * for that one call only, and only to decline it.
+ */
+export function declineToken(callId, secret = process.env.JWT_REFRESH_SECRET || '') {
+  return crypto.createHmac('sha256', `call-decline:${secret}`).update(String(callId)).digest('base64url');
+}
+
+/**
+ * Decline, from the ringing notification's button (CallActionReceiver.kt).
+ * Before the auth middleware on purpose: the token is the credential.
+ */
+router.post('/:id/decline-from-notification', async (req, res) => {
+  const given = String(req.body?.token || '');
+  const want = declineToken(req.params.id);
+  const ok = given.length === want.length && crypto.timingSafeEqual(Buffer.from(given), Buffer.from(want));
+  if (!ok) return res.status(403).json({ error: 'Bad token' });
+  const { rows } = await query(
+    `UPDATE call_sessions SET status = 'declined', ended_at = now(), end_reason = 'declined'
+      WHERE id = $1 AND status = 'ringing' RETURNING *`,
+    [req.params.id]
+  );
+  const call = rows[0];
+  if (call) {
+    // The caller is in the app, waiting: tell them over the live connection.
+    req.app.get('io')?.to(`pair:${call.pair_id}`).emit('call:decline', { callId: call.id, reason: 'declined' });
+    stopRinging(call.callee_id, call.id, { missed: false });
+  }
+  res.json({ ok: true, declined: Boolean(call) });
+});
+
 router.use(requireAuth, requirePair);
 
 /**
@@ -99,6 +131,42 @@ export function fallbackStunUrls(env = process.env) {
   return DEFAULT_FALLBACK_STUN;
 }
 
+/**
+ * The media server (peer-calls' SFU, docker/calls): when it is running, calls
+ * go through it instead of phone to phone. Each phone then only has to reach
+ * the server, which it already does for everything else, rather than the
+ * other phone, which between two carriers' networks it often cannot.
+ *
+ * Where the phones find it: CALLS_SFU_URL if set (ws://host:port/ws), else
+ * the address this request came in on (the one the phone already uses for
+ * this server) with CALLS_SFU_PORT. Only offered while CALLS_SFU_HEALTH (its
+ * address inside Docker) answers, so a server that has not been rebuilt
+ * with it keeps calling phone to phone.
+ */
+const SFU_CHECK_MS = 30 * 1000;
+let sfuHealth = { at: 0, ok: false };
+async function sfuUp() {
+  const health = process.env.CALLS_SFU_HEALTH;
+  if (!health) return Boolean(process.env.CALLS_SFU_URL);
+  if (Date.now() - sfuHealth.at < SFU_CHECK_MS) return sfuHealth.ok;
+  let ok = false;
+  try {
+    const r = await fetch(`${health.replace(/\/+$/, '')}/probes/health`, { signal: AbortSignal.timeout(2000) });
+    ok = r.ok;
+  } catch { ok = false; }
+  sfuHealth = { at: Date.now(), ok };
+  return ok;
+}
+
+export function sfuUrl(req, env = process.env) {
+  if (env.CALLS_SFU_URL) return env.CALLS_SFU_URL.replace(/\/+$/, '');
+  const port = env.CALLS_SFU_PORT;
+  if (!port) return null;
+  const host = String(req.hostname || '').trim();
+  if (!host) return null;
+  return `ws://${host.includes(':') ? `[${host}]` : host}:${port}/ws`;
+}
+
 router.get('/config', async (req, res) => {
   const iceServers = [];
   const stun = stunUrls();
@@ -130,6 +198,8 @@ router.get('/config', async (req, res) => {
     turnExpiresAt: expiresAt,
     // Added to the connection only if the private path does not connect.
     fallbackStun: fallbackStunUrls(),
+    // Present when calls go through the media server instead.
+    sfu: (await sfuUp()) && sfuUrl(req) ? { url: sfuUrl(req) } : null,
   });
 });
 
@@ -288,7 +358,7 @@ router.post('/start', async (req, res) => {
   const others = devices.filter((d) => !d.canRing).map((d) => d.token);
   await Promise.all([
     ringers.length && sendToTokens(ringers, {
-      data: { type: 'call', callId: call.id, kind, from },
+      data: { type: 'call', callId: call.id, kind, from, declineToken: declineToken(call.id) },
       priority: 'high',
     }),
     others.length && sendNotification(

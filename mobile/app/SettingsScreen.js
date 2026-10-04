@@ -22,6 +22,7 @@ import NicknameCard from '../components/NicknameCard';
 import MascotPicker from '../components/MascotPicker';
 import RemindersCard from '../components/RemindersCard';
 import PushCheckCard from '../components/PushCheckCard';
+import CallReadinessCard from '../components/CallReadinessCard';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import ConnectionCard from '../components/ConnectionCard';
@@ -450,6 +451,8 @@ export default function SettingsScreen() {
       <FadeInUp delay={55}>
         <RemindersCard />
         <PushCheckCard />
+        {/* What stops a call ringing this phone with the app closed. */}
+        <CallReadinessCard />
       </FadeInUp>
 
       <FadeInUp delay={60}>

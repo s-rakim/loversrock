@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Person
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -64,8 +65,12 @@ object CallRinger {
         )
     }
 
-    /** Ring for this call. Ringing for it already: nothing changes. */
-    fun ring(context: Context, callId: String, from: String, kind: String) {
+    /**
+     * Ring for this call. Ringing for it already: nothing changes.
+     * `declineToken` (from the push) lets the Decline button decline without
+     * opening the app; without one, Decline opens the app to do it.
+     */
+    fun ring(context: Context, callId: String, from: String, kind: String, declineToken: String? = null) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         // A call that has already been answered, declined or hung up must not
         // start ringing again because its push arrived late.
@@ -97,7 +102,39 @@ object CallRinger {
         }
         if (Build.VERSION.SDK_INT >= 26) builder.setTimeoutAfter(RING_FOR_MS)
 
-        val notification = builder.build()
+        // Answer and Decline, right on the notification, like a phone call.
+        // Answer opens the app straight into the call (loversrock://call?answer=),
+        // Decline declines without opening it (CallActionReceiver).
+        val answer = linkIntent(context, "answer", callId, NOTIFICATION_ID + 1)
+        val decline = if (!declineToken.isNullOrEmpty()) declineIntent(context, callId, declineToken)
+            else linkIntent(context, "decline", callId, NOTIFICATION_ID + 2)
+        var styled = false
+        if (Build.VERSION.SDK_INT >= 31 && answer != null && decline != null) {
+            // The system's own incoming-call notification: big Answer and
+            // Decline buttons, shown first, like the phone app's.
+            try {
+                val caller = Person.Builder().setName(from).setImportant(true).build()
+                builder.setStyle(Notification.CallStyle.forIncomingCall(caller, decline, answer))
+                styled = true
+            } catch (e: Exception) {
+                styled = false
+            }
+        }
+        if (!styled) {
+            if (decline != null) builder.addAction(Notification.Action.Builder(0, "Decline", decline).build())
+            if (answer != null) builder.addAction(Notification.Action.Builder(0, "Answer", answer).build())
+        }
+
+        val notification = try {
+            builder.build()
+        } catch (e: Exception) {
+            // A phone that will not take the call style without a foreground
+            // service: plain buttons instead.
+            builder.setStyle(null)
+            if (decline != null) builder.addAction(Notification.Action.Builder(0, "Decline", decline).build())
+            if (answer != null) builder.addAction(Notification.Action.Builder(0, "Answer", answer).build())
+            builder.build()
+        }
         // Repeat the ringtone until the notification is gone.
         notification.flags = notification.flags or Notification.FLAG_INSISTENT
         manager(context).notify(NOTIFICATION_ID, notification)
@@ -137,6 +174,24 @@ object CallRinger {
 
     private fun manager(context: Context) =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    /** loversrock://call?<what>=<callId>, opening the app (CallContext.js acts on it). */
+    private fun linkIntent(context: Context, what: String, callId: String, requestCode: Int): PendingIntent? {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("loversrock://call?$what=$callId"))
+            .setPackage(context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val immutable = if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+        return PendingIntent.getActivity(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or immutable)
+    }
+
+    private fun declineIntent(context: Context, callId: String, token: String): PendingIntent {
+        val intent = Intent(context, CallActionReceiver::class.java)
+            .setAction(CallActionReceiver.ACTION_DECLINE)
+            .putExtra(CallActionReceiver.EXTRA_CALL_ID, callId)
+            .putExtra(CallActionReceiver.EXTRA_TOKEN, token)
+        val immutable = if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0
+        return PendingIntent.getBroadcast(context, NOTIFICATION_ID + 3, intent, PendingIntent.FLAG_UPDATE_CURRENT or immutable)
+    }
 
     private fun openApp(context: Context): PendingIntent? {
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return null

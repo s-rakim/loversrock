@@ -80,6 +80,36 @@ services:
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
 
+  # The call media server (docker/calls): both phones send their camera and
+  # microphone here and get the other's back, so a call never needs a path
+  # between the two phones themselves, only to this machine, which they
+  # already reach for everything else.
+  #
+  # 4100 is signalling (a websocket), 4101 media over TCP, 4110-4130 media
+  # over UDP. CALLS_PUBLIC_IP (or TURN_PUBLIC_IP) is this machine's Tailscale
+  # IP: what the server tells the phones to send media to. Without it calls
+  # still connect when the server can reach the phones' Tailscale addresses,
+  # but set it.
+  calls:
+    build:
+      context: ./calls
+    restart: unless-stopped
+    environment:
+      PEERCALLS_NETWORK_TYPE: sfu
+      PEERCALLS_BIND_PORT: "4100"
+      PEERCALLS_NETWORK_SFU_PROTOCOLS: udp4,tcp4
+      PEERCALLS_NETWORK_SFU_TCP_LISTEN_PORT: "4101"
+      PEERCALLS_NETWORK_SFU_UDP_PORT_MIN: "4110"
+      PEERCALLS_NETWORK_SFU_UDP_PORT_MAX: "4130"
+      # Present and empty: no STUN servers, the phones reach this directly.
+      PEERCALLS_ICE_SERVER_URLS: ""
+      PEERCALLS_NAT1TO1_IPS: ${CALLS_PUBLIC_IP:-${TURN_PUBLIC_IP:-}}
+      PEERCALLS_WS_ORIGIN_PATTERNS: "*"
+    ports:
+      - "0.0.0.0:4100:4100/tcp"
+      - "0.0.0.0:4101:4101/tcp"
+      - "0.0.0.0:4110-4130:4110-4130/udp"
+
   backend:
     build:
       context: ../backend
@@ -119,6 +149,11 @@ services:
       # it must be the same string coturn was started with.
       TURN_SECRET: ${TURN_SECRET:-change-me-turn-secret}
       TURN_PUBLIC_IP: ${TURN_PUBLIC_IP:-}
+      # The call media server: where the phones reach it (this port, on the
+      # address they reach the backend on) and where the backend checks it
+      # is up before offering it.
+      CALLS_SFU_PORT: "4100"
+      CALLS_SFU_HEALTH: http://calls:4100
     ports:
       # 0.0.0.0 on purpose: the phone reaches this over the Tailscale interface,
       # so binding to loopback would make the API unreachable from the app.

@@ -44,7 +44,8 @@ export default function HomeScreen({ navigation }) {
       apiFetch('/daily-prompt/today'),
       apiFetch('/decks'),
       apiFetch('/games'),
-      apiFetch('/widget-photos/latest'),
+      // What your partner sent you, as on your Locket widget.
+      apiFetch('/widget-photos/latest?from=partner'),
       apiFetch('/profile'),
     ]);
     if (prompt.status === 'fulfilled') setStreak(prompt.value.streakCount || 0);

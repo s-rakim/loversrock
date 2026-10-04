@@ -209,9 +209,11 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
        ORDER BY target_date ASC LIMIT 1`,
       [pair.id]
     ),
+    // The Locket shows what your partner sent you: their newest photo on
+    // your widget, yours on theirs. Never your own photo on your own widget.
     query(
-      'SELECT image_url FROM widget_photos WHERE pair_id = $1 ORDER BY created_at DESC LIMIT 1',
-      [pair.id]
+      'SELECT image_url FROM widget_photos WHERE pair_id = $1 AND sender_id <> $2 ORDER BY created_at DESC LIMIT 1',
+      [pair.id, req.userId]
     ),
     query(
       `SELECT id, name, last_lat, last_lng, location_sharing_enabled, mascot_art, cycle_role,
@@ -584,11 +586,12 @@ router.get('/photo', async (req, res, next) => {
   );
   if (!pairRows[0]) return res.status(404).json({ error: 'Not paired' });
 
+  // Your partner's newest photo, never your own (see the summary above).
   const { rows } = await query(
-    'SELECT image_url FROM widget_photos WHERE pair_id = $1 ORDER BY created_at DESC LIMIT 1',
-    [pairRows[0].id]
+    'SELECT image_url FROM widget_photos WHERE pair_id = $1 AND sender_id <> $2 ORDER BY created_at DESC LIMIT 1',
+    [pairRows[0].id, req.userId]
   );
-  if (!rows[0]) return res.status(404).json({ error: 'No photo yet' });
+  if (!rows[0]) return res.status(404).json({ error: 'No photo from your partner yet' });
 
   const key = rows[0].image_url;
   // Declare the type. Android's BitmapFactory sniffs the bytes and copes
