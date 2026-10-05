@@ -1,0 +1,3 @@
+# A patch must keep its line endings exactly, or git apply rejects it. Git
+# for Windows turns text files into CRLF on checkout unless told otherwise.
+*.patch text eol=lf

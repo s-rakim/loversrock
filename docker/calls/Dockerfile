@@ -27,7 +27,10 @@ WORKDIR /src
 RUN go mod download
 
 COPY loversrock.patch /tmp/loversrock.patch
-RUN git apply /tmp/loversrock.patch \
+# A checkout on Windows can give the patch CRLF line endings, which git apply
+# rejects ("patch does not apply"): strip them first.
+RUN sed -i 's/\r$//' /tmp/loversrock.patch \
+ && git apply /tmp/loversrock.patch \
  && mkdir -p build \
  && printf '' > build/index.js \
  && printf '' > build/style.css \

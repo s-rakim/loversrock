@@ -936,6 +936,13 @@ console.log('\n=== CALLS THROUGH THE MEDIA SERVER (peer-calls) ===');
   check('and Decline works without opening the app (its receiver is in the manifest)', /\.voice\.CallActionReceiver/.test(plugin));
   const settingsSrc = fs.readFileSync(path.join(root, 'app', 'SettingsScreen.js'), 'utf8');
   check('Settings says what stops a call ringing with the app closed', /<CallReadinessCard \/>/.test(settingsSrc));
+  // Git for Windows checks text out as CRLF, and git apply rejects a CRLF
+  // patch: the call server's image failed to build on the PC.
+  const repo = path.join(root, '..');
+  const attrs = fs.existsSync(path.join(repo, '.gitattributes')) ? fs.readFileSync(path.join(repo, '.gitattributes'), 'utf8') : '';
+  const dockerfile = fs.readFileSync(path.join(repo, 'docker', 'calls', 'Dockerfile'), 'utf8');
+  check('the call server builds from a Windows checkout (patch kept LF, CRs stripped before git apply)',
+    /^\*\.patch\s+text\s+eol=lf$/m.test(attrs) && /sed -i 's\/\\r\$\/\/' \/tmp\/loversrock\.patch\s*\\\s*&& git apply/.test(dockerfile));
 }
 
 console.log(`\nRENDER RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
