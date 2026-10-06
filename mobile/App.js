@@ -63,6 +63,7 @@ import WhatYouSayingScreen from './app/games/WhatYouSayingScreen';
 import PerfectPairScreen from './app/games/PerfectPairScreen';
 import LoveLettersScreen from './app/games/LoveLettersScreen';
 import VoiceNotesScreen from './app/VoiceNotesScreen';
+import SharedItemsScreen from './app/SharedItemsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -322,6 +323,7 @@ function Root() {
                 more often than with a blank drawing already in mind. */}
             <Stack.Screen name="Canvas" component={CanvasScreen} options={{ title: 'Draw' }} />
             <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Wallpaper' }} />
+            <Stack.Screen name="SharedItems" component={SharedItemsScreen} options={{ title: 'Shared in the chat' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />
             {/* Fable: its own screen, opened from its button on Home, with a

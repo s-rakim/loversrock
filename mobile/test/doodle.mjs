@@ -111,10 +111,11 @@ check('all tool icons resolve in Ionicons', missing.length === 0, missing.map((t
 console.log('\n=== EVERY SCREEN USES THE SHARED RENDERER ===');
 // The bug this prevents: a screen keeping its own hard-coded Polyline, so a
 // neon stroke arrives and is drawn as a plain pink line.
-for (const screen of ['app/CanvasScreen.js', 'app/MessagesScreen.js', 'app/games/DrawDuelScreen.js']) {
+// The chat draws its doodles in its message bubble.
+for (const screen of ['app/CanvasScreen.js', 'components/chat/MessageBubble.js', 'app/SharedItemsScreen.js', 'app/games/DrawDuelScreen.js']) {
   const text = fs.readFileSync(path.join(root, screen), 'utf8');
   check(`${screen} draws through components/Doodle`,
-    /from '.*components\/Doodle'/.test(text), 'no import found');
+    /from '(.*components\/|\.\.\/)Doodle'/.test(text), 'no import found');
   check(`${screen} has no hand-rolled Polyline left`,
     !/<Polyline/.test(text), 'still renders its own Polyline');
 }

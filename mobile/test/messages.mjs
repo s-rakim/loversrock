@@ -113,6 +113,12 @@ const stubs = {
   '@react-navigation/native': { useFocusEffect: () => {} },
   'expo-image-picker': { MediaTypeOptions: { Images: 'Images' }, launchImageLibraryAsync: async () => ({ canceled: true }), requestMediaLibraryPermissionsAsync: async () => ({ granted: true }) },
 };
+// The chat's pieces (components/chat/) reach the same modules one folder down.
+for (const [from, to] of [
+  ['../../services/crypto', '../services/crypto'], ['../../services/api', '../services/api'],
+  ['../ThemeContext', '../components/ThemeContext'], ['../Motion', '../components/Motion'],
+  ['../Icon', '../components/Icon'], ['../Doodle', '../components/Doodle'], ['../../theme', '../theme'],
+]) stubs[from] = stubs[to];
 
 const { mergeMessage } = load('app/MessagesScreen.js', stubs);
 
@@ -162,8 +168,8 @@ const body = src.slice(src.indexOf('export default function MessagesScreen'));
 check('no raw append survives in the screen', !/setMessages\(\(prev\) => \[\.\.\.prev,/.test(body),
   (body.match(/setMessages\([^)]*\)/g) || []).join(' | '));
 const setters = body.match(/setMessages\(\(prev\) => mergeMessage\(prev, [^)]+\)\)/g) || [];
-check('all three delivery paths merge (socket, text send, photo send)',
-  setters.length === 3, setters.length);
+check('every delivery path merges (socket new and updated, send, edit, photo)',
+  setters.length >= 5, setters.length);
 
 console.log('\n=== AND THE THREAD SHOWS WHO SAID WHAT ===');
 // Every bubble used to be alignSelf: 'flex-start' in one colour, which is
@@ -175,13 +181,87 @@ console.log('\n=== AND THE THREAD IS ENCRYPTED ===');
 // sending plaintext while the composer still claims to be encrypted.
 check('outgoing text is sealed when a partner key exists', /encryptFor\(partnerKey/.test(body));
 check('and marked as encrypted for the server', /encrypted: true/.test(body));
-check('incoming ciphertext is opened rather than shown raw', /decryptFrom\(partnerKey/.test(body));
+// Decrypting moved into a hook the chat and shared items both use.
+const decrypting = fs.readFileSync(path.join(root, 'components', 'chat', 'useDecrypted.js'), 'utf8');
+const bubble = fs.readFileSync(path.join(root, 'components', 'chat', 'MessageBubble.js'), 'utf8');
+check('incoming ciphertext is opened rather than shown raw',
+  /useDecrypted\(messages, partnerKey\)/.test(body) && /decryptFrom\(partnerKey/.test(decrypting));
+check('polls and places are sealed like texts', /type: 'poll', \.\.\.\(await seal\(plain\)\)/.test(body) && /type: 'location', \.\.\.\(await seal\(plain\)\)/.test(body));
 check('a message that will not open says so instead of rendering blank',
-  /keys don&apos;t match|keys don't match/.test(body));
+  /keys don&apos;t match|keys don't match/.test(bubble));
 check('and the composer states which mode is in force',
   /End-to-end encrypted/.test(body) && /Not encrypted yet/.test(body));
-check('mine and theirs are styled apart', /styles\.mine/.test(body) && /styles\.theirs/.test(body));
+check('mine and theirs are styled apart', /mine\s*\?\s*\{ backgroundColor: colors\.accent/.test(bubble) && /: \{ backgroundColor: colors\.surface/.test(bubble));
 check('and the id it compares against is fetched', /setMeId/.test(body));
+
+console.log('\n=== THE CHAT, GROWN UP (Nextcloud Talk\'s features, for two) ===');
+{
+  const model = load('components/chat/chatModel.js', stubs);
+  const me = 'me'; const them = 'them';
+  const now = Date.parse('2026-10-06T10:00:00Z');
+  const text = { id: 't', type: 'text', sender_id: me, sent_at: new Date(now - 3600e3).toISOString() };
+  check('you can edit your own text for a day', model.canEdit(text, me, now));
+  check('not theirs', !model.canEdit({ ...text, sender_id: them }, me, now));
+  check('not after a day', !model.canEdit({ ...text, sent_at: new Date(now - 25 * 3600e3).toISOString() }, me, now));
+  check('not a photo', !model.canEdit({ ...text, type: 'photo' }, me, now));
+  check('a scheduled one, any time before it goes', model.canEdit({ ...text, sent_at: new Date(now - 30 * 3600e3).toISOString(), scheduled_for: 'x' }, me, now));
+  check('only your own can be deleted', model.canDelete(text, me) && !model.canDelete({ ...text, sender_id: them }, me));
+
+  const poll = { type: 'poll', meta: { optionCount: 3, multi: false }, votes: [{ userId: me, choice: 1 }, { userId: them, choice: 1 }, { userId: them, choice: 2 }] };
+  const tally = model.pollTally(poll, me);
+  check('a poll tallies each option, and which is yours', tally.options.map((o) => o.votes).join() === '0,2,1' && tally.options[1].mine && !tally.options[2].mine);
+  check('and counts people, not votes', tally.voters === 2 && tally.voted);
+
+  check('a reply quote says what it was', model.previewOf({ type: 'poll' }, JSON.stringify({ question: 'Dinner?' })) === 'Poll: Dinner?'
+    && model.previewOf({ type: 'location' }, JSON.stringify({ lat: 1, lng: 2, label: 'Home' })) === 'Place: Home'
+    && model.previewOf({ type: 'text', deleted_at: 'x' }, 'gone') === 'Message deleted'
+    && model.previewOf(null) === 'Original message');
+
+  const thread = [
+    { id: 'a', type: 'text', content: 'Pizza tonight?', sender_id: them },
+    { id: 'b', type: 'text', content: 'yes PIZZA', sender_id: me, seen_at: 'x' },
+    { id: 'c', type: 'text', content: 'pizza', sender_id: me, deleted_at: 'x' },
+    { id: 'd', type: 'text', content: 'later', sender_id: me, scheduled_for: 'x' },
+  ];
+  check('search finds every message with the words, whatever the case, never deleted ones',
+    model.searchMatches(thread, (m) => m.content, 'pizza').join() === 'a,b');
+  check('"Seen" goes under your last message they have seen (not a scheduled one)', model.lastSeenOwn(thread, me) === 'b');
+
+  check('links are found in a text', model.linksIn('see https://example.com/a?b=1, and http://x.org.').join() === 'https://example.com/a?b=1,http://x.org');
+  const parts = model.splitLinks('go to https://a.com now');
+  check('and made tappable without losing the words around them', parts.length === 3 && parts[1].url === 'https://a.com' && parts.map((p) => p.text).join('') === 'go to https://a.com now');
+
+  const morning = new Date(2026, 9, 6, 10, 0); // a Tuesday morning, phone time
+  const later = model.laterChoices(morning);
+  check('send later / remind me: in an hour, this evening, tomorrow, the weekend, next week',
+    later.map((c) => c.key).join() === 'hour,evening,tomorrow,weekend,week' && later.every((c) => c.at > morning));
+  check('this evening is gone once it is evening', !model.laterChoices(new Date(2026, 9, 6, 19, 0)).some((c) => c.key === 'evening'));
+  check('a place opens in the phone\'s maps', model.mapsUrl({ lat: 1.5, lng: 2, label: 'Our café' }) === 'geo:1.5,2?q=1.5,2(Our%20caf%C3%A9)');
+
+  const screen = load('app/MessagesScreen.js', stubs);
+  const page = screen.prependPage([{ id: 'c' }, { id: 'd' }], [{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+  check('an older page goes in front, without doubling the overlap', page.map((m) => m.id).join() === 'a,b,c,d');
+
+  const { pollFrom } = load('components/chat/PollComposer.js', stubs);
+  check('a poll needs a question and two options', pollFrom('Q', ['a', ''], false) === null && pollFrom('', ['a', 'b'], false) === null);
+  check('and drops the empty ones', pollFrom(' Q ', ['a', ' ', 'b'], true)?.options.join() === 'a,b');
+
+  const shared = load('app/SharedItemsScreen.js', { ...stubs, '../components/chat/useDecrypted': () => ({ textOf: (m) => m.content }) });
+  const sharedThread = [
+    { id: 'p1', type: 'photo' }, { id: 'p2', type: 'photo', deleted_at: 'x' }, { id: 'l1', type: 'location' },
+    { id: 't1', type: 'text', content: 'look https://a.com and https://b.com' }, { id: 'p3', type: 'photo', scheduled_for: 'x' },
+  ];
+  check('shared items: photos, newest first, nothing deleted or not yet sent',
+    shared.sharedOf(sharedThread, 'photo', (m) => m.content).map((i) => i.id).join() === 'p1');
+  check('and links pulled out of the texts', shared.sharedOf(sharedThread, 'link', (m) => m.content).map((i) => i.url).join() === 'https://a.com,https://b.com');
+
+  const src2 = fs.readFileSync(path.join(root, 'app', 'MessagesScreen.js'), 'utf8');
+  check('holding a message opens its menu; holding Send offers later and silent',
+    /onLongPress=\{setMenuFor\}/.test(src2) && /setLaterFor\(\{ kind: 'send' \}\)/.test(src2) && /sendText\(\{ silent: true \}\)/.test(src2));
+  check('"typing…" is sent, and shown', /emit\('chat:typing'/.test(src2) && /'typing…'/.test(src2));
+  check('the thread is marked seen when it is open', /'\/messages\/seen', \{ method: 'POST' \}/.test(src2));
+  check('older messages load as you scroll up', /&before=/.test(src2) && /maintainVisibleContentPosition/.test(src2));
+}
 
 console.log(`\nMESSAGES RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 if (fails.length) { console.log(fails.map((f) => `  - ${f}`).join('\n')); process.exit(1); }
