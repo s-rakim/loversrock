@@ -98,7 +98,7 @@ check('sending a message fires a push', /sendNotification\(/.test(messages));
 check('at high priority, because a normal one can sit in a doze queue for minutes',
   /priority: 'high'/.test(messages));
 check('and collapsed per pair, so ten in a row is one line in the tray',
-  /collapseKey: `msg:\$\{req\.pair\.id\}`/.test(messages));
+  /collapseKey: `msg:\$\{(req\.pair\.id|message\.pair_id)\}`/.test(messages));
 // This is not a policy the server could change its mind about: with
 // encryption running it holds ciphertext and could not put the text in the
 // notification if it wanted to.

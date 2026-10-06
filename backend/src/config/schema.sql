@@ -997,3 +997,55 @@ CREATE TABLE IF NOT EXISTS fable_messages (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS fable_messages_pair ON fable_messages (pair_id, id);
+
+-- ---------------------------------------------------------------------------
+-- The chat, grown up: what Nextcloud Talk's chat does, for two.
+-- ---------------------------------------------------------------------------
+
+-- Polls and shared locations join text, photos and doodles. Both keep their
+-- body in `content`, sealed like a text when the pair has encryption on.
+ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_type_check;
+ALTER TABLE messages ADD CONSTRAINT messages_type_check
+  CHECK (type IN ('text', 'photo', 'doodle', 'poll', 'location'));
+
+-- Edited and deleted. A deleted message keeps its row (and its place in the
+-- thread, "Message deleted") but loses everything that was in it.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Sent later: the row exists from the moment it is written, but only its
+-- sender sees it until the cron (releaseScheduledMessages) sends it.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS messages_scheduled_idx ON messages (scheduled_for)
+  WHERE scheduled_for IS NOT NULL;
+
+-- Sent without a notification.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS silent BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- What the server needs to know about a message whose body it cannot read: a
+-- poll's number of options, whether it takes more than one answer, whether
+-- it has ended.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS meta JSONB;
+
+-- Pinned to the top of the chat, for good or until a time.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS pinned_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS pinned_until TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS poll_votes (
+  message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  choice      INT NOT NULL CHECK (choice >= 0 AND choice < 20),
+  voted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (message_id, user_id, choice)
+);
+
+-- "Remind me about this": a push to you, about one message, at a time you
+-- chose. Never the message itself, which may be sealed.
+CREATE TABLE IF NOT EXISTS message_reminders (
+  message_id  UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  remind_at   TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (message_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS message_reminders_due_idx ON message_reminders (remind_at);

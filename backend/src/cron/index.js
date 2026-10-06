@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { releaseScheduledMessages, sendMessageReminders } from '../routes/messages.js';
 import { query } from '../config/db.js';
 import { deleteObject } from '../config/storage.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
@@ -372,6 +373,12 @@ export async function growContent({ onlyIfNew = false, retry = false } = {}) {
 }
 
 export function startCronJobs() {
+  // Every minute: scheduled messages whose time has come, and "remind me
+  // about this message" reminders that are due.
+  cron.schedule('* * * * *', () => {
+    releaseScheduledMessages().catch((err) => console.error('[cron] scheduled messages:', err.message));
+    sendMessageReminders().catch((err) => console.error('[cron] message reminders:', err.message));
+  });
   cron.schedule('0 3 * * *', cleanupExpiredMemories);
   cron.schedule('0 6 * * *', checkQuizBankLevel);
   cron.schedule('0 9 * * 1', pushWeeklyDateIdea);
