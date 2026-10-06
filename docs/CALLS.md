@@ -88,6 +88,29 @@ which is MIT.
   off shows their name rather than a frozen frame.
 - **Reactions in the call** (`call:reaction`), floating up both screens.
 
+### The call screen
+
+Laid out like WhatsApp's: your chat wallpaper darkened behind it, minimise
+top left, the name and timer in the middle, the chat top right, their
+picture (or their video) in the middle, your camera in a tile you can drag,
+and one pill of controls at the bottom (more, camera, sound, mute, end).
+Tapping the screen slides the top bar and the controls away and back; on a
+video call they go by themselves after five seconds.
+
+- **Where the sound goes.** It used to be pinned: video calls forced the
+  speakerphone, and "speaker off" forced the earpiece. While a route is
+  forced, InCallManager never moves the call to Bluetooth earbuds or
+  headphones, so the sound stayed on the phone. Now nothing is forced:
+  InCallManager picks Bluetooth, then headphones, then the speaker (video) or
+  earpiece (voice), and follows earbuds connected mid-call. With earbuds or
+  headphones connected, the sound button opens WhatsApp's picker (Phone,
+  Speaker, Bluetooth, Headphones).
+- **Picture in picture** (`PictureInPicture.kt`, `plugins/withPictureInPicture.js`).
+  Minimise, or leaving the app mid video call, shrinks the call into a small
+  window over whatever you open next; the screen draws just their video (or
+  their picture and the timer) at that size. A voice call minimises back into
+  the app, with a green "Tap to return to the call" bar along the top.
+
 ### When calls still do not work
 
 Settings, then **Diagnostics**, now tests calls from the phone:

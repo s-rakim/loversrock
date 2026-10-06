@@ -19,7 +19,7 @@
 import React, {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react';
-import { Platform, AppState, PermissionsAndroid, Alert, NativeModules, Linking } from 'react-native';
+import { Platform, AppState, PermissionsAndroid, Alert, NativeModules, Linking, DeviceEventEmitter } from 'react-native';
 
 /**
  * WebRTC, required rather than imported, for exactly the reason stated below
@@ -83,7 +83,14 @@ const nativeRinger = Platform.OS === 'android' && typeof NativeModules.VoiceNote
 const audio = {
   start: (media) => { try { InCallManager?.start({ media, auto: true }); } catch { /* no native module */ } },
   stop: () => { try { InCallManager?.stop(); } catch { /* */ } },
-  speaker: (on) => { try { InCallManager?.setForceSpeakerphoneOn(on); } catch { /* */ } },
+  // Where the sound goes: 'EARPIECE' (the phone at your ear), 'SPEAKER_PHONE',
+  // 'BLUETOOTH' or 'WIRED_HEADSET'. Chosen, never forced: the old
+  // setForceSpeakerphoneOn(true/false) pinned the speaker or the earpiece, and
+  // while it was pinned InCallManager never moved the call to Bluetooth
+  // earbuds or headphones, which is why the sound stayed on the phone.
+  route: (name) => {
+    try { return InCallManager?.chooseAudioRoute?.(name)?.catch?.(() => null) || Promise.resolve(null); } catch { return Promise.resolve(null); }
+  },
   ring: (callId, from, kind) => {
     if (nativeRinger) {
       nativeRinger.ringIncoming(String(callId), from || 'Your partner', kind || 'voice').catch(() => {});
@@ -487,12 +494,13 @@ export function CallProvider({ children }) {
     setError(null);
     if (!(await ensurePermissions(kind))) return;
     try {
-      // A video call belongs on the speaker; a voice call belongs on the
-      // earpiece with the proximity sensor blanking the screen. `auto: true`
-      // gives the second behaviour, and this gives the first.
+      // `auto: true` picks where the sound goes the way a phone call does:
+      // Bluetooth earbuds or headphones when they are connected, otherwise
+      // the speaker for video and the earpiece (proximity sensor blanking the
+      // screen) for voice. Nothing is forced, so earbuds connected mid-call
+      // take over too.
       audio.start(kind === 'video' ? 'video' : 'audio');
       audio.screenOn(true);
-      if (kind === 'video') { audio.speaker(true); setSpeakerOn(true); }
 
       const stream = await getMedia(kind);
       const { call: record } = await apiFetch('/calls/start', { method: 'POST', body: { kind } });
@@ -551,7 +559,6 @@ export function CallProvider({ children }) {
         audio.stopRing();
         audio.start(call.kind === 'video' ? 'video' : 'audio');
         audio.screenOn(true);
-        if (call.kind === 'video') { audio.speaker(true); setSpeakerOn(true); }
         const stream = await getMedia(call.kind);
         const config = await apiFetch('/calls/config');
         if (!config?.sfu?.url) throw new Error('The call server is not available right now.');
@@ -574,7 +581,6 @@ export function CallProvider({ children }) {
       audio.stopRing();
       audio.start(call.kind === 'video' ? 'video' : 'audio');
       audio.screenOn(true);
-      if (call.kind === 'video') { audio.speaker(true); setSpeakerOn(true); }
 
       const stream = await getMedia(call.kind);
       const connection = await buildPeerConnection(call.kind, stream);
@@ -665,13 +671,40 @@ export function CallProvider({ children }) {
     track?._switchCamera?.();
   }, []);
 
-  const toggleSpeaker = useCallback(() => {
-    setSpeakerOn((on) => {
-      const next = !on;
-      audio.speaker(next);
-      return next;
-    });
+  // Where the sound is going, and where it could go (InCallManager's
+  // onAudioDeviceChanged): WhatsApp's audio picker shows the same list.
+  const [audioRoute, setAudioRoute] = useState({ available: [], selected: '' });
+  useEffect(() => {
+    const read = (data) => {
+      let available = [];
+      try { available = JSON.parse(data?.availableAudioDeviceList || '[]'); } catch { available = []; }
+      const selected = data?.selectedAudioDevice || '';
+      setAudioRoute({ available, selected });
+      setSpeakerOn(selected === 'SPEAKER_PHONE');
+    };
+    const sub = DeviceEventEmitter.addListener('onAudioDeviceChanged', read);
+    return () => sub.remove();
   }, []);
+
+  /** Send the sound to 'EARPIECE', 'SPEAKER_PHONE', 'BLUETOOTH' or 'WIRED_HEADSET'. */
+  const chooseAudio = useCallback(async (name) => {
+    const status = await audio.route(name);
+    if (status?.selectedAudioDevice !== undefined) {
+      let available = [];
+      try { available = JSON.parse(status.availableAudioDeviceList || '[]'); } catch { available = []; }
+      setAudioRoute({ available, selected: status.selectedAudioDevice });
+      setSpeakerOn(status.selectedAudioDevice === 'SPEAKER_PHONE');
+    } else {
+      setSpeakerOn(name === 'SPEAKER_PHONE');
+    }
+  }, []);
+
+  /** Speaker on, or back to the earbuds / headphones / earpiece it came from. */
+  const toggleSpeaker = useCallback(() => {
+    if (!speakerOn) { chooseAudio('SPEAKER_PHONE'); return; }
+    const has = (d) => audioRoute.available.includes(d);
+    chooseAudio(has('BLUETOOTH') ? 'BLUETOOTH' : has('WIRED_HEADSET') ? 'WIRED_HEADSET' : 'EARPIECE');
+  }, [speakerOn, audioRoute, chooseAudio]);
 
   /**
    * Is the partner ringing this phone right now? If so, ask for their offer.
@@ -920,14 +953,14 @@ export function CallProvider({ children }) {
 
   const value = useMemo(() => ({
     call, localStream, remoteStream, muted, cameraOff, speakerOn, error,
-    iceState, relayed, reconnecting, partnerReconnecting, partnerState, reactions,
+    iceState, relayed, reconnecting, partnerReconnecting, partnerState, reactions, audioRoute,
     startCall, answerCall, endCall,
-    toggleMute, toggleCamera, switchCamera, toggleSpeaker, sendReaction,
+    toggleMute, toggleCamera, switchCamera, toggleSpeaker, chooseAudio, sendReaction,
     clearError: () => setError(null),
     isBusy: call.phase !== 'idle' && call.phase !== 'ended',
   }), [call, localStream, remoteStream, muted, cameraOff, speakerOn, error, iceState, relayed,
-    reconnecting, partnerReconnecting, partnerState, reactions,
-    startCall, answerCall, endCall, toggleMute, toggleCamera, switchCamera, toggleSpeaker, sendReaction]);
+    reconnecting, partnerReconnecting, partnerState, reactions, audioRoute,
+    startCall, answerCall, endCall, toggleMute, toggleCamera, switchCamera, toggleSpeaker, chooseAudio, sendReaction]);
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
 }

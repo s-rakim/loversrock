@@ -999,6 +999,34 @@ console.log('\n=== CALLS THROUGH THE MEDIA SERVER (peer-calls) ===');
     check('the call screen shows reconnecting, their mute and camera, and the reactions',
       /is reconnecting…/.test(screen) && /is muted/.test(screen) && /FloatingReaction/.test(screen) && /sendReaction\(emoji\)/.test(screen));
   }
+  // --- WhatsApp's call screen, its audio picker, and picture in picture ---
+  {
+    const callScreen = load('components/calls/callLayout.js');
+    check('picture in picture is recognised by the small window Android gives it',
+      callScreen.isPipSize({ width: 240, height: 426 }) && !callScreen.isPipSize({ width: 411, height: 891 })
+      && !callScreen.isPipSize({ width: 800, height: 1280 }));
+    check('the audio picker knows the phone, the speaker, Bluetooth and headphones',
+      callScreen.AUDIO_ROUTES.map((r) => r.id).join() === 'EARPIECE,SPEAKER_PHONE,BLUETOOTH,WIRED_HEADSET');
+    const screenSrc = fs.readFileSync(path.join(root, 'app', 'CallScreen.js'), 'utf8');
+    check('the controls slide away on a tap, and by themselves on a video call',
+      /onPress=\{toggleControls\}/.test(screenSrc) && /setTimeout\(\(\) => setControlsShown\(false\), CONTROLS_HIDE_MS\)/.test(screenSrc)
+      && /translateY: bottomSlide/.test(screenSrc) && /translateY: topSlide/.test(screenSrc));
+    check('minimise goes into picture in picture on a video call', /enterPictureInPicture\(\)/.test(screenSrc) && /setAutoPictureInPicture/.test(screenSrc));
+    check('with earbuds or headphones connected, the sound button opens a picker',
+      /hasHeadset \? setSoundOpen\(true\) : toggleSpeaker\(\)/.test(screenSrc) && /chooseAudio\(r\.id\)/.test(screenSrc));
+    check('nothing forces the speaker or the earpiece any more, so Bluetooth can take the call',
+      !/setForceSpeakerphoneOn\(/.test(ctx.replace(/\/\/.*$/gm, '')) && /chooseAudioRoute/.test(ctx) && /onAudioDeviceChanged/.test(ctx));
+    const pipPlugin = require(path.join(root, 'plugins', 'withPictureInPicture.js'));
+    const manifest = { manifest: { application: [{ activity: [{ $: { 'android:name': '.MainActivity', 'android:configChanges': 'keyboard|orientation|screenSize' }, 'intent-filter': [{ action: [{ $: { 'android:name': 'android.intent.action.MAIN' } }], category: [{ $: { 'android:name': 'android.intent.category.LAUNCHER' } }] }] }] }] } };
+    const act = pipPlugin.allowSmallWindow(manifest).manifest.application[0].activity[0].$;
+    check('the main activity is allowed into picture in picture, without restarting',
+      act['android:supportsPictureInPicture'] === 'true' && /smallestScreenSize/.test(act['android:configChanges']) && /screenLayout/.test(act['android:configChanges']));
+    const hooked = pipPlugin.addLeaveHint('class MainActivity : ReactActivity() {\n  fun x() {}\n}\n');
+    check('and Android 8-11 shrink a video call when you leave the app', /override fun onUserLeaveHint\(\)/.test(hooked)
+      && /PictureInPicture\.onUserLeaveHint\(this\)/.test(hooked) && pipPlugin.addLeaveHint(hooked) === hooked);
+    const appSrc = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
+    check('a minimised call leaves a bar to get back to it', /<ReturnToCallBar navigationRef=\{navigationRef\} \/>/.test(appSrc));
+  }
   // Git for Windows checks text out as CRLF, and git apply rejects a CRLF
   // patch: the call server's image failed to build on the PC.
   const repo = path.join(root, '..');

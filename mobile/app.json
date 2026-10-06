@@ -39,6 +39,7 @@
       "./plugins/withAndroidWidgets",
       "./plugins/withVoiceNotes",
       "./plugins/withTabletLayout",
+      "./plugins/withPictureInPicture",
       "./plugins/withIosWidgets",
       [
         "expo-location",

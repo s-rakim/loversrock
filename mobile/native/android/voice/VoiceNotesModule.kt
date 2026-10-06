@@ -68,6 +68,32 @@ class VoiceNotesModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    /** Picture in picture: shrink the call into a small window now. */
+    @ReactMethod
+    fun enterPictureInPicture(promise: Promise) {
+        val activity = currentActivity
+        if (activity == null || !PictureInPicture.supported(activity)) {
+            promise.resolve(false)
+            return
+        }
+        activity.runOnUiThread { promise.resolve(PictureInPicture.enter(activity)) }
+    }
+
+    /** Whether leaving the app mid-call shrinks it (on during video calls). */
+    @ReactMethod
+    fun setAutoPictureInPicture(enabled: Boolean, promise: Promise) {
+        val activity = currentActivity
+        if (activity == null) {
+            PictureInPicture.auto = enabled
+            promise.resolve(false)
+            return
+        }
+        activity.runOnUiThread {
+            PictureInPicture.setAuto(activity, enabled)
+            promise.resolve(PictureInPicture.supported(activity))
+        }
+    }
+
     @ReactMethod
     fun stopCallService(promise: Promise) {
         CallService.stop(reactContext)

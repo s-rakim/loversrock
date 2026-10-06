@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, Image } from 'react-native';
+import { View, ActivityIndicator, Image, Pressable, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -184,6 +185,35 @@ function CallPresenter({ navigationRef }) {
   return null;
 }
 
+/**
+ * A call you minimised: the green bar along the top of the app (WhatsApp's
+ * "Tap to return to call"), until you go back to it or it ends.
+ */
+function ReturnToCallBar({ navigationRef }) {
+  const { call } = useCall();
+  const insets = useSafeAreaInsets();
+  const [route, setRoute] = useState(null);
+  useEffect(() => navigationRef.addListener('state', () => {
+    setRoute(navigationRef.getCurrentRoute()?.name || null);
+  }), [navigationRef]);
+  const live = call.phase === 'connecting' || call.phase === 'connected' || call.phase === 'ringing-out';
+  if (!live || route === 'Call' || !route) return null;
+  return (
+    <Pressable
+      onPress={() => navigationRef.navigate('Call')}
+      accessibilityRole="button"
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50, elevation: 50,
+        paddingTop: insets.top + 4, paddingBottom: 6, backgroundColor: '#1DAA61', alignItems: 'center',
+      }}
+    >
+      <Text style={{ color: '#fff', fontWeight: '600' }}>
+        {call.kind === 'video' ? 'Video call' : 'Voice call'} · Tap to return to the call
+      </Text>
+    </Pressable>
+  );
+}
+
 function Root() {
   const { navTheme, screenOptions } = useNavTheme();
   const { colors, statusBarStyle } = useTheme();
@@ -328,6 +358,8 @@ function Root() {
             {/* Tapping the mic in the middle of the nav bar; holding it records. */}
             <Stack.Screen name="VoiceNotes" component={VoiceNotesScreen} options={{ title: 'Voice messages' }} />
           </Stack.Navigator>
+          {/* Over the screens, so it sits on top of whichever is showing. */}
+          <ReturnToCallBar navigationRef={navigationRef} />
       </NavigationContainer>
     </View>
   );
