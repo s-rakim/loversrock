@@ -22,7 +22,12 @@ import { MorphButton } from '../components/Motion';
 import Celebration from '../components/Celebration';
 import Icon3D from '../components/Icon3D';
 
-const { width: SCREEN } = Dimensions.get('window');
+// A card's width, capped: on a tablet the full screen is far wider than the
+// card, and a swipe would have had to travel a third of it to count.
+const WINDOW = Dimensions.get('window');
+const SCREEN = Math.min(WINDOW.width, 480);
+// Far enough to leave the screen whichever way the tablet is turned.
+const FLING = Math.max(WINDOW.width, WINDOW.height);
 
 // Far enough that a scroll-ish drag is not a vote, close enough that a
 // deliberate flick always is.
@@ -79,7 +84,7 @@ export default function SwipeDeckScreen({ navigation }) {
     busy.current = true;
 
     Animated.timing(pan, {
-      toValue: { x: liked ? SCREEN * 1.3 : -SCREEN * 1.3, y: 40 },
+      toValue: { x: liked ? FLING : -FLING, y: 40 },
       duration: 230,
       useNativeDriver: true,
     }).start(() => {

@@ -1027,6 +1027,27 @@ console.log('\n=== CALLS THROUGH THE MEDIA SERVER (peer-calls) ===');
     const appSrc = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
     check('a minimised call leaves a bar to get back to it', /<ReturnToCallBar navigationRef=\{navigationRef\} \/>/.test(appSrc));
   }
+  // --- Tablets ---
+  {
+    const layout = load('components/useLayout.js');
+    check('a phone is a phone, a tablet a tablet, either way up',
+      !layout.isTablet({ width: 411, height: 891 }) && layout.isTablet({ width: 800, height: 1280 }) && layout.isTablet({ width: 1280, height: 800 }));
+    check('screens sit in a centred column on a tablet, and are untouched on a phone',
+      layout.contentColumn(411) === null && layout.contentColumn(1280)?.maxWidth === layout.CONTENT_MAX && layout.contentColumn(1280).alignSelf === 'center');
+    check('the tab bar stays a thumb\'s width', layout.barInset(411, 8) === 8 && 1280 - 2 * layout.barInset(1280, 8) === layout.BAR_MAX);
+    check('grids add columns rather than growing their tiles', layout.columnsFor(360, 170, 8) === 2 && layout.columnsFor(1280, 170, 8) === 5);
+    const appSrc = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
+    check('both navigators put their screens in the column, and the call stays full screen',
+      /contentStyle: \{ backgroundColor: 'transparent', \.\.\.column \}/.test(appSrc)
+      && /sceneContainerStyle=\{\{ backgroundColor: 'transparent', \.\.\.column \}\}/.test(appSrc)
+      && /Full screen on a tablet too/.test(appSrc));
+    const appJson = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8')).expo;
+    check('tablets are supported and turn; phones are held portrait by the plugin',
+      appJson.ios.supportsTablet === true && appJson.orientation === 'default' && appJson.plugins.includes('./plugins/withTabletLayout'));
+    const { lockPhonesToPortrait } = require(path.join(root, 'plugins', 'withTabletLayout.js'));
+    const main = lockPhonesToPortrait('class MainActivity : ReactActivity() {\n  override fun onCreate(savedInstanceState: Bundle?) {\n    super.onCreate(null)\n  }\n}');
+    check('MainActivity locks phones (shortest side under 600dp) to portrait', /smallestScreenWidthDp < 600/.test(main) && /SCREEN_ORIENTATION_PORTRAIT/.test(main));
+  }
   // Git for Windows checks text out as CRLF, and git apply rejects a CRLF
   // patch: the call server's image failed to build on the PC.
   const repo = path.join(root, '..');

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, Image, Pressable, Text } from 'react-native';
+import { View, ActivityIndicator, Image, Pressable, Text, useWindowDimensions } from 'react-native';
+import { contentColumn } from './components/useLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, DarkTheme, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -97,6 +98,8 @@ const SettingsTab = fadeOnFocus(SettingsScreen);
 // they render outside the React tree the tokens normally reach.
 function useNavTheme() {
   const { colors, isDark, reduceMotion } = useTheme();
+  // A tablet: screens in a centred column (components/useLayout.js).
+  const column = contentColumn(useWindowDimensions().width);
   const base = isDark ? DarkTheme : DefaultTheme;
   return {
     navTheme: {
@@ -119,7 +122,7 @@ function useNavTheme() {
       headerStyle: { backgroundColor: colors.surface },
       headerTintColor: colors.textPrimary,
       headerShadowVisible: false,
-      contentStyle: { backgroundColor: 'transparent' },
+      contentStyle: { backgroundColor: 'transparent', ...column },
       // Screen-to-screen motion, set once for the whole stack. react-native-screens
       // runs these on the UI thread, so they stay smooth while a screen is still
       // fetching. Anyone who asked the OS for reduced motion gets a plain fade.
@@ -138,6 +141,8 @@ function useNavTheme() {
 const renderTabBar = (props) => <LumaBar {...props} />;
 
 function MainTabs() {
+  // A tablet: each section in the centred column (components/useLayout.js).
+  const column = contentColumn(useWindowDimensions().width);
   return (
     // bottom-tabs v6 does not animate the scene change at all — it swaps the
     // view outright. fadeOnFocus() gives each tab its own entrance so the
@@ -146,7 +151,7 @@ function MainTabs() {
     <Tab.Navigator
       initialRouteName="Home"
       screenOptions={{ headerShown: false }}
-      sceneContainerStyle={{ backgroundColor: 'transparent' }}
+      sceneContainerStyle={{ backgroundColor: 'transparent', ...column }}
       tabBar={renderTabBar}
     >
       {/* Home sits in the MIDDLE rather than first: with six buttons the
@@ -343,6 +348,8 @@ function Root() {
                 // Not swipe-dismissible: leaving a call is a deliberate act,
                 // and an accidental back-swipe mid-call would be maddening.
                 gestureEnabled: false,
+                // Full screen on a tablet too, not the centred column.
+                contentStyle: { backgroundColor: 'transparent' },
               }}
             />
             <Stack.Screen name="FourInARow" component={FourInARowScreen} options={{ title: 'Four in a Row' }} />

@@ -8,8 +8,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable, Alert, RefreshControl,
-  Dimensions, TextInput, Modal,
+  TextInput, Modal, useWindowDimensions,
 } from 'react-native';
+import { columnsFor, CONTENT_MAX } from '../components/useLayout';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiFetch, onSocketEvent } from '../services/api';
@@ -45,9 +46,12 @@ export default function CanvasGalleryScreen({ navigation }) {
   const [renaming, setRenaming] = useState(null);
   const [draftTitle, setDraftTitle] = useState('');
 
-  // Two columns, measured rather than guessed, so the cells butt up against
-  // the screen edges by exactly the page padding at every width.
-  const cell = (Dimensions.get('window').width - spacing.md * 2 - GAP) / 2;
+  // Two columns on a phone, more on a tablet, measured rather than guessed,
+  // so the cells butt up against the edges by exactly the page padding.
+  const { width } = useWindowDimensions();
+  const inner = Math.min(width, CONTENT_MAX) - spacing.md * 2;
+  const columns = Math.max(2, columnsFor(inner, 190, GAP));
+  const cell = (inner - GAP * (columns - 1)) / columns;
 
   const load = useCallback(async () => {
     try {
@@ -187,7 +191,8 @@ export default function CanvasGalleryScreen({ navigation }) {
       <FlatList
         data={drawings}
         keyExtractor={(d) => d.id}
-        numColumns={2}
+        key={`cols-${columns}`}
+        numColumns={columns}
         columnWrapperStyle={{ gap: GAP }}
         contentContainerStyle={[styles.list, { paddingBottom: clearance.content + 64 }]}
         renderItem={renderItem}

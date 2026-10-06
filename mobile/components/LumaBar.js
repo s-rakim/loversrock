@@ -30,7 +30,8 @@
 // language would silently misalign the glow. So the row is measured on layout
 // and the glow is positioned from real coordinates.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Animated, Easing, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Animated, Easing, Platform, useWindowDimensions } from 'react-native';
+import { barInset } from './useLayout';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
@@ -219,6 +220,8 @@ function Glow({ colors, size = GLOW }) {
 export default function LumaBar({ state, navigation }) {
   const { colors, font, reduceMotion, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  // On a tablet the bar stays a thumb's width, centred (useLayout.barInset).
+  const { width: windowWidth } = useWindowDimensions();
   const { intensity, barScale } = useGlass();
   const g = useMemo(() => barGeometry(barScale), [barScale]);
   const styles2 = useMemo(() => makeStyles(colors, font, barScale), [colors, font, barScale]);
@@ -278,7 +281,7 @@ export default function LumaBar({ state, navigation }) {
 
   return (
     <View
-      style={[styles2.wrapper, { bottom: Math.max(insets.bottom, spacing.sm) }]}
+      style={[styles2.wrapper, { bottom: Math.max(insets.bottom, spacing.sm), left: barInset(windowWidth, spacing.sm), right: barInset(windowWidth, spacing.sm) }]}
       pointerEvents="box-none"
     >
       {pillWidth > 0 && micCentre != null && (
