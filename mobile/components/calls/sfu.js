@@ -198,3 +198,111 @@ export class SfuSession {
     if (notify) this.onClosed(reason);
   }
 }
+
+/**
+ * A call's place on the call server, kept through network trouble.
+ *
+ * Learned from Nextcloud Talk's CallActivity, which never treats a dropped
+ * connection as the end of a call: the signalling socket closing, or the
+ * media connection failing, puts the call into "Reconnecting…" and it joins
+ * the room again, with the same microphone and camera, until it is back or
+ * has plainly gone for good. A phone moving from Wi-Fi to mobile data, or a
+ * lift, should cost a few seconds of frozen picture, not the call.
+ *
+ * Same options as SfuSession, plus:
+ *   onReconnecting(bool)  "Reconnecting…" on and off
+ *   onClosed(reason)      gave up (after `attempts` tries)
+ */
+export class SfuCall {
+  constructor({
+    attempts = 6, disconnectGraceMs = 4000, backoffMs = [500, 1000, 2000, 3000, 5000, 8000],
+    onReconnecting = () => {}, onClosed = () => {}, onIceState = () => {}, onRemoteStream = () => {},
+    clientPrefix = 'p', ...session
+  }) {
+    Object.assign(this, {
+      attempts, disconnectGraceMs, backoffMs, onReconnecting, onClosed, onIceState, onRemoteStream, clientPrefix, session,
+    });
+    this.current = null;
+    this.tries = 0;
+    this.reconnecting = false;
+    this.ended = false;
+    this.graceTimer = null;
+    this.retryTimer = null;
+  }
+
+  get pc() { return this.current?.pc || null; }
+
+  start() {
+    this.join();
+    return this;
+  }
+
+  join() {
+    if (this.ended) return;
+    const session = new SfuSession({
+      ...this.session,
+      clientId: newClientId(this.clientPrefix),
+      onIceState: (state) => {
+        if (this.current !== session) return;
+        this.onIceState(state);
+        clearTimeout(this.graceTimer);
+        if (state === 'connected' || state === 'completed') {
+          this.recovered();
+        } else if (state === 'failed') {
+          this.lost(session, 'the connection to the call server failed');
+        } else if (state === 'disconnected') {
+          // Often a blip that heals by itself: give it a moment first.
+          this.graceTimer = setTimeout(() => this.lost(session, 'the connection to the call server dropped'), this.disconnectGraceMs);
+        }
+      },
+      onRemoteStream: (remote, track) => {
+        if (this.current !== session) return;
+        this.recovered();
+        this.onRemoteStream(remote, track);
+      },
+      onClosed: (reason) => {
+        if (this.current === session) this.lost(session, reason);
+      },
+    });
+    this.current = session;
+    session.start();
+  }
+
+  recovered() {
+    this.tries = 0;
+    if (this.reconnecting) {
+      this.reconnecting = false;
+      this.onReconnecting(false);
+    }
+  }
+
+  lost(session, reason) {
+    if (this.ended || this.current !== session) return;
+    clearTimeout(this.graceTimer);
+    session.close();
+    this.current = null;
+    if (this.tries >= this.attempts) {
+      this.end();
+      this.onClosed(reason);
+      return;
+    }
+    if (!this.reconnecting) {
+      this.reconnecting = true;
+      this.onReconnecting(true);
+    }
+    const wait = this.backoffMs[Math.min(this.tries, this.backoffMs.length - 1)];
+    this.tries += 1;
+    this.retryTimer = setTimeout(() => this.join(), wait);
+  }
+
+  /** Leave for good (hang up). */
+  end() {
+    this.ended = true;
+    clearTimeout(this.graceTimer);
+    clearTimeout(this.retryTimer);
+    this.current?.close();
+    this.current = null;
+  }
+
+  close() { this.end(); }
+}

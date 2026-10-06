@@ -144,18 +144,28 @@ export function fallbackStunUrls(env = process.env) {
  * with it keeps calling phone to phone.
  */
 const SFU_CHECK_MS = 30 * 1000;
-let sfuHealth = { at: 0, ok: false };
-async function sfuUp() {
-  const health = process.env.CALLS_SFU_HEALTH;
-  if (!health) return Boolean(process.env.CALLS_SFU_URL);
-  if (Date.now() - sfuHealth.at < SFU_CHECK_MS) return sfuHealth.ok;
-  let ok = false;
+let sfuHealth = { at: 0, ok: false, state: { ok: false } };
+/**
+ * Whether the call server can be offered, and if not, why: the line the
+ * Diagnostics screen shows, so "calls do not work" comes with a reason.
+ */
+export async function sfuState(env = process.env) {
+  const health = env.CALLS_SFU_HEALTH;
+  if (!health) {
+    return env.CALLS_SFU_URL
+      ? { ok: true }
+      : { ok: false, reason: 'not set up on the PC (the backend has no CALLS_SFU_HEALTH: pull, then docker compose up -d --build)' };
+  }
+  if (Date.now() - sfuHealth.at < SFU_CHECK_MS) return sfuHealth.state;
+  let state;
   try {
     const r = await fetch(`${health.replace(/\/+$/, '')}/probes/health`, { signal: AbortSignal.timeout(2000) });
-    ok = r.ok;
-  } catch { ok = false; }
-  sfuHealth = { at: Date.now(), ok };
-  return ok;
+    state = r.ok ? { ok: true } : { ok: false, reason: `answering with an error (${r.status})` };
+  } catch (err) {
+    state = { ok: false, reason: `not running (the calls container did not answer: ${err.cause?.code || err.name || 'no answer'})` };
+  }
+  sfuHealth = { at: Date.now(), ok: state.ok, state };
+  return state;
 }
 
 export function sfuUrl(req, env = process.env) {
@@ -192,6 +202,7 @@ router.get('/config', async (req, res) => {
     hasTurn = true;
   }
 
+  const sfu = await sfuState();
   res.json({
     iceServers,
     hasTurn,
@@ -199,7 +210,11 @@ router.get('/config', async (req, res) => {
     // Added to the connection only if the private path does not connect.
     fallbackStun: fallbackStunUrls(),
     // Present when calls go through the media server instead.
-    sfu: (await sfuUp()) && sfuUrl(req) ? { url: sfuUrl(req) } : null,
+    sfu: sfu.ok && sfuUrl(req) ? { url: sfuUrl(req) } : null,
+    // And when it is not, why not (shown by Diagnostics).
+    sfuStatus: sfu.ok && !sfuUrl(req)
+      ? { ok: false, reason: 'missing an address (set CALLS_SFU_PORT or CALLS_SFU_URL)' }
+      : sfu,
   });
 });
 

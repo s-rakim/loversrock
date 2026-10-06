@@ -48,6 +48,10 @@ export function initSockets(httpServer, corsOrigins) {
       socket.to(room).emit(event, { ...payload, fromUserId: socket.userId });
     };
 
+    // "Typing…" in the chat. Relayed, never stored; the phone stops showing
+    // it on its own a few seconds after the last one, so a dropped socket
+    // cannot leave it stuck on.
+    socket.on('chat:typing', (payload) => broadcast('chat:typing', { typing: Boolean(payload?.typing) }));
     socket.on('bucket:update', (payload) => broadcast('bucket:update', payload));
 
     socket.on('location:update', (payload) => broadcast('location:update', payload));
@@ -93,6 +97,14 @@ export function initSockets(httpServer, corsOrigins) {
     socket.on('call:ice', (payload) => broadcast('call:ice', payload));
     socket.on('call:hangup', (payload) => broadcast('call:hangup', payload));
     socket.on('call:decline', (payload) => broadcast('call:decline', payload));
+    // Muted / camera off, and reactions, during a call: relayed to the other
+    // phone, never stored.
+    socket.on('call:state', (payload) => broadcast('call:state', {
+      callId: payload?.callId, muted: Boolean(payload?.muted), cameraOff: Boolean(payload?.cameraOff),
+    }));
+    socket.on('call:reaction', (payload) => broadcast('call:reaction', {
+      callId: payload?.callId, emoji: String(payload?.emoji || '').slice(0, 8),
+    }));
     // Renegotiation, for switching a voice call to video mid-call.
     socket.on('call:renegotiate', (payload) => broadcast('call:renegotiate', payload));
     // "Still ringing" / "I picked up on another device".

@@ -21,6 +21,7 @@ import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
 import { MorphButton } from '../components/Motion';
 import Icon from '../components/Icon';
+import { testCallServer } from '../components/calls/callSelfTest';
 
 // A real 1x1 PNG. Uploading actual image bytes is the point — a base64-shaped
 // string would pass a check that the image pipeline would still fail.
@@ -35,6 +36,16 @@ try {
   Updates = require('expo-updates');
 } catch {
   Updates = null;
+}
+
+// The call server test needs WebRTC, which an old build may not have.
+function loadWebRTC() {
+  try {
+    // eslint-disable-next-line global-require
+    return require('react-native-webrtc');
+  } catch {
+    return null;
+  }
 }
 
 const OK = 'ok';
@@ -207,6 +218,27 @@ export default function DiagnosticsScreen() {
       add('Call servers', count > 0 ? OK : BAD, `${count} ICE server${count === 1 ? '' : 's'}`);
       // Without TURN, two phones behind strict NAT cannot connect at all.
       // On one tailnet that never comes up; on mobile data it can.
+      // The call server (docker/calls), which calls go through when it is
+      // up. Not offered: say why. Offered: try it for real from this phone.
+      if (config?.sfu?.url) {
+        add('Call server', OK, `Offered at ${config.sfu.url}`);
+        const webrtc = loadWebRTC();
+        if (webrtc?.mediaDevices) {
+          const test = await testCallServer({
+            url: config.sfu.url,
+            webrtc,
+            getStream: () => webrtc.mediaDevices.getUserMedia({ audio: true, video: false }),
+          });
+          add('Call through the call server', test.ok ? OK : BAD, test.detail);
+        } else {
+          add('Call through the call server', WARN, 'This build has no calling (react-native-webrtc) to test with');
+        }
+      } else {
+        add('Call server', BAD,
+          config?.sfuStatus?.reason
+            ? `Not in use, so calls go phone to phone (which is what fails with "No path found"). The call server is ${config.sfuStatus.reason}.`
+            : 'Not in use, so calls go phone to phone (which is what fails with "No path found"). This backend is older than the call server: pull, then docker compose up -d --build.');
+      }
       add('TURN relay', config?.hasTurn ? OK : WARN,
         config?.hasTurn
           ? 'Configured — calls work even behind strict NAT'

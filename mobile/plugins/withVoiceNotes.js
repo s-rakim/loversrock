@@ -28,6 +28,10 @@ const PACKAGE_DIR = 'com/loversrock/app/voice';
 const PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE',
   'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK',
+  // The ongoing-call service (CallService.kt): keeps the microphone and the
+  // camera working mid-call with the app off screen.
+  'android.permission.FOREGROUND_SERVICE_MICROPHONE',
+  'android.permission.FOREGROUND_SERVICE_CAMERA',
   'android.permission.WAKE_LOCK',
   'android.permission.RECORD_AUDIO',
   'android.permission.POST_NOTIFICATIONS',
@@ -80,6 +84,16 @@ function withVoiceManifest(config) {
           'android:name': '.voice.VoicePlaybackService',
           'android:exported': 'false',
           'android:foregroundServiceType': 'mediaPlayback',
+        },
+      });
+    }
+
+    if (!has('.voice.CallService')) {
+      application.service.push({
+        $: {
+          'android:name': '.voice.CallService',
+          'android:exported': 'false',
+          'android:foregroundServiceType': 'microphone|camera',
         },
       });
     }

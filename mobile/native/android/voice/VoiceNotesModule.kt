@@ -53,6 +53,27 @@ class VoiceNotesModule(private val reactContext: ReactApplicationContext) :
         promise.resolve(true)
     }
 
+    /**
+     * A call is live: keep the microphone (and camera) working with the app
+     * off screen, and show it as an ongoing call (CallService).
+     */
+    @ReactMethod
+    fun startCallService(callId: String, from: String, kind: String, promise: Promise) {
+        try {
+            CallService.start(reactContext, callId, from, kind)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            // Refused while in the background (Android 12+): the call goes on.
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun stopCallService(promise: Promise) {
+        CallService.stop(reactContext)
+        promise.resolve(true)
+    }
+
     /** Answered, declined or hung up: stop ringing. */
     @ReactMethod
     fun stopRinging(callId: String?, promise: Promise) {

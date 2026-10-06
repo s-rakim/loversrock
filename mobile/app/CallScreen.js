@@ -3,8 +3,8 @@
 // Video fills the screen with your own feed as a small inset; voice shows
 // the partner's name and a running timer instead. Both share one control
 // bar, because switching between them mid-call should not move the buttons.
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Alert, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RTCView } from 'react-native-webrtc';
@@ -50,12 +50,39 @@ function ControlButton({ icon, label, onPress, active, danger, size = 60 }) {
   );
 }
 
+// The reactions you can send mid-call (Nextcloud Talk has the same row).
+export const CALL_REACTIONS = ['❤️', '😂', '😘', '👍', '😮', '🥺'];
+
+/** One reaction, floating up the screen and fading, then gone. */
+function FloatingReaction({ emoji, mine, lane }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(t, { toValue: 1, duration: 3000, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, [t]);
+  return (
+    <Animated.Text
+      style={{
+        position: 'absolute', bottom: 0, fontSize: 40,
+        [mine ? 'right' : 'left']: 24 + lane * 18,
+        opacity: t.interpolate({ inputRange: [0, 0.1, 0.75, 1], outputRange: [0, 1, 1, 0] }),
+        transform: [
+          { translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -320] }) },
+          { scale: t.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0.4, 1.15, 1] }) },
+        ],
+      }}
+    >
+      {emoji}
+    </Animated.Text>
+  );
+}
+
 export default function CallScreen({ navigation }) {
   const { colors, font } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const {
     call, localStream, remoteStream, muted, cameraOff, speakerOn, error, iceState, relayed,
+    reconnecting, partnerReconnecting, partnerState, reactions, sendReaction,
     answerCall, endCall, toggleMute, toggleCamera, switchCamera, toggleSpeaker, clearError,
   } = useCall();
 
@@ -97,12 +124,23 @@ export default function CallScreen({ navigation }) {
     'ringing-out': 'Calling…',
     'ringing-in': isVideo ? 'Incoming video call' : 'Incoming call',
     connecting: 'Connecting…',
-    connected: elapsed,
+    connected: reconnecting ? 'Reconnecting…' : elapsed,
     ended: 'Call ended',
     idle: '',
   }[call.phase];
 
-  const showVideo = isVideo && call.phase === 'connected' && remoteStream;
+  // Their camera off: their name and picture, as on a voice call, rather
+  // than a frozen last frame.
+  const showVideo = isVideo && call.phase === 'connected' && remoteStream && !partnerState?.cameraOff;
+  const connected = call.phase === 'connected';
+  // What is happening to the connection or to them, one line at a time.
+  const notice = connected
+    ? (reconnecting && 'Reconnecting…')
+      || (partnerReconnecting && `${partnerName} is reconnecting…`)
+      || (partnerState?.muted && `${partnerName} is muted`)
+      || (isVideo && partnerState?.cameraOff && `${partnerName}'s camera is off`)
+      || null
+    : null;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + spacing.lg }]}>
@@ -142,7 +180,7 @@ export default function CallScreen({ navigation }) {
           {stageText && call.phase !== 'connected' && (
             <Text style={[font.muted, styles.status]}>{stageText}</Text>
           )}
-          {isVideo && call.phase === 'connected' && (
+          {isVideo && connected && !partnerState?.cameraOff && (
             <Text style={[font.muted, styles.status]}>
               {cameraOff ? 'Your camera is off' : 'Waiting for their video…'}
             </Text>
@@ -160,7 +198,26 @@ export default function CallScreen({ navigation }) {
         </View>
       )}
 
+      {notice ? (
+        <View style={[styles.notice, { top: insets.top + (showVideo ? 64 : spacing.lg) }]}>
+          <Text style={styles.noticeText}>{notice}</Text>
+        </View>
+      ) : null}
+
+      <View pointerEvents="none" style={styles.reactionLayer}>
+        {reactions.map((r, i) => <FloatingReaction key={r.id} emoji={r.emoji} mine={r.mine} lane={i % 4} />)}
+      </View>
+
       <View style={styles.controls}>
+        {connected && (
+          <View style={styles.reactionRow}>
+            {CALL_REACTIONS.map((emoji) => (
+              <Pressable key={emoji} onPress={() => sendReaction(emoji)} accessibilityLabel={`Send ${emoji}`} hitSlop={6}>
+                <Text style={styles.reactionButton}>{emoji}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {call.phase === 'ringing-in' ? (
           <View style={styles.answerRow}>
             <ControlButton icon="close" label="Decline" danger size={72} onPress={() => endCall('declined')} />
@@ -232,6 +289,19 @@ const makeStyles = (colors) =>
     },
     videoHeaderText: { color: '#fff' },
     controls: { paddingHorizontal: spacing.lg },
+    notice: {
+      position: 'absolute', alignSelf: 'center',
+      backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: radius.pill,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    },
+    noticeText: { color: '#fff', fontWeight: '600' },
+    reactionLayer: { position: 'absolute', left: 0, right: 0, bottom: 220, height: 340 },
+    reactionRow: {
+      flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginBottom: spacing.md,
+      alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: radius.pill,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    },
+    reactionButton: { fontSize: 26 },
     controlRow: {
       flexDirection: 'row', justifyContent: 'space-evenly',
       alignItems: 'center', marginBottom: spacing.lg,

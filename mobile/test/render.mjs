@@ -928,7 +928,7 @@ console.log('\n=== CALLS THROUGH THE MEDIA SERVER (peer-calls) ===');
   check('a call uses the media server whenever the backend offers one',
     /if \(config\?\.sfu\?\.url\) \{\s*sfuModeRef\.current = true;/.test(ctx) && /joinSfu\(\{ \.\.\.config\.sfu, room: `call-\$\{call\.id\}` \}/.test(ctx));
   check('answering from the notification answers the call when it arrives',
-    /loversrock:\\\/\\\/call\\\?\(answer\|decline\)=/.test(ctx) && /if \(want\.action === 'answer'\) answerCall\(\);/.test(ctx));
+    /loversrock:\\\/\\\/call\\\?\(answer\|decline\|hangup\)=/.test(ctx) && /if \(want\.action === 'answer'\) answerCall\(\);/.test(ctx));
   const ringer = fs.readFileSync(path.join(root, 'native', 'android', 'voice', 'CallRinger.kt'), 'utf8');
   check('the ringing notification has Answer and Decline, as the phone\'s own call style',
     /Notification\.CallStyle\.forIncomingCall\(caller, decline, answer\)/.test(ringer) && /"Decline"/.test(ringer) && /"Answer"/.test(ringer));
@@ -936,6 +936,69 @@ console.log('\n=== CALLS THROUGH THE MEDIA SERVER (peer-calls) ===');
   check('and Decline works without opening the app (its receiver is in the manifest)', /\.voice\.CallActionReceiver/.test(plugin));
   const settingsSrc = fs.readFileSync(path.join(root, 'app', 'SettingsScreen.js'), 'utf8');
   check('Settings says what stops a call ringing with the app closed', /<CallReadinessCard \/>/.test(settingsSrc));
+  // --- What Nextcloud Talk's calls do, rewritten for this app ---
+  {
+    const { SfuCall } = load('components/calls/sfu.js');
+    const sockets = [];
+    class Sock {
+      constructor(url) { this.url = url; this.readyState = 1; sockets.push(this); }
+      send() {}
+      close() { this.readyState = 3; }
+    }
+    class PC {
+      constructor() { this.remoteDescription = null; }
+      addTrack() {}
+      close() {}
+    }
+    const webrtc = { RTCPeerConnection: PC, RTCSessionDescription: function D(x) { return x; }, RTCIceCandidate: function C(x) { return x; }, MediaStream: class {} };
+    const log = [];
+    const call = new SfuCall({
+      url: 'ws://h:4100/ws', room: 'call-9', clientPrefix: 'caller', stream: { getTracks: () => [] }, webrtc, WebSocketImpl: Sock,
+      backoffMs: [1, 1, 1], attempts: 3, disconnectGraceMs: 5,
+      onReconnecting: (on) => log.push(`reconnecting:${on}`), onClosed: (r) => log.push(`closed:${r}`),
+      onRemoteStream: () => log.push('media'),
+    }).start();
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    sockets[0].onclose();
+    check('a dropped connection says "Reconnecting…" instead of ending the call', log.join() === 'reconnecting:true', log);
+    await wait(10);
+    check('and joins the room again, as a new client', sockets.length === 2 && sockets[1].url.startsWith('ws://h:4100/ws/call-9/caller-') && sockets[1].url !== sockets[0].url, sockets.map((x) => x.url));
+    call.current.onRemoteStream({ getTracks: () => [] }, {});
+    check('media back: "Reconnecting…" goes away', log.slice(-2).join() === 'reconnecting:false,media', log);
+    // Three more drops in a row, with nothing coming back: it gives up.
+    for (let i = 0; i < 4; i += 1) { sockets.at(-1).onclose(); await wait(10); }
+    check('and gives up after its tries, saying why', log.at(-1)?.startsWith('closed:'), log);
+    const before = sockets.length;
+    call.end(); await wait(10);
+    check('hanging up stops it rejoining', sockets.length === before);
+  }
+  {
+    const { testCallServer } = load('components/calls/callSelfTest.js');
+    class Refused { constructor() { setTimeout(() => this.onerror?.(), 1); } close() {} }
+    const out = await testCallServer({ url: 'ws://pc:4100/ws', webrtc: {}, getStream: async () => null, WebSocketImpl: Refused, socketMs: 200 });
+    check('the self-test says when the phone cannot reach the call server, and what to check on the PC',
+      out.ok === false && out.step === 'socket' && /Windows Firewall allow TCP 4100/.test(out.detail), out);
+    const diag = fs.readFileSync(path.join(root, 'app', 'DiagnosticsScreen.js'), 'utf8');
+    check('Diagnostics runs it, and says why the call server is not in use when it is not',
+      /testCallServer\(/.test(diag) && /sfuStatus\?\.reason/.test(diag));
+  }
+  check('a call hangs on through reconnects (SfuCall), shows them, and tells the other phone mute/camera and reactions',
+    /new SfuCall\(/.test(ctx) && /onReconnecting: \(on\) => setReconnecting\(on\)/.test(ctx)
+    && /emit\('call:state'/.test(ctx) && /emit\('call:reaction'/.test(ctx));
+  check('a live call runs the ongoing-call service, so the microphone works with the app off screen',
+    /startCallService\?\.\(call\.id/.test(ctx) && /stopCallService/.test(ctx));
+  {
+    const service = fs.readFileSync(path.join(root, 'native', 'android', 'voice', 'CallService.kt'), 'utf8');
+    const pluginSrc = fs.readFileSync(path.join(root, 'plugins', 'withVoiceNotes.js'), 'utf8');
+    check('the service holds the microphone (and camera on video), as Android 11+ requires',
+      /FOREGROUND_SERVICE_TYPE_MICROPHONE/.test(service) && /FOREGROUND_SERVICE_TYPE_CAMERA/.test(service)
+      && /'\.voice\.CallService'/.test(pluginSrc) && /'android:foregroundServiceType': 'microphone\|camera'/.test(pluginSrc)
+      && /FOREGROUND_SERVICE_MICROPHONE/.test(pluginSrc) && /FOREGROUND_SERVICE_CAMERA/.test(pluginSrc));
+    check('and its notification hangs up through the app', /loversrock:\/\/call\?hangup=\$callId/.test(service) && /forOngoingCall/.test(service));
+    const screen = fs.readFileSync(path.join(root, 'app', 'CallScreen.js'), 'utf8');
+    check('the call screen shows reconnecting, their mute and camera, and the reactions',
+      /is reconnecting…/.test(screen) && /is muted/.test(screen) && /FloatingReaction/.test(screen) && /sendReaction\(emoji\)/.test(screen));
+  }
   // Git for Windows checks text out as CRLF, and git apply rejects a CRLF
   // patch: the call server's image failed to build on the PC.
   const repo = path.join(root, '..');

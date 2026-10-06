@@ -61,6 +61,46 @@ server with two Chromium pages: voice and video both connected in about 1.5
 seconds, and a hang-up reached the other side. **Not yet verified on two
 real phones.**
 
+### What Nextcloud Talk's calls taught these
+
+Nextcloud Talk for Android (GPL-3.0) was read for how it keeps calls up,
+and the ideas were rewritten here; none of its code is in this repository,
+which is MIT.
+
+- **An ongoing-call service.** Since Android 11 an app may only use the
+  microphone and camera while it is on screen, unless a foreground service
+  of type `microphone` (`camera`) is running. Talk runs one for every call
+  (CallForegroundService); without it, switching apps or locking the phone
+  mid-call cut the microphone and the other phone heard silence.
+  `native/android/voice/CallService.kt` does the same while a call is
+  connecting or connected, and shows the call in the notification shade
+  with Hang up (`loversrock://call?hangup=<id>`).
+- **Reconnecting, not hanging up.** Talk puts a call into "Reconnecting…"
+  when its connection drops and joins again. `SfuCall` (in
+  `components/calls/sfu.js`) does that on the call server: a closed socket,
+  a failed connection, or one disconnected for four seconds rejoins the
+  room with the same microphone and camera, backing off, up to six times.
+  The other phone shows "<name> is reconnecting…" until the media is back.
+  Tested by killing the call server mid-call: both sides were back with
+  audio 0.6 seconds after it restarted.
+- **Mute and camera state, sent to the other phone** (`call:state`), so a
+  muted partner reads "is muted" rather than silence, and a camera turned
+  off shows their name rather than a frozen frame.
+- **Reactions in the call** (`call:reaction`), floating up both screens.
+
+### When calls still do not work
+
+Settings, then **Diagnostics**, now tests calls from the phone:
+
+- **Call server**: whether the backend offers it, and if not, why (not set
+  up, the container not running, no address).
+- **Call through the call server**: joins a room of its own and checks,
+  step by step, that the phone reaches the websocket (TCP 4100) and that
+  audio actually gets through (UDP 4110-4130 or TCP 4101). Each failure
+  names the fix on the PC.
+
+A call that fails phone to phone also says why the call server was not used.
+
 ### Peer to peer (the fallback)
 
 Once the two phones have found each other, audio and video travel directly

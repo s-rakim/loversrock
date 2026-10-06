@@ -112,7 +112,7 @@ console.log('\n=== DECLINE FROM THE NOTIFICATION, WITHOUT OPENING THE APP ===');
 {
   // The same secret the server signs with (backend/.env).
   await import('dotenv/config');
-  const { declineToken, sfuUrl } = await import('../src/routes/calls.js');
+  const { declineToken, sfuUrl, sfuState } = await import('../src/routes/calls.js');
   const ringing = await req('/calls/start', { method: 'POST', token: A.token, body: { kind: 'voice' } });
   const id = ringing.data.call.id;
   const forged = await req(`/calls/${id}/decline-from-notification`, { method: 'POST', body: { token: 'not-the-token' } });
@@ -131,7 +131,13 @@ console.log('\n=== DECLINE FROM THE NOTIFICATION, WITHOUT OPENING THE APP ===');
     sfuUrl({ hostname: 'pc.example' }, { CALLS_SFU_PORT: '4100' }) === 'ws://pc.example:4100/ws');
   check('or wherever CALLS_SFU_URL says', sfuUrl({ hostname: 'x' }, { CALLS_SFU_URL: 'ws://calls.example:9/ws/' }) === 'ws://calls.example:9/ws');
   check('and not at all when it is not set up', sfuUrl({ hostname: 'x' }, {}) === null);
+  const notSetUp = await sfuState({});
+  check('not set up: says so, and how to fix it', notSetUp.ok === false && /CALLS_SFU_HEALTH/.test(notSetUp.reason), notSetUp);
+  const viaUrl = await sfuState({ CALLS_SFU_URL: 'ws://calls.example/ws' });
+  check('a call server given by URL counts as up', viaUrl.ok === true, viaUrl);
   const cfg = await req('/calls/config', { token: A.token });
+  check('config says why the call server is not in use when it is not',
+    cfg.data.sfu ? cfg.data.sfuStatus?.ok === true : typeof cfg.data.sfuStatus?.reason === 'string', cfg.data.sfuStatus);
   check('config says whether calls go through it',
     'sfu' in cfg.data && (process.env.CALLS_SFU_HEALTH || process.env.CALLS_SFU_URL ? true : cfg.data.sfu === null), cfg.data.sfu);
 }
@@ -205,6 +211,16 @@ const wantHeard = waitFor(sockA, 'call:want-offer');
 sockB.emit('call:want-offer', { callId: 'test-call' });
 const want = await wantHeard;
 check('a phone that missed the offer can ask for it again', want.callId === 'test-call' && want.fromUserId === B.id, want);
+
+// Mute / camera off, and reactions, mid-call (learned from Nextcloud Talk).
+const stateHeard = waitFor(sockB, 'call:state');
+sockA.emit('call:state', { callId: 'test-call', muted: true, cameraOff: false, extra: 'dropped' });
+const state = await stateHeard;
+check('mute and camera state reach the other phone', state.callId === 'test-call' && state.muted === true && state.cameraOff === false && !('extra' in state), state);
+const reactionHeard = waitFor(sockB, 'call:reaction');
+sockA.emit('call:reaction', { callId: 'test-call', emoji: '❤️' });
+const reaction = await reactionHeard;
+check('and so do reactions', reaction.emoji === '❤️' && reaction.fromUserId === A.id, reaction);
 
 const hangupHeard = waitFor(sockB, 'call:hangup');
 sockA.emit('call:hangup', { callId: 'test-call' });

@@ -43,7 +43,7 @@ const {
   RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices, MediaStream,
 } = WebRTC || {};
 import { apiFetch, connectSocket, getSocket, waitForSocket } from '../../services/api';
-import { SfuSession, newClientId } from './sfu';
+import { SfuCall } from './sfu';
 import {
   candidateLines, describePaths, isPrivateCandidate, privateSdp, scrubCandidate,
 } from './paths';
@@ -135,6 +135,16 @@ export function CallProvider({ children }) {
   // call spent most of its life in, and it told nobody anything.
   const [iceState, setIceState] = useState(null);
   const [relayed, setRelayed] = useState(false);
+  // Learned from Nextcloud Talk: a dropped connection is "Reconnecting…",
+  // not the end of the call. `reconnecting` is this phone rejoining the call
+  // server; `partnerReconnecting` is the other phone gone from it for now.
+  const [reconnecting, setReconnecting] = useState(false);
+  const [partnerReconnecting, setPartnerReconnecting] = useState(false);
+  // What the other phone says about itself (Talk sends this on a data
+  // channel; here it rides the socket): muted, camera off.
+  const [partnerState, setPartnerState] = useState({ muted: false, cameraOff: false });
+  // Reactions floating up the call screen: { id, emoji, mine }.
+  const [reactions, setReactions] = useState([]);
   const restarted = useRef(false);
 
   const pc = useRef(null);
@@ -208,6 +218,10 @@ export function CallProvider({ children }) {
     sfuModeRef.current = false;
     setIceState(null);
     setRelayed(false);
+    setReconnecting(false);
+    setPartnerReconnecting(false);
+    setPartnerState({ muted: false, cameraOff: false });
+    setReactions([]);
     setLocalStream(null);
     setRemoteStream(null);
     setMuted(false);
@@ -278,10 +292,16 @@ export function CallProvider({ children }) {
   };
 
   /** Which networks each phone offered, from the SDPs and trickled candidates. */
-  const pathSummary = (connection) => describePaths(
-    candidateLines(connection?.localDescription?.sdp, localCandidates.current.map((c) => c?.candidate)),
-    candidateLines(connection?.remoteDescription?.sdp, remoteCandidates.current),
-  );
+  // A phone-to-phone call only happens when the call server is not in use,
+  // so its failure says why the call server was not used: that is the fix.
+  const pathSummary = (connection) => {
+    const paths = describePaths(
+      candidateLines(connection?.localDescription?.sdp, localCandidates.current.map((c) => c?.candidate)),
+      candidateLines(connection?.remoteDescription?.sdp, remoteCandidates.current),
+    );
+    const why = iceConfig.current?.sfuStatus?.reason;
+    return why ? `${paths}\n\nThis call went phone to phone because the call server is ${why}.` : paths;
+  };
 
   const buildPeerConnection = useCallback(async (kind, stream) => {
     const config = await apiFetch('/calls/config');
@@ -421,25 +441,32 @@ export function CallProvider({ children }) {
    */
   const joinSfu = useCallback((sfu, stream) => {
     if (sfuRef.current) return sfuRef.current;
-    const session = new SfuSession({
+    const session = new SfuCall({
       url: sfu.url,
       room: sfu.room,
-      clientId: newClientId(roleRef.current || 'p'),
+      clientPrefix: roleRef.current || 'p',
       nickname: roleRef.current || '',
       stream,
       iceServers: sfu.iceServers || [],
       webrtc: { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, MediaStream },
       onIceState: (state) => setIceState(state),
       onRemoteStream: (remote) => {
-        // The other phone's media has arrived: that is the call connected.
+        // The other phone's media has arrived: that is the call connected
+        // (or back, after either phone rejoined).
         setRemoteStream(remote);
+        setPartnerReconnecting(false);
         audio.stopRingback();
         audio.stopRing();
         setCall((c) => (c.phase === 'connecting' || c.phase === 'ringing-out' ? { ...c, phase: 'connected' } : c));
       },
+      // The other phone left the call server's room. If it is hanging up, the
+      // hang-up follows on the socket; if not, it is rejoining.
+      onPeerLeft: () => setPartnerReconnecting(true),
+      onReconnecting: (on) => setReconnecting(on),
       onClosed: (reason) => {
         if (sfuRef.current !== session) return;
-        setError(`The call server hung up (${reason}). Check that the calls service is running (docker compose ps).`);
+        setError(`Lost the call: ${reason}, and rejoining did not work. Settings, then Diagnostics, tests the call server from this phone.`);
+        endCallRef.current?.('sfu-lost');
       },
     });
     sfuRef.current = session;
@@ -588,20 +615,49 @@ export function CallProvider({ children }) {
     }
     setTimeout(() => setCall((c) => (c.phase === 'ended' ? IDLE : c)), 1200);
   }, [call, teardown]);
+  // For the call server's give-up, which is set up once per call.
+  const endCallRef = useRef(null);
+  endCallRef.current = endCall;
+
+  // Muted and camera-off are told to the other phone, so it can say so
+  // rather than show silence or a frozen frame.
+  const tellState = useCallback(() => {
+    const audioTrack = localStreamRef.current?.getAudioTracks?.()[0];
+    const videoTrack = localStreamRef.current?.getVideoTracks?.()[0];
+    getSocket()?.emit('call:state', {
+      callId: callIdRef.current,
+      muted: audioTrack ? !audioTrack.enabled : false,
+      cameraOff: videoTrack ? !videoTrack.enabled : true,
+    });
+  }, []);
 
   const toggleMute = useCallback(() => {
     const track = localStreamRef.current?.getAudioTracks?.()[0];
     if (!track) return;
     track.enabled = !track.enabled;
     setMuted(!track.enabled);
-  }, []);
+    tellState();
+  }, [tellState]);
 
   const toggleCamera = useCallback(() => {
     const track = localStreamRef.current?.getVideoTracks?.()[0];
     if (!track) return;
     track.enabled = !track.enabled;
     setCameraOff(!track.enabled);
+    tellState();
+  }, [tellState]);
+
+  // A reaction in the call (Talk's in-call reactions): floats up both screens.
+  const addReaction = useCallback((emoji, mine) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setReactions((list) => [...list.slice(-11), { id, emoji, mine }]);
+    setTimeout(() => setReactions((list) => list.filter((r) => r.id !== id)), 3200);
   }, []);
+  const sendReaction = useCallback((emoji) => {
+    if (!callIdRef.current) return;
+    addReaction(emoji, true);
+    getSocket()?.emit('call:reaction', { callId: callIdRef.current, emoji: String(emoji).slice(0, 8) });
+  }, [addReaction]);
 
   const switchCamera = useCallback(() => {
     const track = localStreamRef.current?.getVideoTracks?.()[0];
@@ -721,6 +777,13 @@ export function CallProvider({ children }) {
       socket.on('call:hangup', remoteEnded);
       socket.on('call:decline', remoteEnded);
       socket.on('call:peer-gone', () => { if (pc.current) remoteEnded(); });
+      socket.on('call:state', (payload) => {
+        if (payload?.callId !== callIdRef.current) return;
+        setPartnerState({ muted: Boolean(payload.muted), cameraOff: Boolean(payload.cameraOff) });
+      });
+      socket.on('call:reaction', (payload) => {
+        if (payload?.callId === callIdRef.current && payload.emoji) addReaction(String(payload.emoji), false);
+      });
 
       // The callee's app was closed when the call came in, so the offer went
       // into a socket that was not there and was lost; the push opened the
@@ -750,11 +813,11 @@ export function CallProvider({ children }) {
       cancelled = true;
       const live = getSocket();
       ['call:offer', 'call:answer', 'call:ice', 'call:hangup', 'call:decline', 'call:peer-gone', 'call:renegotiate',
-        'call:want-offer']
+        'call:want-offer', 'call:state', 'call:reaction']
         .forEach((event) => live?.off(event));
       live?.off('connect', askForRingingCall);
     };
-  }, [flushCandidates, teardown, askForRingingCall, widen, joinSfu]);
+  }, [flushCandidates, teardown, askForRingingCall, widen, joinSfu, addReaction]);
 
   // Answered, and not connected within a few seconds: Tailscale, the home
   // network and the relay have had their chance, which on a working tailnet
@@ -780,8 +843,8 @@ export function CallProvider({ children }) {
     if (call.phase !== 'connecting') return undefined;
     const timer = setTimeout(() => {
       setError(sfuModeRef.current
-        ? `Could not connect through the call server (${iceConfig.current?.sfu?.url || 'not configured'}). `
-          + 'Check that the calls service is running on the server PC and that both phones are online.'
+        ? 'Could not connect through the call server. Settings, then Diagnostics, tests it from this phone '
+          + 'and says what to change on the PC.'
         : `${failureMessage()}\n\n${pathSummary(pc.current)}`);
       endCall('ice-timeout');
     }, 45000);
@@ -795,8 +858,15 @@ export function CallProvider({ children }) {
   const pendingAction = useRef(null);
   useEffect(() => {
     const take = (url) => {
-      const m = /^loversrock:\/\/call\?(answer|decline)=([\w-]+)/.exec(String(url || ''));
-      if (m) pendingAction.current = { action: m[1], callId: m[2], at: Date.now() };
+      const m = /^loversrock:\/\/call\?(answer|decline|hangup)=([\w-]+)/.exec(String(url || ''));
+      if (!m) return;
+      // Hang up, from the ongoing-call notification: the call is already
+      // live in this app, so it ends now.
+      if (m[1] === 'hangup') {
+        if (callIdRef.current === m[2]) endCallRef.current?.('hangup');
+        return;
+      }
+      pendingAction.current = { action: m[1], callId: m[2], at: Date.now() };
     };
     Linking.getInitialURL().then(take).catch(() => {});
     const sub = Linking.addEventListener('url', ({ url }) => take(url));
@@ -834,15 +904,30 @@ export function CallProvider({ children }) {
 
   useEffect(() => () => teardown(), [teardown]);
 
+  // The ongoing-call service (CallService.kt), learned from Nextcloud Talk's
+  // CallForegroundService: while a call is live it keeps the microphone (and
+  // the camera, on video) working with the app off screen. Without it,
+  // Android cuts the microphone the moment you switch apps or the screen
+  // locks, and the other phone hears silence. It also puts the call in the
+  // notification shade, with Hang up.
+  const live = call.phase === 'connecting' || call.phase === 'connected';
+  useEffect(() => {
+    if (!live || !call.id) return undefined;
+    const native = NativeModules.VoiceNotes;
+    native?.startCallService?.(call.id, partnerNameRef.current || 'Your partner', call.kind || 'voice');
+    return () => { native?.stopCallService?.(); };
+  }, [live, call.id, call.kind]);
+
   const value = useMemo(() => ({
     call, localStream, remoteStream, muted, cameraOff, speakerOn, error,
-    iceState, relayed,
+    iceState, relayed, reconnecting, partnerReconnecting, partnerState, reactions,
     startCall, answerCall, endCall,
-    toggleMute, toggleCamera, switchCamera, toggleSpeaker,
+    toggleMute, toggleCamera, switchCamera, toggleSpeaker, sendReaction,
     clearError: () => setError(null),
     isBusy: call.phase !== 'idle' && call.phase !== 'ended',
   }), [call, localStream, remoteStream, muted, cameraOff, speakerOn, error, iceState, relayed,
-    startCall, answerCall, endCall, toggleMute, toggleCamera, switchCamera, toggleSpeaker]);
+    reconnecting, partnerReconnecting, partnerState, reactions,
+    startCall, answerCall, endCall, toggleMute, toggleCamera, switchCamera, toggleSpeaker, sendReaction]);
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
 }
