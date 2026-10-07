@@ -624,11 +624,11 @@ export default function SettingsScreen() {
       </FadeInUp>
 
       <FadeInUp delay={94}>
-        <MorphButton onPress={() => navigation.navigate('Esprits')} style={styles.actionRow}>
+        <MorphButton onPress={() => navigation.navigate('FableSetup')} style={styles.actionRow}>
           <Icon3D name="robot" size={34} />
           <View style={{ flex: 1 }}>
-            <Text style={font.body}>AI room (Esprits)</Text>
-            <Text style={font.muted}>Your models come from Free Claude Code on the PC; pick them in its admin page. The globe in the room opens its full pages.</Text>
+            <Text style={font.body}>AI chat (Fable)</Text>
+            <Text style={font.muted}>Choose the AI in your group chat and add your own API keys.</Text>
           </View>
         </MorphButton>
       </FadeInUp>
