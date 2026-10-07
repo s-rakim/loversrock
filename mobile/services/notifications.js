@@ -82,7 +82,9 @@ try {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
       const type = notification?.request?.content?.data?.type;
-      const inThread = activeScreen === 'Messages' && type === 'message';
+      // Already looking at it: the chat for a message, the AI room for the room.
+      const inThread = (activeScreen === 'Messages' && type === 'message')
+        || (activeScreen === 'Esprits' && type === 'esprits');
       return {
         shouldShowAlert: !inThread,
         shouldPlaySound: !inThread,
@@ -206,7 +208,7 @@ export const SCREEN_FOR_TYPE = {
   // arriving somewhere adjacent is indistinguishable from not arriving.
   memory: { tab: 'Photos', screen: 'Wall' },
   message: { tab: 'Photos', screen: 'Messages' },
-  fable: 'Fable',
+  esprits: 'Esprits',
   // Only iPhones get a notification for a voice note — Android plays it
   // itself (native/android/voice/) — and tapping one opens the list.
   voice: 'VoiceNotes',

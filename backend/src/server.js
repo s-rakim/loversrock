@@ -5,7 +5,7 @@ import { createServer } from 'http';
 
 import { initSockets } from './sockets/index.js';
 import { startCronJobs } from './cron/index.js';
-import { refreshSharedAiConfig } from './models/fableAi.js';
+import { startEspritsWatcher } from './models/espritsWatcher.js';
 import { ensureBucket, getObjectStream, statObject } from './config/storage.js';
 import { requireAuthAllowingQuery } from './middleware/auth.js';
 import { wrapAsync } from './lib/asyncRouter.js';
@@ -32,7 +32,7 @@ import canvasRoutes from './routes/canvas.js';
 import checkinRoutes from './routes/checkins.js';
 import feedRoutes from './routes/feed.js';
 import voiceRoutes from './routes/voice.js';
-import fableRoutes from './routes/fable.js';
+import espritsRoutes from './routes/esprits.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -72,7 +72,9 @@ app.use('/checkins', checkinRoutes);
 app.use('/feed', feedRoutes);
 // Voice notes from the mic in the nav bar — see routes/voice.js.
 app.use('/voice', voiceRoutes);
-app.use('/fable', fableRoutes);
+// The AI room (Collaboration des Esprits), which replaced Fable — see
+// routes/esprits.js and docs/ESPRITS.md.
+app.use('/esprits', espritsRoutes);
 
 /** image/jpeg for a .jpg, and so on. */
 const EXTENSION_TYPES = {
@@ -151,8 +153,8 @@ ensureBucket()
   .finally(() => {
     httpServer.listen(PORT, () => {
       console.log(`[server] listening on :${PORT}`);
-      // A key added in the app can also write the daily content (aiShared.js);
-      // loaded before the first cron tick needs it.
-      refreshSharedAiConfig().finally(startCronJobs);
+      startCronJobs();
+      // Pushes and live nudges for what is said in the AI room.
+      startEspritsWatcher(io);
     });
   });

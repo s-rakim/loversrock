@@ -23,6 +23,7 @@
     "test:engines": "node test/gameEngines.mjs",
     "test:calls": "node test/calls.mjs",
     "test:chat": "node test/chat.mjs",
+    "test:esprits": "node test/esprits.mjs",
     "test:quiz-compare": "node test/quizCompare.mjs",
     "test:locket": "node test/locket.mjs",
     "test:media": "node test/media.mjs",
@@ -44,7 +45,6 @@
     "test:quiz-generator": "node --env-file=.env test/quizGenerator.mjs",
     "test:voice": "node --env-file=.env test/voice.mjs",
     "test:voice-ai": "node --env-file=.env test/voiceAi.mjs",
-    "test:fable": "node test/fable.mjs",
     "ai:generate": "node scripts/generate-content.js",
     "test:content-generator": "node test/contentGenerator.mjs"
   },

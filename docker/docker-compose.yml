@@ -110,6 +110,27 @@ services:
       - "0.0.0.0:4101:4101/tcp"
       - "0.0.0.0:4110-4130:4110-4130/udp"
 
+
+  # Collaboration des Esprits: the AI room (it replaced Fable). See
+  # docker/esprits/Dockerfile and docs/ESPRITS.md. The app reaches it through
+  # the backend (/esprits), which signs each of you in under your own name;
+  # port 4300 is published for its full web pages (setup, board, work), which
+  # ask for the room's token once per browser.
+  esprits:
+    build: ./esprits
+    restart: unless-stopped
+    environment:
+      # Empty: one is made on first start and kept in the esprits-secret volume.
+      ESPRITS_TOKEN: ${ESPRITS_TOKEN:-}
+      # Free Claude Code on this PC, which the room looks for at startup.
+      ESPRITS_FCC: ${ESPRITS_FCC:-http://host.docker.internal:8082/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - espritsdata:/data
+      - espritssecret:/secret
+    ports:
+      - "0.0.0.0:4300:4300"
   backend:
     build:
       context: ../backend
@@ -154,6 +175,17 @@ services:
       # is up before offering it.
       CALLS_SFU_PORT: "4100"
       CALLS_SFU_HEALTH: http://calls:4100
+      # The AI room (Esprits): where it is, and the token it made.
+      ESPRITS_URL: http://esprits:4300
+      ESPRITS_TOKEN_FILE: /esprits-secret/token
+      ESPRITS_PORT: "4300"
+      # Free Claude Code, for the daily prompts, quiz and date ideas when
+      # backend/.env names no QUIZ_LLM_* model of its own.
+      FCC_URL: ${FCC_URL:-http://host.docker.internal:8082}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - espritssecret:/esprits-secret:ro
     ports:
       # 0.0.0.0 on purpose: the phone reaches this over the Tailscale interface,
       # so binding to loopback would make the API unreachable from the app.
@@ -172,5 +204,7 @@ services:
     # `docker compose up -d --build`, which rebuilds the image anyway.
 
 volumes:
+  espritsdata:
+  espritssecret:
   pgdata:
   miniodata:

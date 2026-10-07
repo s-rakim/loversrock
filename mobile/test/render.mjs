@@ -721,26 +721,28 @@ console.log('\n=== FABLE: THE GROUP CHAT WITH AN AI ===');
   const went = [];
   const navigation = { navigate: (to) => went.push(to), setOptions: () => {} };
 
-  const Fable = load('app/FableScreen.js', stubs);
+  // The AI room (Collaboration des Esprits), which replaced Fable.
+  stubs['../services/notifications'] = { setActiveScreen() {} };
+  const Esprits = load('app/EspritsScreen.js', stubs);
   let threw = null;
-  try { collectAll(Fable.default({ navigation })); } catch (err) { threw = err.message; }
-  check('the Fable chat renders', threw === null, threw);
-  const merged = Fable.mergeFeed([{ id: 2, body: 'b' }, { id: 1, body: 'a' }], [{ id: 3, body: 'c' }, { id: 2, body: 'b2' }]);
+  try { collectAll(Esprits.default({ navigation })); } catch (err) { threw = err.message; }
+  check('the AI room renders', threw === null, threw);
+  const merged = Esprits.mergeFeed([{ id: 2, body: 'b' }, { id: 1, body: 'a' }], [{ id: 3, body: 'c' }, { id: 2, body: 'b2' }]);
   check('new messages merge in order, without duplicates', merged.map((m) => `${m.id}${m.body}`).join(',') === '1a,2b2,3c', merged);
+  check('tapping a model asks it by name (and swaps one already asked)',
+    Esprits.mentionIn('dinner?', 'critic') === '@critic dinner?' && Esprits.mentionIn('@critic dinner?', 'architect') === '@architect dinner?');
 
   const thread = fs.readFileSync(path.join(root, 'app', 'MessagesScreen.js'), 'utf8');
   check('the chat with your partner has no chip row any more', !/ChatSwitcher/.test(thread));
-  check('Fable\'s gear sits in its title bar', /headerRight/.test(fs.readFileSync(path.join(root, 'app', 'FableScreen.js'), 'utf8')));
-  const screen = fs.readFileSync(path.join(root, 'app', 'FableScreen.js'), 'utf8');
-  check('Fable talks only to our own server', /apiFetch\(`\/fable\/messages/.test(screen) && /apiFetch\('\/fable\/messages'/.test(screen) && !/\bfetch\(|https?:\/\//.test(screen));
-  check('and stops polling and listening when you leave it', /live = false;\s*clearInterval\(timer\);/.test(screen) && /socketRef\?\.off\('fable:message'/.test(screen));
-  const setup = fs.readFileSync(path.join(root, 'app', 'FableSetupScreen.js'), 'utf8');
-  check('the setup page sends keys to our server and never shows one back', /apiFetch\(`\/fable\/keys\/\$\{provider\.id\}`/.test(setup) && /secureTextEntry/.test(setup) && /savedKey\.hint/.test(setup));
-  let setupThrew = null;
-  try { collectAll(load('app/FableSetupScreen.js', stubs).default({ navigation })); } catch (err) { setupThrew = err.message; }
-  check('the setup page renders', setupThrew === null, setupThrew);
+  const screen = fs.readFileSync(path.join(root, 'app', 'EspritsScreen.js'), 'utf8');
+  check('the room talks only to our own server, never to Esprits or a model directly',
+    /apiFetch\(`\/esprits\/feed/.test(screen) && /apiFetch\('\/esprits\/post'/.test(screen) && !/\bfetch\(|https?:\/\/(?!host\.docker\.internal)/.test(screen));
+  check('and stops polling and listening when you leave it',
+    /live = false;[\s\S]*clearInterval\(feedTimer\);[\s\S]*clearInterval\(statusTimer\);/.test(screen) && /socketRef\?\.off\('esprits:new'/.test(screen));
+  check('it can connect Free Claude Code, stop a reply, drop an idea and open the full room',
+    /'\/esprits\/connect'/.test(screen) && /'\/esprits\/stop'/.test(screen) && /'\/esprits\/ideas'/.test(screen) && /Linking\.openURL\(status\.webUrl\)/.test(screen));
   const appJs = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
-  check('the setup page is reachable from anywhere', /<Stack\.Screen name="FableSetup" component=\{FableSetupScreen\}/.test(appJs));
+  check('Fable is gone', !/Fable(Setup)?Screen/.test(appJs) && !fs.existsSync(path.join(root, 'app', 'FableScreen.js')));
 }
 
 console.log('\n=== BACKGROUNDS: LAVA LAMP BY DEFAULT, THE LIVE SKY AND THE TIMELAPSE AS OPTIONS ===');

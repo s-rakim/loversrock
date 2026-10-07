@@ -46,8 +46,7 @@ import SettingsScreen from './app/SettingsScreen';
 import CallScreen from './app/CallScreen';
 import DiagnosticsScreen from './app/DiagnosticsScreen';
 import WardrobeScreen from './app/WardrobeScreen';
-import FableSetupScreen from './app/FableSetupScreen';
-import FableScreen from './app/FableScreen';
+import EspritsScreen from './app/EspritsScreen';
 import WidgetLookScreen from './app/WidgetLookScreen';
 import { PAIR_ART } from './assets/mascot';
 import WallpaperScreen from './app/WallpaperScreen';
@@ -331,10 +330,9 @@ function Root() {
             <Stack.Screen name="SharedItems" component={SharedItemsScreen} options={{ title: 'Shared in the chat' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />
-            {/* Fable: its own screen, opened from its button on Home, with a
-                back arrow rather than living behind chips inside the chat. */}
-            <Stack.Screen name="Fable" component={FableScreen} options={{ title: 'Fable' }} />
-            <Stack.Screen name="FableSetup" component={FableSetupScreen} options={{ title: 'AI chat setup' }} />
+            {/* The AI room (Collaboration des Esprits), which replaced Fable:
+                its own screen, opened from its button on Home. */}
+            <Stack.Screen name="Esprits" component={EspritsScreen} options={{ title: 'Esprits' }} />
             <Stack.Screen name="WidgetLook" component={WidgetLookScreen} options={{ title: 'Widget look' }} />
             <Stack.Screen name="ThumbKiss" component={ThumbKissScreen} options={{ title: 'Thumb Kiss' }} />
             <Stack.Screen name="DistanceApart" component={DistanceApartScreen} options={{ title: 'Distance Apart' }} />

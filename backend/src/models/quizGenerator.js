@@ -18,7 +18,6 @@
 // number of choices, a trivia answer that is one of its choices, no repeats of
 // a question already in the bank. Anything that fails is dropped, not fixed.
 import { query } from '../config/db.js';
-import { getSharedAiConfig } from './aiShared.js';
 
 export const QUIZ_TYPES = ['trivia', 'guess_partner', 'this_or_that'];
 const QUESTIONS_PER_DAY = 5;
@@ -50,20 +49,34 @@ const ENV_NAMES = {
  * Throws with a plain explanation when it is half set up, so a typo is a
  * clear message in the log rather than a silent fall back to recycling.
  *
- * With nothing in the environment, a key added in the app (Settings → AI
- * chat, "also use it for daily content") is used instead; see aiShared.js.
- * Only for the real environment: a test passing its own env gets exactly
- * what it passed.
+ * With no QUIZ_LLM_* of its own, it uses Free Claude Code when FCC_URL says
+ * where that is (docker-compose sets it to the PC): the same free models the
+ * AI room (Esprits) talks through, no key needed. FCC speaks Anthropic's
+ * /v1/messages, so it is the anthropic provider at FCC's address; FCC routes
+ * the call to whichever model is picked in its admin page, whatever the
+ * model name says. FCC_TOKEN only if FCC's proxy authentication is on.
  */
 export function quizLlmConfig(env = process.env) {
   const provider = String(env.QUIZ_LLM_PROVIDER || '').trim().toLowerCase();
-  if (!provider) return env === process.env ? getSharedAiConfig() : null;
+  if (!provider) return fccLlmConfig(env);
   return buildLlmConfig({
     provider, apiKey: env.QUIZ_LLM_API_KEY, model: env.QUIZ_LLM_MODEL, baseUrl: env.QUIZ_LLM_BASE_URL,
   });
 }
 
-/** backend/.env's own connector, ignoring any key added in the app. */
+/** Free Claude Code as the connector (FCC_URL), or null when it is not set. */
+export function fccLlmConfig(env = process.env) {
+  const url = String(env.FCC_URL || '').trim().replace(/\/+$/, '').replace(/\/v1$/, '');
+  if (!url) return null;
+  return buildLlmConfig({
+    provider: 'anthropic',
+    apiKey: env.FCC_TOKEN || 'free-claude-code',
+    model: env.QUIZ_LLM_MODEL || '',
+    baseUrl: url,
+  }, { ...ENV_NAMES, baseUrl: 'FCC_URL' });
+}
+
+/** backend/.env's own connector (QUIZ_LLM_*), ignoring Free Claude Code. */
 export function serverLlmConfig(env = process.env) {
   if (!String(env.QUIZ_LLM_PROVIDER || '').trim()) return null;
   return quizLlmConfig(env === process.env ? { ...env } : env);

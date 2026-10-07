@@ -64,13 +64,13 @@ for (const [file, want] of Object.entries(sections)) {
     JSON.stringify([...pill].sort()) === JSON.stringify([...onPill].sort()), { pill, inner });
 }
 
-// Fable: its own screen above the tabs, one tap from Home.
-check('Fable is a screen of its own', /<Stack\.Screen name="Fable" component=\{FableScreen\}/.test(app));
+// The AI room (Esprits, which replaced Fable): its own screen above the tabs, one tap from Home.
+check('the AI room is a screen of its own', /<Stack\.Screen name="Esprits" component=\{EspritsScreen\}/.test(app));
 const homeSrc = read('app', 'HomeScreen.js');
 const kissAt = homeSrc.indexOf("navigate('ThumbKiss')");
-const fableAt = homeSrc.indexOf("navigate('Fable')");
+const fableAt = homeSrc.indexOf("navigate('Esprits')");
 const callsAt = homeSrc.indexOf('<CallButtons />');
-check('Home has a Fable button, below Thumb Kiss and above the calls', kissAt > 0 && fableAt > kissAt && callsAt > fableAt, { kissAt, fableAt, callsAt });
+check('Home has an AI room button, below Thumb Kiss and above the calls', kissAt > 0 && fableAt > kissAt && callsAt > fableAt, { kissAt, fableAt, callsAt });
 
 // The chat takes the whole screen, and back from it is the camera.
 const lumaSrc = read('components', 'LumaBar.js');

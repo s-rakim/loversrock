@@ -1049,3 +1049,19 @@ CREATE TABLE IF NOT EXISTS message_reminders (
   PRIMARY KEY (message_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS message_reminders_due_idx ON message_reminders (remind_at);
+
+-- ---------------------------------------------------------------------------
+-- The AI room: Collaboration des Esprits (docker/esprits) replaced Fable.
+-- ---------------------------------------------------------------------------
+
+-- Who has used the room through the app, and the name they have in it: for
+-- notifications and for showing a person by the name they have here.
+CREATE TABLE IF NOT EXISTS esprits_members (
+  user_id  UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  handle   TEXT NOT NULL,
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- fable_settings, ai_keys and fable_messages are no longer used. They are
+-- left as they were, not dropped, so nothing anyone wrote is deleted by an
+-- update; drop them by hand once you no longer want the old Fable chat.

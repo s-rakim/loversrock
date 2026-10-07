@@ -152,14 +152,14 @@ export default function HomeScreen({ navigation }) {
           </MorphButton>
         </FadeInUp>
 
-        {/* Fable, the group chat with an AI: its own button, one tap from
-            Home, rather than a chip inside your partner's thread. */}
+        {/* The AI room (Esprits): its own button, one tap from Home, rather
+            than a chip inside your partner's thread. */}
         <FadeInUp delay={115}>
-          <MorphButton onPress={() => navigation.navigate('Fable')} style={styles.fableCard}>
+          <MorphButton onPress={() => navigation.navigate('Esprits')} style={styles.fableCard}>
             <Icon3D name="robot" size={36} />
             <View style={{ flex: 1 }}>
-              <Text style={[font.body, { fontWeight: '700' }]}>Fable</Text>
-              <Text style={font.muted}>Group chat: you, your partner and an AI</Text>
+              <Text style={[font.body, { fontWeight: '700' }]}>Esprits</Text>
+              <Text style={font.muted}>The AI room: you, your partner and your models</Text>
             </View>
             <Icon name="chevron-forward" chip={false} size={16} color={colors.textMuted} />
           </MorphButton>
