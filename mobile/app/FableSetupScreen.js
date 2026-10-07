@@ -1,15 +1,21 @@
-// Setting up the AI in Fable: which model answers, with whose key, what it is
-// called and how it talks.
+// Setting up the AI in Fable: which connection answers, what it is called and
+// how it talks.
 //
-// Keys are pasted here once and go straight to our own server, which seals
-// them and never sends them back — this page only ever sees "…a1b2". You can
-// keep a key for several providers and switch between them; either of you
-// can change anything, and the page says who set it up last.
+// A connection is any endpoint you define: a name, an address, a key and a
+// model (Collaboration des Esprits' connection layer; see the backend's
+// models/aiConnections.js). Presets only fill the boxes in, free tiers first,
+// and nothing is chosen for you: Free Claude Code is one preset among them,
+// for when it happens to be running on the PC, never a requirement.
 //
-// The server's own AI (QUIZ_LLM_* in backend/.env) is offered too, when it has
-// one. And a key added here can also write the daily quiz, prompts and date
-// ideas when backend/.env has none.
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// Keys go straight to our own server, sealed, and never come back: a row shows
+// the key's length and last four characters, which is how a key cut off when
+// it was copied shows itself. Or paste the provider's whole example and the
+// server reads the address, key and model out of it.
+//
+// Find asks the endpoint itself: it repairs the address (a missing /v1,
+// Google's /v1beta/openai), lists the models it really serves, and proves the
+// key with a one-token call. Test has Fable say hello through it.
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Switch, Alert, Linking, ActivityIndicator,
 } from 'react-native';
@@ -22,20 +28,34 @@ import Icon from '../components/Icon';
 import Icon3D from '../components/Icon3D';
 import { useBarClearance } from '../components/LumaBar';
 
+const at = (name, tail = '') => `/fable/connections/${encodeURIComponent(name)}${tail}`;
+
+/** "integrate.api.nvidia.com" from an address, for the row's second line. */
+export function hostOf(url) {
+  const m = /^https?:\/\/([^/:]+)/i.exec(String(url || ''));
+  return m ? m[1] : '';
+}
+
+/** What a row says about its key, never the key itself. */
+export function keyLine(c) {
+  if (c.keyUnreadable) return 'key can no longer be read: paste it again';
+  if (!c.keySet) return /localhost|127\.0\.0\.1|host\.docker\.internal|192\.168\.|\/\/10\./.test(c.baseURL) ? 'no key (on the PC)' : 'no key yet';
+  return `key: ${c.keyLength} characters ${c.keyPreview}`;
+}
+
 export default function FableSetupScreen({ navigation }) {
   const { colors, font } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const clearance = useBarClearance();
 
   const [data, setData] = useState(null);       // what the server has
-  const [form, setForm] = useState(null);       // what is on the page
-  const [keyDraft, setKeyDraft] = useState('');
-  const [busy, setBusy] = useState(null);       // 'save' | 'test' | 'key' | null
-  const [result, setResult] = useState(null);   // { ok, text, switchTo }
+  const [form, setForm] = useState(null);       // how Fable behaves, as on the page
+  const [editor, setEditor] = useState(null);   // the connection being added or changed
+  const [snippet, setSnippet] = useState('');
+  const [busy, setBusy] = useState(null);       // 'save' | 'test' | 'paste' | 'edit' | 'find:<name>' | 'test:<name>'
+  const [result, setResult] = useState(null);   // { ok, text }
+  const [notes, setNotes] = useState({});       // per row: { ok, text, models }
   const [loadError, setLoadError] = useState(null);
-  // The models the provider offers this key today: { provider, list, error }.
-  const [models, setModels] = useState(null);
-  const [allModels, setAllModels] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -49,27 +69,6 @@ export default function FableSetupScreen({ navigation }) {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // Asks the provider which models this key can use, so the page offers what
-  // exists today instead of a name to guess.
-  const fetchModels = useCallback(async (providerId, { apiKey, baseUrl } = {}) => {
-    setModels({ provider: providerId, list: null, error: null });
-    try {
-      const d = await apiFetch('/fable/models', { method: 'POST', body: { provider: providerId, apiKey, baseUrl } });
-      setModels({ provider: providerId, list: d.models, error: null });
-    } catch (err) {
-      setModels({ provider: providerId, list: null, error: err.message });
-    }
-  }, []);
-  // With a key saved (or Ollama, which needs none), the list loads by itself.
-  const providerId = form?.provider;
-  const hasKey = Boolean(data?.keys?.some((k) => k.provider === providerId)) || providerId === 'ollama';
-  useEffect(() => {
-    if (form?.source !== 'key' || !providerId || !hasKey || providerId === 'custom') return;
-    if (models?.provider === providerId) return;
-    fetchModels(providerId, { baseUrl: form?.baseUrl || undefined });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providerId, hasKey, form?.source]);
-
   if (loadError) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -82,28 +81,145 @@ export default function FableSetupScreen({ navigation }) {
     return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.accent} /></View>;
   }
 
-  const provider = data.providers.find((p) => p.id === form.provider) || data.providers[0];
-  const savedKey = data.keys.find((k) => k.provider === provider.id);
+  const connections = data.connections || [];
   const set = (patch) => { setForm((f) => ({ ...f, ...patch })); setResult(null); };
+  const note = (name, value) => setNotes((n) => ({ ...n, [name]: value }));
+  const withConnections = (list) => setData((old) => ({ ...old, connections: list }));
+  const afterSettings = (d) => setData((old) => ({ ...old, settings: d.settings, saved: true, ready: d.ready, problem: d.problem }));
 
-  const pickProvider = (p) => {
-    const previous = data.providers.find((x) => x.id === form.provider);
-    // Keep a model you typed yourself; swap one that was just the default.
-    const model = !form.model || form.model === previous?.defaultModel ? p.defaultModel : form.model;
-    set({ provider: p.id, model: p.id === form.provider ? form.model : model });
-    setKeyDraft('');
+  /** Fable answers through this one from now on, for both of you. */
+  const choose = async (name) => {
+    set({ source: 'key', connection: name });
+    try {
+      const d = await apiFetch('/fable/settings', { method: 'PUT', body: { ...form, source: 'key', connection: name } });
+      setForm(d.settings);
+      afterSettings(d);
+    } catch (err) { setResult({ ok: false, text: err.message }); }
   };
 
-  const saveKey = async () => {
-    const apiKey = keyDraft.trim();
-    if (!apiKey) return;
-    setBusy('key');
+  const find = async (name) => {
+    setBusy(`find:${name}`);
+    note(name, null);
     try {
-      const d = await apiFetch(`/fable/keys/${provider.id}`, { method: 'PUT', body: { apiKey } });
-      setData((old) => ({ ...old, keys: d.keys }));
-      setKeyDraft('');
-      setResult({ ok: true, text: `${provider.label} key saved. Press Test to try it.` });
-      fetchModels(provider.id, { baseUrl: form.baseUrl || undefined });
+      const d = await apiFetch(at(name, '/find'), { method: 'POST', body: {} });
+      const parts = [];
+      if (d.changed) parts.push(`Address corrected to ${d.baseURL}.`);
+      if (d.clearedModel) parts.push(`It does not serve "${d.clearedModel}".`);
+      parts.push(d.key.ok ? `The key works, with ${d.key.model}.` : `The address answers, but: ${d.key.error}`);
+      note(name, { ok: d.key.ok, text: parts.join(' '), models: d.models });
+    } catch (err) {
+      note(name, { ok: false, text: err.message, models: err.body?.models });
+    } finally {
+      setBusy(null);
+      load();
+    }
+  };
+
+  const testRow = async (name) => {
+    setBusy(`test:${name}`);
+    note(name, null);
+    try {
+      const d = await apiFetch(at(name, '/test'), { method: 'POST', body: { botName: form.botName } });
+      note(name, {
+        ok: true,
+        text: `“${d.reply}”  (${d.model}, ${(d.ms / 1000).toFixed(1)}s)`
+          + (d.fallback ? `\n${d.fallback.from} could not answer, so ${d.fallback.to} did: ${d.fallback.why}` : ''),
+      });
+    } catch (err) {
+      note(name, { ok: false, text: err.message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const pickModel = async (name, model) => {
+    try {
+      const d = await apiFetch(at(name), { method: 'PUT', body: { model } });
+      withConnections(d.connections);
+      note(name, { ...(notes[name] || {}), ok: true, text: `Using ${model}. Press Test to hear it.` });
+      load();
+    } catch (err) { note(name, { ok: false, text: err.message }); }
+  };
+
+  const remove = (c) => Alert.alert(`Remove “${c.name}”?`, 'Its key is deleted from the server.', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Remove', style: 'destructive',
+      onPress: async () => {
+        try {
+          const d = await apiFetch(at(c.name), { method: 'DELETE' });
+          withConnections(d.connections);
+          load();
+        } catch (err) { setResult({ ok: false, text: err.message }); }
+      },
+    },
+  ]);
+
+  const openEditor = (c) => {
+    setResult(null);
+    setEditor(c
+      ? { original: c.name, name: c.name, baseURL: c.baseURL, model: c.model, apiKey: '', extra: c.extra || {}, saved: c }
+      : { original: null, name: '', baseURL: '', model: '', apiKey: '', extra: {}, preset: null });
+  };
+
+  const usePreset = (p) => setEditor((e) => ({
+    ...e,
+    preset: p,
+    name: e.original ? e.name : p.preset.replace(/\s*\(.*\)$/, '').replace(/[^A-Za-z0-9 ._-]/g, '').trim(),
+    baseURL: p.baseURL,
+    model: p.model || '',
+    extra: p.extra || {},
+  }));
+
+  /** Saves the row, makes it Fable's when there is none yet, then runs Find on it. */
+  const saveEditor = async () => {
+    const e = editor;
+    const handle = e.original || e.name.trim();
+    if (!handle) { setResult({ ok: false, text: 'Give the connection a name.' }); return; }
+    setBusy('edit');
+    try {
+      const d = await apiFetch(at(handle), {
+        method: 'PUT',
+        body: {
+          baseURL: e.baseURL.trim(),
+          model: e.model.trim(),
+          ...(e.apiKey.trim() ? { apiKey: e.apiKey } : {}),
+          extra: e.extra,
+          ...(e.original && e.name.trim() !== e.original ? { rename: e.name.trim() } : {}),
+          use: !form.connection || form.connection === e.original,
+        },
+      });
+      withConnections(d.connections);
+      setEditor(null);
+      setBusy(null);
+      await find(d.name);
+    } catch (err) {
+      setResult({ ok: false, text: err.message });
+      setBusy(null);
+    }
+  };
+
+  /** The provider's example, read on the server: address, key, model. */
+  const readSnippet = async () => {
+    if (!snippet.trim()) return;
+    setBusy('paste');
+    setResult(null);
+    try {
+      const d = await apiFetch('/fable/connections/from-snippet', { method: 'POST', body: { snippet } });
+      const f = d.found;
+      const read = [
+        f.baseURL ? `address ${f.baseURL}` : null,
+        f.model ? `model ${f.model}` : null,
+        f.key ? `a key of ${f.key}` : 'no key (paste it on the row)',
+      ].filter(Boolean).join(', ');
+      setSnippet('');
+      setResult({
+        ok: d.check?.ok !== false,
+        text: `Read ${read}. Saved as “${d.name}”, and Fable uses it now.`
+          + (d.check ? (d.check.ok ? ` It works, with ${d.check.model}.` : `\nBut: ${d.check.error}`) : ''),
+      });
+      if (d.check?.models) note(d.name, { ok: d.check.ok, text: d.check.ok ? 'Tap a model to switch.' : d.check.error, models: d.check.models });
+      await load();
     } catch (err) {
       setResult({ ok: false, text: err.message });
     } finally {
@@ -111,39 +227,16 @@ export default function FableSetupScreen({ navigation }) {
     }
   };
 
-  const removeKey = (k) => {
-    const label = data.providers.find((p) => p.id === k.provider)?.label || k.provider;
-    Alert.alert(`Remove the ${label} key?`, 'The AI stops working with it until a key is added again.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive',
-        onPress: async () => {
-          try {
-            const d = await apiFetch(`/fable/keys/${k.provider}`, { method: 'DELETE' });
-            setData((old) => ({ ...old, keys: d.keys }));
-          } catch (err) { setResult({ ok: false, text: err.message }); }
-        },
-      },
-    ]);
-  };
-
   const test = async () => {
     setBusy('test');
     setResult(null);
     try {
-      const d = await apiFetch('/fable/test', { method: 'POST', body: { ...form, apiKey: keyDraft.trim() || undefined } });
-      if (d.fallback) {
-        // The chosen model did not answer; another one did. Say which, and
-        // offer to switch to it.
-        const label = data.providers.find((p) => p.id === d.provider)?.label || d.provider;
-        setResult({
-          ok: true,
-          text: `“${d.reply}”\n\n${d.fallback.from} could not answer (${d.fallback.why}), so ${d.fallback.to} did.`,
-          switchTo: { provider: d.provider, model: d.model, label: d.provider === form.provider ? d.model : `${label} · ${d.model}` },
-        });
-      } else {
-        setResult({ ok: true, text: `“${d.reply}”  (${d.model}, ${(d.ms / 1000).toFixed(1)}s)` });
-      }
+      const d = await apiFetch('/fable/test', { method: 'POST', body: form });
+      setResult({
+        ok: true,
+        text: `“${d.reply}”  (${d.connection} · ${d.model}, ${(d.ms / 1000).toFixed(1)}s)`
+          + (d.fallback ? `\n\n${d.fallback.from} could not answer (${d.fallback.why}), so ${d.fallback.to} did.` : ''),
+      });
     } catch (err) {
       setResult({ ok: false, text: err.message });
     } finally {
@@ -154,15 +247,9 @@ export default function FableSetupScreen({ navigation }) {
   const save = async () => {
     setBusy('save');
     try {
-      // A key typed but not yet saved goes with it.
-      if (form.source === 'key' && keyDraft.trim()) {
-        const k = await apiFetch(`/fable/keys/${provider.id}`, { method: 'PUT', body: { apiKey: keyDraft.trim() } });
-        setData((old) => ({ ...old, keys: k.keys }));
-        setKeyDraft('');
-      }
       const d = await apiFetch('/fable/settings', { method: 'PUT', body: form });
       setForm(d.settings);
-      setData((old) => ({ ...old, settings: d.settings, saved: true, ready: d.ready, problem: d.problem }));
+      afterSettings(d);
       if (d.ready) navigation.goBack();
       else setResult({ ok: false, text: `Saved, but not working yet: ${d.problem}` });
     } catch (err) {
@@ -177,12 +264,14 @@ export default function FableSetupScreen({ navigation }) {
     { text: 'Clear', style: 'destructive', onPress: () => apiFetch('/fable/messages', { method: 'DELETE' }).then(() => setResult({ ok: true, text: 'Chat cleared.' })).catch((e) => setResult({ ok: false, text: e.message })) },
   ]);
 
-  const turnOff = () => Alert.alert(`Turn ${form.botName} off?`, 'It stops answering. Your saved keys and the chat are kept.', [
+  const turnOff = () => Alert.alert(`Turn ${form.botName} off?`, 'It stops answering. Your connections and the chat are kept.', [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Turn off', style: 'destructive', onPress: () => apiFetch('/fable/settings', { method: 'DELETE' }).then(load).catch((e) => setResult({ ok: false, text: e.message })) },
   ]);
 
   const server = data.server || {};
+  const editorPreset = editor?.preset;
+  const editingSaved = editor?.saved;
 
   return (
     <ScrollView
@@ -198,7 +287,7 @@ export default function FableSetupScreen({ navigation }) {
             <Text style={font.muted}>
               {data.saved
                 ? (data.ready ? `Working${form.updatedBy ? ` · set up by ${form.updatedBy}` : ''}` : data.problem)
-                : 'Pick a model, add your key, and it joins your group chat.'}
+                : 'Add a connection to any AI service, and it joins your group chat.'}
             </Text>
           </View>
         </View>
@@ -210,7 +299,7 @@ export default function FableSetupScreen({ navigation }) {
           <Text style={styles.label}>Who answers</Text>
           <View style={styles.segment}>
             {[
-              { id: 'key', text: 'My own API key' },
+              { id: 'key', text: 'One of my connections' },
               { id: 'server', text: "The server's AI" },
             ].map((o) => (
               <MorphButton
@@ -228,164 +317,188 @@ export default function FableSetupScreen({ navigation }) {
                 ? `Uses ${server.provider} (${server.model}) from backend/.env, the same AI as the daily quiz.`
                 : server.error
                   ? `The server's AI is misconfigured: ${server.error}`
-                  : 'The server has no AI set up in backend/.env. Use your own key instead.'}
+                  : 'The server has no AI set up in backend/.env. Use one of your connections instead.'}
             </Text>
           ) : null}
         </View>
       </FadeInUp>
 
       {form.source === 'key' ? (
-        <FadeInUp delay={60}>
-          <View style={styles.card}>
-            <Text style={styles.label}>Provider</Text>
-            <View style={styles.chips}>
-              {data.providers.map((p) => {
-                const active = p.id === form.provider;
-                const hasKey = data.keys.some((k) => k.provider === p.id);
+        <>
+          {/* Paste the example */}
+          <FadeInUp delay={60}>
+            <View style={styles.card}>
+              <Text style={styles.label}>Paste the example</Text>
+              <Text style={styles.hint}>
+                The page where you made the key shows an example (curl, Python or JavaScript). Paste all of it:
+                the address, key and model are read out of it, and it is checked straight away.
+              </Text>
+              <TextInput
+                value={snippet}
+                onChangeText={(t) => { setSnippet(t); setResult(null); }}
+                placeholder={'curl "https://…/chat/completions" \\\n  -H "Authorization: Bearer …"'}
+                placeholderTextColor={colors.textMuted}
+                multiline
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.input, styles.code, { marginTop: spacing.sm }]}
+              />
+              <MorphButton
+                onPress={readSnippet}
+                disabled={!snippet.trim() || Boolean(busy)}
+                style={[styles.smallButton, { alignSelf: 'flex-start', marginTop: spacing.sm }, (!snippet.trim() || busy) && styles.dim]}
+              >
+                {busy === 'paste' ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.smallButtonText}>Read it</Text>}
+              </MorphButton>
+            </View>
+          </FadeInUp>
+
+          {/* The connections */}
+          <FadeInUp delay={90}>
+            <View style={styles.card}>
+              <Text style={styles.label}>Connections</Text>
+              {!connections.length ? (
+                <Text style={styles.hint}>None yet. Paste an example above, or add one below. Gemini's free key is a good start.</Text>
+              ) : null}
+              {connections.map((c) => {
+                const chosen = form.connection === c.name;
+                const n = notes[c.name];
                 return (
-                  <MorphButton key={p.id} onPress={() => pickProvider(p)} style={[styles.chip, active && styles.chipActive]}>
-                    {hasKey ? <Icon name="key" chip={false} size={11} color={active ? '#fff' : colors.success} /> : null}
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{p.label}</Text>
-                    {p.free ? <Text style={[styles.free, active && { color: '#fff' }]}>free</Text> : null}
-                  </MorphButton>
+                  <View key={c.name} style={[styles.row, chosen && styles.rowChosen]}>
+                    <MorphButton onPress={() => choose(c.name)} style={styles.rowHead} accessibilityLabel={`Use ${c.name}`}>
+                      <Icon name={chosen ? 'radio-button-on' : 'radio-button-off'} chip={false} size={18} color={chosen ? colors.accent : colors.textMuted} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={font.body}>{c.name}{chosen ? '  · Fable uses this' : ''}</Text>
+                        <Text style={styles.sub} numberOfLines={1}>
+                          {hostOf(c.baseURL) || 'no address'} · {c.model || 'no model: press Find'}{c.extra?.api === 'messages' ? ' · Anthropic shape' : ''}
+                        </Text>
+                        <Text style={[styles.sub, /^(no key yet|key can no)/.test(keyLine(c)) && { color: colors.danger }]}>{keyLine(c)}</Text>
+                      </View>
+                    </MorphButton>
+                    <View style={styles.rowActions}>
+                      <MorphButton onPress={() => find(c.name)} disabled={Boolean(busy)} style={[styles.rowButton, busy && styles.dim]}>
+                        {busy === `find:${c.name}` ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={styles.rowButtonText}>Find</Text>}
+                      </MorphButton>
+                      <MorphButton onPress={() => testRow(c.name)} disabled={Boolean(busy)} style={[styles.rowButton, busy && styles.dim]}>
+                        {busy === `test:${c.name}` ? <ActivityIndicator size="small" color={colors.accent} /> : <Text style={styles.rowButtonText}>Test</Text>}
+                      </MorphButton>
+                      <MorphButton onPress={() => openEditor(c)} style={styles.rowButton}><Text style={styles.rowButtonText}>Edit</Text></MorphButton>
+                      <MorphButton onPress={() => remove(c)} style={styles.rowIcon} accessibilityLabel={`Remove ${c.name}`}>
+                        <Icon name="trash-outline" chip={false} size={16} color={colors.danger} />
+                      </MorphButton>
+                    </View>
+                    {n ? <Text style={[styles.note, { color: n.ok ? colors.text : colors.danger }]}>{n.text}</Text> : null}
+                    {n?.models?.length ? (
+                      <View style={[styles.chips, { marginTop: spacing.xs }]}>
+                        {n.models.slice(0, 12).map((m) => (
+                          <MorphButton key={m} onPress={() => pickModel(c.name, m)} style={[styles.chip, m === c.model && styles.chipActive]}>
+                            <Text style={[styles.chipText, m === c.model && styles.chipTextActive]}>{m}</Text>
+                          </MorphButton>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
                 );
               })}
-            </View>
 
-            {!provider.noKey ? (
-              <>
-                <Text style={[styles.label, { marginTop: spacing.md }]}>{provider.label} API key</Text>
-                {savedKey ? (
-                  <View style={styles.savedKey}>
-                    <Icon name="lock-closed" chip={false} size={14} color={colors.success} />
-                    <Text style={[font.body, { flex: 1 }]}>
-                      Saved {savedKey.hint}{savedKey.addedBy ? ` · added by ${savedKey.addedBy}` : ''}
-                    </Text>
-                    <MorphButton onPress={() => removeKey(savedKey)} accessibilityLabel="Remove key">
-                      <Icon name="trash-outline" chip={false} size={16} color={colors.danger} />
-                    </MorphButton>
-                  </View>
-                ) : null}
-                <View style={styles.keyRow}>
+              {editor ? (
+                <View style={styles.editor}>
+                  <Text style={styles.label}>{editor.original ? `Change “${editor.original}”` : 'New connection'}</Text>
+                  {!editor.original ? (
+                    <>
+                      <Text style={styles.hint}>Start from one of these, or type any address.</Text>
+                      <View style={[styles.chips, { marginTop: spacing.xs }]}>
+                        {(data.presets || []).map((p) => {
+                          const active = editorPreset?.preset === p.preset;
+                          return (
+                            <MorphButton key={p.preset} onPress={() => usePreset(p)} style={[styles.chip, active && styles.chipActive]}>
+                              <Text style={[styles.chipText, active && styles.chipTextActive]}>{p.preset}</Text>
+                              {p.free ? <Text style={[styles.free, active && { color: '#fff' }]}>free</Text> : null}
+                            </MorphButton>
+                          );
+                        })}
+                      </View>
+                      {editorPreset ? (
+                        <View style={{ marginTop: spacing.xs }}>
+                          <Text style={styles.hint}>{editorPreset.keyHint}</Text>
+                          {editorPreset.keyUrl ? (
+                            <MorphButton onPress={() => Linking.openURL(editorPreset.keyUrl)} style={styles.linkRow}>
+                              <Icon name="open-outline" chip={false} size={13} color={colors.accent} />
+                              <Text style={styles.link}>Get a key</Text>
+                            </MorphButton>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  <Text style={[styles.label, { marginTop: spacing.md }]}>Name</Text>
+                  <TextInput value={editor.name} onChangeText={(t) => setEditor((e) => ({ ...e, name: t }))} maxLength={64}
+                    placeholder="Gemini" placeholderTextColor={colors.textMuted} autoCorrect={false} style={styles.input} />
+
+                  <Text style={[styles.label, { marginTop: spacing.md }]}>Address</Text>
+                  <TextInput value={editor.baseURL} onChangeText={(t) => setEditor((e) => ({ ...e, baseURL: t }))}
+                    placeholder="https://…/v1" placeholderTextColor={colors.textMuted}
+                    autoCapitalize="none" autoCorrect={false} keyboardType="url" style={styles.input} />
+
+                  <Text style={[styles.label, { marginTop: spacing.md }]}>API key</Text>
                   <TextInput
-                    value={keyDraft}
-                    onChangeText={(t) => { setKeyDraft(t); setResult(null); }}
-                    placeholder={savedKey ? 'Paste a new key to replace it' : 'Paste your API key'}
+                    value={editor.apiKey}
+                    onChangeText={(t) => setEditor((e) => ({ ...e, apiKey: t }))}
+                    placeholder={editingSaved?.keySet
+                      ? `Leave empty to keep the saved one (${editingSaved.keyLength} characters ${editingSaved.keyPreview})`
+                      : editorPreset?.keyOptional ? 'Not needed' : 'Paste the key, or the whole line it is in'}
                     placeholderTextColor={colors.textMuted}
                     secureTextEntry
                     autoCapitalize="none"
                     autoCorrect={false}
-                    style={[styles.input, { flex: 1 }]}
+                    style={styles.input}
                   />
-                  <MorphButton onPress={saveKey} disabled={!keyDraft.trim() || busy} style={[styles.smallButton, (!keyDraft.trim() || busy) && styles.dim]}>
-                    {busy === 'key' ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.smallButtonText}>Save key</Text>}
-                  </MorphButton>
-                </View>
-                {provider.keyUrl ? (
-                  <MorphButton onPress={() => Linking.openURL(provider.keyUrl)} style={styles.linkRow}>
-                    <Icon name="open-outline" chip={false} size={13} color={colors.accent} />
-                    <Text style={styles.link}>
-                      {provider.free ? `Get a free ${provider.label} key` : `Get a ${provider.label} key`}
-                    </Text>
-                  </MorphButton>
-                ) : null}
-                <Text style={styles.hint}>Stored on your own server, sealed. It never comes back to a phone.</Text>
-              </>
-            ) : (
-              <Text style={[styles.hint, { marginTop: spacing.sm }]}>No key needed: Ollama runs on the server PC itself.</Text>
-            )}
-
-            <Text style={[styles.label, { marginTop: spacing.md }]}>Model</Text>
-            <TextInput
-              value={form.model}
-              onChangeText={(t) => set({ model: t })}
-              placeholder={provider.defaultModel || 'model name'}
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-            />
-            {models?.provider === provider.id && models.list?.length ? (
-              <>
-                <Text style={styles.hint}>{provider.label} offers these to your key. Tap one, or type any other.</Text>
-                <View style={[styles.chips, { marginTop: spacing.xs }]}>
-                  {(allModels ? models.list : models.list.slice(0, 10)).map((m) => {
-                    const active = m === form.model;
-                    return (
-                      <MorphButton key={m} onPress={() => set({ model: m })} style={[styles.chip, active && styles.chipActive]}>
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{m}</Text>
-                      </MorphButton>
-                    );
-                  })}
-                  {models.list.length > 10 ? (
-                    <MorphButton onPress={() => setAllModels((v) => !v)} style={styles.chip}>
-                      <Text style={[styles.chipText, { color: colors.accent }]}>{allModels ? 'Fewer' : `All ${models.list.length}`}</Text>
-                    </MorphButton>
+                  {editor.apiKey.trim() ? (
+                    <Text style={styles.hint}>{editor.apiKey.trim().length} characters pasted, ending “{editor.apiKey.trim().slice(-4)}”. The server takes the key out of any quotes or “Bearer” around it.</Text>
                   ) : null}
-                </View>
-              </>
-            ) : models?.provider === provider.id && !models.list && !models.error ? (
-              <View style={[styles.linkRow, { marginTop: spacing.xs }]}>
-                <ActivityIndicator size="small" color={colors.accent} />
-                <Text style={styles.hint}>Asking {provider.label} which models your key can use…</Text>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.hint}>
-                  {models?.provider === provider.id && models.error
-                    ? `Could not list the models: ${models.error}`
-                    : `Any chat model ${provider.label} offers. ${provider.defaultModel ? `${provider.defaultModel} is a good start.` : ''}`}
-                </Text>
-                {savedKey || keyDraft.trim() || provider.noKey || provider.needsBaseUrl ? (
-                  <MorphButton
-                    onPress={() => fetchModels(provider.id, { apiKey: keyDraft.trim() || undefined, baseUrl: form.baseUrl || undefined })}
-                    style={styles.linkRow}
-                  >
-                    <Icon name="list-outline" chip={false} size={13} color={colors.accent} />
-                    <Text style={styles.link}>Show the models my key can use</Text>
-                  </MorphButton>
-                ) : null}
-              </>
-            )}
 
-            {provider.needsBaseUrl || provider.id === 'ollama' ? (
-              <>
-                <Text style={[styles.label, { marginTop: spacing.md }]}>Address{provider.needsBaseUrl ? '' : ' (optional)'}</Text>
-                <TextInput
-                  value={form.baseUrl || ''}
-                  onChangeText={(t) => set({ baseUrl: t })}
-                  placeholder={provider.id === 'ollama' ? 'http://host.docker.internal:11434/v1' : 'https://…/v1'}
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  style={styles.input}
-                />
-              </>
-            ) : null}
+                  <Text style={[styles.label, { marginTop: spacing.md }]}>Model</Text>
+                  <TextInput value={editor.model} onChangeText={(t) => setEditor((e) => ({ ...e, model: t }))}
+                    placeholder="Leave empty: Find picks one that answers" placeholderTextColor={colors.textMuted}
+                    autoCapitalize="none" autoCorrect={false} style={styles.input} />
 
-            {data.keys.filter((k) => k.provider !== provider.id).length ? (
-              <>
-                <Text style={[styles.label, { marginTop: spacing.md }]}>Your other keys</Text>
-                {data.keys.filter((k) => k.provider !== provider.id).map((k) => (
-                  <View key={k.provider} style={styles.savedKey}>
-                    <Icon name="key" chip={false} size={13} color={colors.textMuted} />
-                    <Text style={[font.body, { flex: 1 }]}>
-                      {data.providers.find((p) => p.id === k.provider)?.label || k.provider} {k.hint}
-                    </Text>
-                    <MorphButton onPress={() => removeKey(k)} accessibilityLabel="Remove key">
-                      <Icon name="trash-outline" chip={false} size={16} color={colors.danger} />
+                  <View style={styles.switchRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={font.body}>Anthropic shape</Text>
+                      <Text style={font.muted}>/messages with x-api-key: Claude, or Free Claude Code when it is running.</Text>
+                    </View>
+                    <Switch
+                      value={editor.extra?.api === 'messages'}
+                      onValueChange={(v) => setEditor((e) => {
+                        const { api, ...rest } = e.extra || {};
+                        return { ...e, extra: v ? { ...rest, api: 'messages' } : rest };
+                      })}
+                      trackColor={{ true: colors.accent }}
+                    />
+                  </View>
+
+                  <View style={[styles.actions, { marginTop: spacing.md }]}>
+                    <MorphButton onPress={() => setEditor(null)} style={[styles.secondary, { flex: 1 }]}><Text style={styles.secondaryText}>Cancel</Text></MorphButton>
+                    <MorphButton onPress={saveEditor} disabled={Boolean(busy)} style={[styles.primary, { flex: 1 }, busy && styles.dim]}>
+                      {busy === 'edit' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Save and Find</Text>}
                     </MorphButton>
                   </View>
-                ))}
-              </>
-            ) : null}
-          </View>
-        </FadeInUp>
+                </View>
+              ) : (
+                <MorphButton onPress={() => openEditor(null)} style={styles.linkRow}>
+                  <Icon name="add-circle-outline" chip={false} size={16} color={colors.accent} />
+                  <Text style={styles.link}>Add a connection</Text>
+                </MorphButton>
+              )}
+              <Text style={styles.hint}>Keys are stored on your own server, sealed, and never come back to a phone.</Text>
+            </View>
+          </FadeInUp>
+        </>
       ) : null}
 
       {/* How it behaves */}
-      <FadeInUp delay={90}>
+      <FadeInUp delay={120}>
         <View style={styles.card}>
           <Text style={styles.label}>Its name</Text>
           <TextInput value={form.botName} onChangeText={(t) => set({ botName: t })} maxLength={24} style={styles.input} placeholder="Fable" placeholderTextColor={colors.textMuted} />
@@ -405,7 +518,7 @@ export default function FableSetupScreen({ navigation }) {
           <View style={styles.segment}>
             {[
               { id: 'always', text: 'Every message' },
-              { id: 'mention', text: `Only when named` },
+              { id: 'mention', text: 'Only when named' },
             ].map((o) => (
               <MorphButton
                 key={o.id}
@@ -429,7 +542,7 @@ export default function FableSetupScreen({ navigation }) {
                 <Text style={font.muted}>
                   {server.available
                     ? 'The server already has its own AI for this, so it is used instead.'
-                    : 'Fresh daily quiz questions, prompts, date ideas and challenges from this key.'}
+                    : 'Fresh daily quiz questions, prompts, date ideas and challenges through this connection.'}
                 </Text>
               </View>
               <Switch value={Boolean(form.useForContent)} onValueChange={(v) => set({ useForContent: v })} trackColor={{ true: colors.accent }} />
@@ -441,21 +554,7 @@ export default function FableSetupScreen({ navigation }) {
       {result ? (
         <View style={[styles.result, { borderColor: result.ok ? colors.success : colors.danger }]}>
           <Icon name={result.ok ? 'checkmark-circle' : 'alert-circle'} chip={false} size={16} color={result.ok ? colors.success : colors.danger} />
-          <View style={{ flex: 1, gap: spacing.sm }}>
-            <Text style={font.body}>{result.text}</Text>
-            {result.switchTo ? (
-              <MorphButton
-                onPress={() => {
-                  const { provider: p, model: m } = result.switchTo;
-                  setForm((f) => ({ ...f, provider: p, model: m }));
-                  setResult({ ok: true, text: `Switched to ${result.switchTo.label}. Press Save to keep it.` });
-                }}
-                style={[styles.smallButton, { alignSelf: 'flex-start' }]}
-              >
-                <Text style={styles.smallButtonText}>Use {result.switchTo.label}</Text>
-              </MorphButton>
-            ) : null}
-          </View>
+          <Text style={[font.body, { flex: 1 }]}>{result.text}</Text>
         </View>
       ) : null}
 
@@ -489,10 +588,13 @@ const makeStyles = (colors) =>
     },
     label: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', marginBottom: spacing.xs },
     hint: { fontSize: 12, color: colors.textMuted, marginTop: spacing.xs },
+    sub: { fontSize: 12, color: colors.textMuted },
+    note: { fontSize: 13, marginTop: spacing.xs },
     input: {
       backgroundColor: colors.background, color: colors.text, borderRadius: radius.md,
       paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.border,
     },
+    code: { minHeight: 90, textAlignVertical: 'top', fontFamily: 'monospace', fontSize: 12 },
     segment: { flexDirection: 'row', gap: spacing.xs },
     segmentItem: {
       flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.pill,
@@ -501,6 +603,20 @@ const makeStyles = (colors) =>
     segmentActive: { backgroundColor: colors.accent, borderColor: colors.accent },
     segmentText: { color: colors.text, fontWeight: '600', fontSize: 13 },
     segmentTextActive: { color: '#fff' },
+    row: {
+      borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.sm,
+      marginTop: spacing.sm, backgroundColor: colors.background,
+    },
+    rowChosen: { borderColor: colors.accent },
+    rowHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    rowActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm, flexWrap: 'wrap' },
+    rowButton: {
+      backgroundColor: colors.accentSoft, borderRadius: radius.pill, paddingVertical: 6, paddingHorizontal: spacing.md,
+      minWidth: 56, alignItems: 'center',
+    },
+    rowButtonText: { color: colors.accent, fontWeight: '700', fontSize: 13 },
+    rowIcon: { padding: 6, marginLeft: 'auto' },
+    editor: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     chip: {
       flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: spacing.sm,
@@ -510,10 +626,6 @@ const makeStyles = (colors) =>
     chipText: { color: colors.text, fontSize: 13, fontWeight: '600' },
     chipTextActive: { color: '#fff' },
     free: { fontSize: 10, fontWeight: '700', color: colors.success, textTransform: 'uppercase' },
-    savedKey: {
-      flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs, marginBottom: spacing.xs,
-    },
-    keyRow: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
     smallButton: {
       backgroundColor: colors.accent, borderRadius: radius.pill, paddingVertical: spacing.sm, paddingHorizontal: spacing.md,
       minWidth: 84, alignItems: 'center',

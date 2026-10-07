@@ -1049,3 +1049,26 @@ CREATE TABLE IF NOT EXISTS message_reminders (
   PRIMARY KEY (message_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS message_reminders_due_idx ON message_reminders (remind_at);
+
+-- ---------------------------------------------------------------------------
+-- Fable's connections: Collaboration des Esprits' connection layer
+-- (models/aiConnections.js). Any endpoint under any name, rather than one key
+-- per fixed provider; ai_keys rows are moved over once (migrateLegacy).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ai_connections (
+  pair_id     UUID NOT NULL REFERENCES pairs(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  base_url    TEXT NOT NULL DEFAULT '',
+  -- Sealed with AES-256-GCM (FABLE_KEY_SECRET, or JWT_REFRESH_SECRET).
+  key_enc     TEXT,
+  model       TEXT NOT NULL DEFAULT '',
+  -- What shape it speaks and how it wants its key: { api: 'messages' },
+  -- { keyHeader }, { keyScheme }, { tokenParam }.
+  extra       JSONB NOT NULL DEFAULT '{}'::jsonb,
+  added_by    UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (pair_id, name)
+);
+
+-- Which connection Fable talks through.
+ALTER TABLE fable_settings ADD COLUMN IF NOT EXISTS connection TEXT;

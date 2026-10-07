@@ -735,10 +735,47 @@ console.log('\n=== FABLE: THE GROUP CHAT WITH AN AI ===');
   check('Fable talks only to our own server', /apiFetch\(`\/fable\/messages/.test(screen) && /apiFetch\('\/fable\/messages'/.test(screen) && !/\bfetch\(|https?:\/\//.test(screen));
   check('and stops polling and listening when you leave it', /live = false;\s*clearInterval\(timer\);/.test(screen) && /socketRef\?\.off\('fable:message'/.test(screen));
   const setup = fs.readFileSync(path.join(root, 'app', 'FableSetupScreen.js'), 'utf8');
-  check('the setup page sends keys to our server and never shows one back', /apiFetch\(`\/fable\/keys\/\$\{provider\.id\}`/.test(setup) && /secureTextEntry/.test(setup) && /savedKey\.hint/.test(setup));
+  check('the setup page sends keys to our server and never shows one back',
+    /apiFetch\(at\(handle\)/.test(setup) && /secureTextEntry/.test(setup) && /keyPreview/.test(setup) && !/\bfetch\(/.test(setup));
   let setupThrew = null;
   try { collectAll(load('app/FableSetupScreen.js', stubs).default({ navigation })); } catch (err) { setupThrew = err.message; }
   check('the setup page renders', setupThrew === null, setupThrew);
+
+  // Filled in: two connections (one with a key the service refused, one
+  // chosen), the presets, and a new connection half typed in the editor.
+  const setupMod = load('app/FableSetupScreen.js', stubs);
+  const presets = [
+    { preset: 'Google Gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-flash-latest', keyHint: 'free', keyUrl: 'https://aistudio.google.com/apikey', free: true },
+    { preset: 'Free Claude Code (on the server PC, when running)', baseURL: 'http://host.docker.internal:8082/v1', model: '', keyHint: 'no key needed', keyOptional: true, extra: { api: 'messages' } },
+  ];
+  const conns = [
+    { name: 'Gemini', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-flash-latest', extra: {}, keySet: true, keyLength: 39, keyPreview: '••••••••x9Qa' },
+    { name: 'Ollama', baseURL: 'http://host.docker.internal:11434/v1', model: '', extra: {}, keySet: false, keyLength: 0, keyPreview: null },
+  ];
+  const seeded = [
+    { settings: {}, saved: true, ready: true, connections: conns, presets, server: { available: false } },
+    { source: 'key', connection: 'Gemini', botName: 'Fable', persona: '', replyMode: 'always', useForContent: true },
+    { original: null, name: 'Free Claude Code', baseURL: presets[1].baseURL, model: '', apiKey: '"Bearer sk-abcdefgh1234",', extra: { api: 'messages' }, preset: presets[1] },
+    '', null, { ok: false, text: 'refused' }, { Gemini: { ok: false, text: 'The key was refused', models: ['gemini-flash-latest', 'gemini-2.5-flash'] } }, null,
+  ];
+  let slot = 0;
+  const motion = { MorphButton: (props) => React.createElement('MorphButton', props), FadeInUp: (props) => React.createElement('FadeInUp', props) };
+  const filledStubs = { ...stubs, '../components/Motion': motion, react: { ...reactStub, useState: () => [seeded[slot++], () => {}] } };
+  let filled = null; let filledThrew = null;
+  try { filled = collectAll(load('app/FableSetupScreen.js', filledStubs).default({ navigation })); } catch (err) { filledThrew = err.stack; }
+  check('the setup page renders with connections and the editor open', filledThrew === null, filledThrew);
+  const words = (filled || []).filter((e) => e.type === 'Text').map(textOf).join(' | ');
+  check('  each row shows its key as a length and last four, never the key', /key: 39 characters ••••••••x9Qa/.test(words), words);
+  check('  the chosen one says so', /Gemini  · Fable uses this/.test(words));
+  check('  a key-less row on the PC is not flagged as missing a key', /no key \(on the PC\)/.test(words));
+  check('  every row has Find and Test', (words.match(/\| Find \|/g) || []).length === 2 && (words.match(/\| Test \|/g) || []).length >= 2, words);
+  check('  Find\'s models come back as chips to tap', /gemini-2\.5-flash/.test(words));
+  check('  the editor offers presets, Free Claude Code among them only "when running"', /Free Claude Code \(on the server PC, when running\)/.test(words) && /free/.test(words));
+  check('  and says how much key was pasted, so a cut-off one shows', /25 characters pasted, ending “34",”/.test(words), words);
+  check('  the paste-the-example box is there', /Paste the example/.test(words) && /Read it/.test(words));
+  check('hostOf and keyLine', setupMod.hostOf('https://integrate.api.nvidia.com/v1') === 'integrate.api.nvidia.com'
+    && setupMod.keyLine({ keySet: false, baseURL: 'https://api.groq.com/openai/v1' }) === 'no key yet'
+    && setupMod.keyLine({ keyUnreadable: true }).startsWith('key can no longer'));
   const appJs = fs.readFileSync(path.join(root, 'App.js'), 'utf8');
   check('the setup page is reachable from anywhere', /<Stack\.Screen name="FableSetup" component=\{FableSetupScreen\}/.test(appJs));
 }

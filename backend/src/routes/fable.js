@@ -7,19 +7,19 @@ import { requireAuth, requirePair } from '../middleware/auth.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
 import { sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import {
-  PROVIDERS, DEFAULT_SETTINGS, HISTORY_FOR_AI, MAX_BODY, FableSetupError,
-  listKeys, saveKey, deleteKey, getSettings, saveSettings, deleteSettings, cleanSettings,
+  DEFAULT_SETTINGS, HISTORY_FOR_AI, MAX_BODY, FableSetupError,
+  getSettings, saveSettings, deleteSettings, cleanSettings,
   serverConnector, resolveConfig, wantsReply, systemPrompt, transcript, cleanReply, askWithFallback,
-  listModels,
+  chatModels, refreshSharedAiConfig,
 } from '../models/fableAi.js';
+import {
+  PRESETS, ConnectionError, listConnections, resolveConnection, saveConnection, removeConnection,
+  parseSnippet, hostName, probe, tryKey, asSent,
+} from '../models/aiConnections.js';
 
 const router = asyncRouter();
 router.use(requireAuth, requirePair);
 
-const setupError = (res, err) => {
-  if (err instanceof FableSetupError) return res.status(400).json({ error: err.message });
-  throw err;
-};
 
 /** Both of your names, yours first. */
 async function namesOf(req) {
@@ -41,18 +41,22 @@ function present(row, names, me, botName) {
 
 // ------------------------------------------------------------------ setup
 
-/** Everything the setup page shows. Keys come back as hints only. */
+const setupError = (res, err) => {
+  if (err instanceof FableSetupError || err instanceof ConnectionError) return res.status(400).json({ error: err.message });
+  throw err;
+};
+
+/** Everything the setup page shows. Keys come back as a length and last four only. */
 router.get('/settings', async (req, res) => {
   const settings = await getSettings(req.pair.id);
-  const keys = await listKeys(req.pair.id);
   const { problem } = settings ? await resolveConfig(req.pair.id, settings) : { problem: null };
   res.json({
     settings: settings || { ...DEFAULT_SETTINGS },
     saved: Boolean(settings),
     ready: Boolean(settings) && !problem,
     problem: settings ? problem || null : null,
-    keys,
-    providers: PROVIDERS,
+    connections: await listConnections(req.pair.id),
+    presets: PRESETS,
     server: serverConnector(),
   });
 });
@@ -70,34 +74,83 @@ router.delete('/settings', async (req, res) => {
   res.json({ ok: true });
 });
 
-/** Adds or replaces the key for one provider. The key never comes back. */
-router.put('/keys/:provider', async (req, res) => {
+// -------------------------------------------------------------- connections
+
+/**
+ * Add or change a connection: name, address, model, and a key only when one
+ * was typed (re-saving a row never wipes the key). `use` makes it Fable's.
+ */
+router.put('/connections/:name', async (req, res) => {
   try {
-    await saveKey(req.pair.id, req.userId, req.params.provider, req.body?.apiKey);
-    res.json({ keys: await listKeys(req.pair.id) });
+    const { baseURL, model, apiKey, extra, rename, use } = req.body || {};
+    const name = await saveConnection(req.pair.id, req.userId, {
+      name: req.params.name, baseURL, model, apiKey, extra, rename,
+    });
+    if (use) await saveSettings(req.pair.id, req.userId, { source: 'key', connection: name });
+    else await refreshSharedAiConfig();
+    res.json({ name, connections: await listConnections(req.pair.id) });
   } catch (err) { setupError(res, err); }
 });
 
-router.delete('/keys/:provider', async (req, res) => {
-  await deleteKey(req.pair.id, req.params.provider);
-  res.json({ keys: await listKeys(req.pair.id) });
+router.delete('/connections/:name', async (req, res) => {
+  const removed = await removeConnection(req.pair.id, req.params.name);
+  if (!removed) return res.status(404).json({ error: 'No such connection.' });
+  await refreshSharedAiConfig();
+  res.json({ connections: await listConnections(req.pair.id) });
 });
 
 /**
- * Tries a setup without saving it: the settings on the page, with the key
- * typed there or the one already saved. Says hello, or says what is wrong.
+ * Find: ask the endpoint which address works and which models it serves,
+ * repair the address if one of the usual mistakes was the problem, then prove
+ * the key with the smallest real call. A model it has never heard of is
+ * cleared; with none chosen, the first that answers is kept.
  */
-router.post('/test', async (req, res) => {
-  let settings;
-  try {
-    settings = cleanSettings(req.body || {}, await getSettings(req.pair.id));
-  } catch (err) { return setupError(res, err); }
-  const { config, problem } = await resolveConfig(req.pair.id, settings, { apiKey: req.body?.apiKey });
+router.post('/connections/:name/find', async (req, res) => {
+  const conn = await resolveConnection(req.pair.id, req.params.name);
+  if (!conn) return res.status(404).json({ ok: false, error: 'No such connection.' });
+  const baseURL = String(req.body?.baseURL ?? conn.baseURL ?? '').trim();
+  if (!baseURL) return res.status(400).json({ ok: false, error: 'There is no address to check.' });
+
+  const found = await probe({ baseURL, apiKey: conn.apiKey, extra: conn.extra });
+  if (!found.ok) {
+    return res.status(400).json({
+      ...found,
+      error: found.unauthorized
+        ? `${found.baseURL} is the right address, but the key was refused (${found.error}). It ${asSent(conn)}.`
+        : `${found.error}: tried ${found.tried.map((t) => t.baseURL).join(', ') || 'nothing'}`,
+    });
+  }
+  const models = chatModels(found.baseURL, found.models);
+  const keepsModel = Boolean(conn.model) && found.models.includes(conn.model);
+  const usable = await tryKey({
+    baseURL: found.baseURL, apiKey: conn.apiKey, extra: conn.extra,
+    ...(keepsModel ? { model: conn.model } : { models: models.length ? models : found.models }),
+  });
+  const model = keepsModel ? conn.model : (usable.ok ? usable.model : '');
+  await saveConnection(req.pair.id, req.userId, { name: conn.name, baseURL: found.baseURL, model });
+  await refreshSharedAiConfig();
+  res.json({
+    ok: usable.ok === true,
+    baseURL: found.baseURL,
+    changed: found.changed,
+    models: models.length ? models : found.models,
+    model,
+    clearedModel: conn.model && !keepsModel ? conn.model : null,
+    key: usable.ok ? { ok: true, model: usable.model }
+      : { ok: false, error: usable.unauthorized ? `The key was refused (${usable.error}). It ${asSent(conn)}.` : usable.error },
+  });
+});
+
+/**
+ * Test: Fable says hello through this connection (or the chosen one), the
+ * way the chat would, trying other models if this one is busy or gone.
+ */
+async function testConnection(req, res, name) {
+  const settings = cleanSettings(req.body || {}, await getSettings(req.pair.id));
+  const { config, problem } = await resolveConfig(req.pair.id, settings, name ? { connection: name } : {});
   if (!config) return res.status(400).json({ ok: false, error: problem });
   const started = Date.now();
   try {
-    // Tried the way the chat tries: if the chosen model is busy or gone,
-    // the test says which one stood in, so the page can offer to switch.
     const got = await askWithFallback(req.pair.id, config, {
       system: `You are ${settings.botName}, an AI in a couple's group chat, being tested.`,
       user: 'Say hello to the couple in one short, friendly sentence.',
@@ -105,7 +158,7 @@ router.post('/test', async (req, res) => {
     res.json({
       ok: true,
       reply: cleanReply(got.text, settings.botName),
-      provider: got.config.provider,
+      connection: got.config.name,
       model: got.config.model,
       fallback: got.fallback,
       ms: Date.now() - started,
@@ -113,26 +166,67 @@ router.post('/test', async (req, res) => {
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
   }
+}
+router.post('/connections/:name/test', async (req, res) => {
+  try { await testConnection(req, res, req.params.name); } catch (err) { setupError(res, err); }
+});
+router.post('/test', async (req, res) => {
+  try { await testConnection(req, res, null); } catch (err) { setupError(res, err); }
 });
 
 /**
- * The chat models a provider offers this key today, best first, for the
- * setup page to pick from. Uses the key typed on the page, or the saved one.
+ * Paste the example from the page where the key was made (Python,
+ * JavaScript or curl): the address, key, model and parameter names are read
+ * out of it, saved as a connection, checked with Find, and made Fable's.
  */
-router.post('/models', async (req, res) => {
-  let settings;
+router.post('/connections/from-snippet', async (req, res) => {
+  const parsed = parseSnippet(req.body?.snippet ?? '');
+  if (!parsed.ok) return res.status(400).json({ ok: false, error: parsed.error });
+  const name = String(req.body?.name ?? '').trim() || hostName(parsed.baseURL) || 'pasted';
+  let saved;
   try {
-    // The model does not matter for a list (and a half-typed one must not stop it).
-    settings = cleanSettings({ ...req.body, source: 'key', model: 'any' }, await getSettings(req.pair.id));
+    const existing = await resolveConnection(req.pair.id, name);
+    saved = await saveConnection(req.pair.id, req.userId, {
+      name,
+      baseURL: parsed.baseURL || existing?.baseURL,
+      model: parsed.model || existing?.model || '',
+      ...(parsed.apiKey ? { apiKey: parsed.apiKey } : {}),
+      extra: { ...(existing?.extra ?? {}), ...parsed.extra },
+    });
   } catch (err) { return setupError(res, err); }
-  const { config, problem } = await resolveConfig(req.pair.id, settings, { apiKey: req.body?.apiKey });
-  if (!config) return res.status(400).json({ error: problem });
-  try {
-    const models = await listModels(config);
-    res.json({ provider: config.provider, models: models.slice(0, 60) });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+
+  const conn = await resolveConnection(req.pair.id, saved);
+  let check = null;
+  if (conn.baseURL) {
+    const found = await probe({ baseURL: conn.baseURL, apiKey: conn.apiKey, extra: conn.extra });
+    if (found.ok) {
+      const models = chatModels(found.baseURL, found.models);
+      const keeps = conn.model && found.models.includes(conn.model);
+      const usable = await tryKey({
+        baseURL: found.baseURL, apiKey: conn.apiKey, extra: conn.extra,
+        ...(keeps ? { model: conn.model } : { models: models.length ? models : found.models }),
+      });
+      await saveConnection(req.pair.id, req.userId, { name: saved, baseURL: found.baseURL, model: keeps ? conn.model : (usable.ok ? usable.model : conn.model) });
+      check = usable.ok ? { ok: true, model: usable.model, models }
+        : { ok: false, models, error: usable.unauthorized ? `The key was refused (${usable.error}). It ${asSent(conn)}.` : usable.error };
+    } else {
+      check = { ok: false, error: found.unauthorized ? `The key was refused (${found.error}). It ${asSent(conn)}.` : found.error };
+    }
   }
+  if (req.body?.use !== false) await saveSettings(req.pair.id, req.userId, { source: 'key', connection: saved });
+  res.json({
+    ok: true,
+    name: saved,
+    found: {
+      baseURL: parsed.baseURL,
+      model: parsed.model,
+      // Never the key: how much of one arrived, which says whether the paste was whole.
+      key: parsed.apiKey ? `${parsed.apiKey.length} characters ending "${parsed.apiKey.slice(-4)}"` : null,
+      api: parsed.extra.api || 'chat',
+    },
+    check,
+    connections: await listConnections(req.pair.id),
+  });
 });
 
 // ------------------------------------------------------------------- chat
@@ -230,7 +324,7 @@ function queueReply(req, settings, names, io, room) {
       const got = await askWithFallback(pairId, config, {
         system: systemPrompt(settings, [names[req.userId], names[req.partnerId]]),
         user: transcript(labelled, settings, latestAuthor),
-      }, { settings });
+      });
       if (got.fallback) console.log(`[fable] ${got.fallback.from} could not answer (${got.fallback.why}); ${got.fallback.to} did`);
       const text = cleanReply(got.text, settings.botName);
       ({ rows: [row] } = await query(

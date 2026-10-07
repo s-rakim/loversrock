@@ -174,7 +174,7 @@ export default function FableScreen({ navigation }) {
             {info.problem ? `${botName} needs a hand` : 'Add an AI to your chat'}
           </Text>
           <Text style={[font.muted, { textAlign: 'center' }]}>
-            {info.problem || 'Pick a model and paste an API key. Google Gemini and Groq both have free keys.'}
+            {info.problem || 'Add a connection: paste the example from the page where you made a key. Google Gemini and Groq both have free keys.'}
           </Text>
           <MorphButton onPress={openSetup} style={styles.setupButton}>
             <Icon name="key-outline" chip={false} size={16} color="#fff" />

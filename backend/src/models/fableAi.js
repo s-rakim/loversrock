@@ -1,22 +1,21 @@
 // Fable: the group chat between the two of you and an AI model.
 //
-// Everything lives in this backend: the messages (fable_messages), which
-// model answers (fable_settings) and the API keys you add in the app
-// (ai_keys, one per provider). The phones never see a key. They send one in
-// once, on the setup page, and from then on only a hint of it ("…a1b2")
-// comes back.
+// Everything lives in this backend: the messages (fable_messages), how Fable
+// behaves (fable_settings), and the connections it reaches models through
+// (ai_connections, models/aiConnections.js — Collaboration des Esprits'
+// connection layer). The phones never see a key: they paste one in once, and
+// from then on only its length and last four characters come back.
 //
-// The model is reached through the same connector as the AI-written quiz and
-// prompts (models/quizGenerator.js), so any provider that works there works
-// here: Gemini and Groq on their free tiers, OpenRouter, OpenAI, Claude, a
-// local Ollama, or any OpenAI-compatible address. Or the setup page can
-// point Fable at the connector already in backend/.env.
-import crypto from 'node:crypto';
+// A connection is any endpoint speaking OpenAI's /chat/completions or
+// Anthropic's /messages: Gemini, Groq, OpenRouter, NVIDIA and Mistral on
+// their free tiers, OpenAI, Claude, Ollama on the PC, or any address you
+// type. Or the setup page can point Fable at backend/.env's own connector.
 import { query } from '../config/db.js';
-import {
-  PROVIDER_URLS, ANTHROPIC_DEFAULT_MODEL, buildLlmConfig, serverLlmConfig, networkError,
-} from './quizGenerator.js';
+import { PROVIDER_URLS, serverLlmConfig, networkError } from './quizGenerator.js';
 import { setSharedAiConfig } from './aiShared.js';
+import {
+  resolveConnection, listConnections, probe, headersFor, asSent, explain, migrateLegacy,
+} from './aiConnections.js';
 
 const TIMEOUT_MS = 60_000;
 // How long to wait before each retry when the provider says it is busy.
@@ -24,116 +23,17 @@ export const BUSY_RETRY_MS = [2000, 5000];
 export const HISTORY_FOR_AI = 30;
 export const MAX_BODY = 4000;
 
-/**
- * What the setup page offers, in the order it offers them: the free ones
- * first. The default models are a starting point the page fills in; any
- * model the provider has can be typed instead.
- */
-export const PROVIDERS = [
-  { id: 'gemini', label: 'Google Gemini', free: true, defaultModel: 'gemini-flash-latest', keyUrl: 'https://aistudio.google.com/apikey' },
-  { id: 'groq', label: 'Groq', free: true, defaultModel: 'llama-3.3-70b-versatile', keyUrl: 'https://console.groq.com/keys' },
-  { id: 'openrouter', label: 'OpenRouter', free: true, defaultModel: 'meta-llama/llama-3.3-70b-instruct:free', keyUrl: 'https://openrouter.ai/keys' },
-  { id: 'mistral', label: 'Mistral', free: true, defaultModel: 'mistral-small-latest', keyUrl: 'https://console.mistral.ai/api-keys' },
-  { id: 'openai', label: 'OpenAI', free: false, defaultModel: 'gpt-4o-mini', keyUrl: 'https://platform.openai.com/api-keys' },
-  { id: 'anthropic', label: 'Claude (Anthropic)', free: false, defaultModel: ANTHROPIC_DEFAULT_MODEL, keyUrl: 'https://console.anthropic.com/settings/keys' },
-  { id: 'deepseek', label: 'DeepSeek', free: false, defaultModel: 'deepseek-chat', keyUrl: 'https://platform.deepseek.com/api_keys' },
-  { id: 'together', label: 'Together', free: false, defaultModel: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', keyUrl: 'https://api.together.xyz/settings/api-keys' },
-  { id: 'ollama', label: 'Ollama on the server PC', free: true, defaultModel: 'llama3.2', keyUrl: null, noKey: true },
-  { id: 'custom', label: 'Another OpenAI-compatible service', free: false, defaultModel: '', keyUrl: null, needsBaseUrl: true },
-];
-const PROVIDER_IDS = PROVIDERS.map((p) => p.id);
-const APP_NAMES = { provider: 'The provider', apiKey: 'An API key', model: 'The model', baseUrl: 'The server address' };
-
 export class FableSetupError extends Error {}
-
-// ---------------------------------------------------------------- the keys
-
-/**
- * Keys are sealed with AES-256-GCM before they reach the database, so a copy
- * of the database (a backup, a dump pasted somewhere) is not a copy of your
- * keys. The secret is FABLE_KEY_SECRET, or JWT_REFRESH_SECRET when that is
- * not set;
- * change it and the saved keys can no longer be opened — the setup page then
- * asks for them again rather than failing strangely.
- */
-function sealKey() {
-  const secret = process.env.FABLE_KEY_SECRET || process.env.JWT_REFRESH_SECRET;
-  if (!secret) throw new Error('JWT_REFRESH_SECRET is not set, so API keys cannot be stored safely');
-  return crypto.createHash('sha256').update(`loversrock-ai-keys:${secret}`).digest();
-}
-
-export function sealApiKey(plain) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', sealKey(), iv);
-  const body = Buffer.concat([cipher.update(String(plain), 'utf8'), cipher.final()]);
-  return ['v1', iv.toString('base64'), cipher.getAuthTag().toString('base64'), body.toString('base64')].join(':');
-}
-
-export function openApiKey(sealed) {
-  try {
-    const [v, iv, tag, body] = String(sealed).split(':');
-    if (v !== 'v1') return null;
-    const decipher = crypto.createDecipheriv('aes-256-gcm', sealKey(), Buffer.from(iv, 'base64'));
-    decipher.setAuthTag(Buffer.from(tag, 'base64'));
-    return Buffer.concat([decipher.update(Buffer.from(body, 'base64')), decipher.final()]).toString('utf8');
-  } catch {
-    return null;
-  }
-}
-
-/** Enough of a key to recognise it, never enough to use it. */
-export const keyHint = (key) => (key && key.length > 8 ? `…${key.slice(-4)}` : '…');
-
-export async function listKeys(pairId) {
-  const { rows } = await query(
-    `SELECT k.provider, k.hint, k.created_at, u.name AS added_by
-       FROM ai_keys k LEFT JOIN users u ON u.id = k.added_by
-      WHERE k.pair_id = $1 ORDER BY k.created_at`,
-    [pairId]
-  );
-  return rows.map((r) => ({ provider: r.provider, hint: r.hint, addedBy: r.added_by, addedAt: r.created_at }));
-}
-
-export async function saveKey(pairId, userId, provider, apiKey) {
-  const id = String(provider || '').toLowerCase();
-  if (!PROVIDER_IDS.includes(id)) throw new FableSetupError(`Unknown provider "${provider}".`);
-  const key = String(apiKey || '').trim();
-  if (key.length < 8) throw new FableSetupError('That does not look like an API key. Paste the whole key.');
-  if (/\s/.test(key)) throw new FableSetupError('An API key has no spaces in it. Paste just the key.');
-  await query(
-    `INSERT INTO ai_keys (pair_id, provider, key_enc, hint, added_by)
-     VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (pair_id, provider) DO UPDATE
-       SET key_enc = EXCLUDED.key_enc, hint = EXCLUDED.hint, added_by = EXCLUDED.added_by, created_at = now()`,
-    [pairId, id, sealApiKey(key), keyHint(key), userId]
-  );
-  await refreshSharedAiConfig();
-}
-
-export async function deleteKey(pairId, provider) {
-  await query('DELETE FROM ai_keys WHERE pair_id = $1 AND provider = $2', [pairId, String(provider).toLowerCase()]);
-  await refreshSharedAiConfig();
-}
-
-async function keyFor(pairId, provider) {
-  const { rows } = await query('SELECT key_enc FROM ai_keys WHERE pair_id = $1 AND provider = $2', [pairId, provider]);
-  if (!rows[0]) return { key: null, missing: true };
-  const key = openApiKey(rows[0].key_enc);
-  return key ? { key } : { key: null, unreadable: true };
-}
 
 // ------------------------------------------------------------ the settings
 
 export const DEFAULT_SETTINGS = {
-  source: 'key', provider: 'gemini', model: 'gemini-flash-latest', baseUrl: null,
-  botName: 'Fable', persona: '', replyMode: 'always', useForContent: true,
+  source: 'key', connection: null, botName: 'Fable', persona: '', replyMode: 'always', useForContent: true,
 };
 
 const presentSettings = (row) => (row ? {
   source: row.source,
-  provider: row.provider,
-  model: row.model,
-  baseUrl: row.base_url,
+  connection: row.connection || null,
   botName: row.bot_name,
   persona: row.persona || '',
   replyMode: row.reply_mode,
@@ -143,6 +43,8 @@ const presentSettings = (row) => (row ? {
 } : null);
 
 export async function getSettings(pairId) {
+  // Keys saved under the old setup become connections the first time.
+  await migrateLegacy(pairId).catch((err) => console.error('[fable] could not move old keys over:', err.message));
   const { rows } = await query(
     `SELECT s.*, u.name AS updated_by_name FROM fable_settings s
        LEFT JOIN users u ON u.id = s.updated_by WHERE s.pair_id = $1`,
@@ -156,35 +58,29 @@ const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 /** Checks what the setup page sent and fills in what it left out. */
 export function cleanSettings(input, current = null) {
   const base = { ...DEFAULT_SETTINGS, ...(current || {}) };
-  const source = input.source ?? base.source;
-  if (!['key', 'server'].includes(source)) throw new FableSetupError('Choose your own key or the server\'s AI.');
-  const provider = String(input.provider ?? base.provider).toLowerCase();
-  if (source === 'key' && !PROVIDER_IDS.includes(provider)) throw new FableSetupError(`Unknown provider "${provider}".`);
-  const preset = PROVIDERS.find((p) => p.id === provider);
-  const model = clip(input.model ?? (input.provider && input.provider !== base.provider ? preset?.defaultModel : base.model), 120)
-    || preset?.defaultModel || '';
-  const baseUrl = clip(input.baseUrl ?? base.baseUrl, 300) || null;
-  if (baseUrl && !/^https?:\/\/\S+$/i.test(baseUrl)) throw new FableSetupError('The server address must start with http:// or https://');
+  // 'key' is "one of your connections"; 'server' is backend/.env's connector.
+  const source = input.source === 'connection' ? 'key' : (input.source ?? base.source);
+  if (!['key', 'server'].includes(source)) throw new FableSetupError('Choose one of your connections or the server\'s AI.');
+  const connection = input.connection === undefined ? base.connection : (clip(input.connection, 64) || null);
   const botName = clip(input.botName ?? base.botName, 24) || 'Fable';
   if (!/^[\p{L}\p{N} _.'-]+$/u.test(botName)) throw new FableSetupError('Give the AI a name made of letters and numbers.');
   const persona = String(input.persona ?? base.persona ?? '').trim().slice(0, 1000);
   const replyMode = input.replyMode ?? base.replyMode;
   if (!['always', 'mention'].includes(replyMode)) throw new FableSetupError('Choose when the AI replies.');
   const useForContent = input.useForContent === undefined ? base.useForContent : Boolean(input.useForContent);
-  return { source, provider, model, baseUrl, botName, persona, replyMode, useForContent };
+  return { source, connection, botName, persona, replyMode, useForContent };
 }
 
 export async function saveSettings(pairId, userId, input) {
   const s = cleanSettings(input, await getSettings(pairId));
   await query(
-    `INSERT INTO fable_settings (pair_id, source, provider, model, base_url, bot_name, persona, reply_mode, use_for_content, updated_by, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+    `INSERT INTO fable_settings (pair_id, source, connection, provider, model, bot_name, persona, reply_mode, use_for_content, updated_by, updated_at)
+     VALUES ($1, $2, $3, 'connection', '', $4, $5, $6, $7, $8, now())
      ON CONFLICT (pair_id) DO UPDATE SET
-       source = EXCLUDED.source, provider = EXCLUDED.provider, model = EXCLUDED.model,
-       base_url = EXCLUDED.base_url, bot_name = EXCLUDED.bot_name, persona = EXCLUDED.persona,
-       reply_mode = EXCLUDED.reply_mode, use_for_content = EXCLUDED.use_for_content,
+       source = EXCLUDED.source, connection = EXCLUDED.connection, bot_name = EXCLUDED.bot_name,
+       persona = EXCLUDED.persona, reply_mode = EXCLUDED.reply_mode, use_for_content = EXCLUDED.use_for_content,
        updated_by = EXCLUDED.updated_by, updated_at = now()`,
-    [pairId, s.source, s.provider, s.model, s.baseUrl, s.botName, s.persona, s.replyMode, s.useForContent, userId]
+    [pairId, s.source, s.connection, s.botName, s.persona, s.replyMode, s.useForContent, userId]
   );
   await refreshSharedAiConfig();
   return getSettings(pairId);
@@ -205,50 +101,71 @@ export function serverConnector() {
   }
 }
 
-/**
- * The connector for a pair's settings: { config } ready to call, or
- * { problem } saying in a sentence what is missing. `override` lets the
- * setup page try settings (and a key) before saving them.
- */
-export async function resolveConfig(pairId, settings, { apiKey } = {}) {
-  if (!settings) return { problem: 'The AI is not set up yet.' };
-  if (settings.source === 'server') {
-    const server = serverConnector();
-    if (!server.available) {
-      return { problem: server.error ? `The server's AI is misconfigured: ${server.error}` : 'The server has no AI set up in backend/.env. Add your own key instead.' };
-    }
-    return { config: serverLlmConfig() };
-  }
-  let key = apiKey ? String(apiKey).trim() : null;
-  if (!key) {
-    const found = await keyFor(pairId, settings.provider);
-    if (found.unreadable) return { problem: `The saved ${labelOf(settings.provider)} key can no longer be read (the server's secret changed). Add it again.` };
-    key = found.key;
-  }
-  try {
-    return { config: buildLlmConfig({ provider: settings.provider, apiKey: key || '', model: settings.model, baseUrl: settings.baseUrl }, APP_NAMES) };
-  } catch (err) {
-    const noKey = !key && settings.provider !== 'ollama';
-    return { problem: noKey ? `Add a ${labelOf(settings.provider)} API key to use it.` : err.message };
-  }
+/** backend/.env's connector, as a connection Fable can call. */
+function serverConnection() {
+  const c = serverLlmConfig();
+  if (!c) return null;
+  const messages = c.provider === 'anthropic';
+  const baseURL = (c.baseUrl || PROVIDER_URLS[c.provider] || (messages ? 'https://api.anthropic.com' : '')).replace(/\/+$/, '');
+  return {
+    name: `the server's ${c.provider}`,
+    baseURL: messages && !/\/v1$/.test(baseURL) ? `${baseURL}/v1` : baseURL,
+    apiKey: c.apiKey || null,
+    model: c.model,
+    extra: messages ? { api: 'messages' } : {},
+  };
 }
 
-const labelOf = (id) => PROVIDERS.find((p) => p.id === id)?.label || id;
+const isLocal = (url) => /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0|host\.docker\.internal|192\.168\.|10\.)/i.test(url || '');
 
 /**
- * Loads the connector the daily quiz, prompts and date ideas can borrow when
- * backend/.env has none: the most recently saved setup with its own key and
- * "also use it for daily content" on. Called at start and on every save.
+ * The connection a pair's settings point at, ready to call: { config }, or
+ * { problem } saying in a sentence what is missing. `connection` lets the
+ * setup page test a named connection that is not the chosen one.
  */
+export async function resolveConfig(pairId, settings, { connection: override } = {}) {
+  if (!settings && !override) return { problem: 'The AI is not set up yet.' };
+  if (!override && settings.source === 'server') {
+    const server = serverConnector();
+    if (!server.available) {
+      return { problem: server.error ? `The server's AI is misconfigured: ${server.error}` : 'The server has no AI set up in backend/.env. Add a connection instead.' };
+    }
+    return { config: serverConnection() };
+  }
+  const name = override || settings.connection;
+  if (!name) return { problem: 'Choose a connection for Fable on the setup page, or add one.' };
+  const conn = await resolveConnection(pairId, name);
+  if (!conn) return { problem: `There is no connection called "${name}" any more. Choose another on the setup page.` };
+  if (conn.keyUnreadable) return { problem: `The key saved on "${name}" can no longer be read (the server's secret changed). Paste it again.` };
+  if (!conn.baseURL) return { problem: `"${name}" has no address. Add one on the setup page.` };
+  if (!conn.apiKey && !isLocal(conn.baseURL)) return { problem: `"${name}" has no API key. Paste one on the setup page.` };
+  if (!conn.model) return { problem: `"${name}" has no model chosen. Press Find on it to pick one.` };
+  return { config: conn };
+}
+
+/**
+ * The connection the daily quiz, prompts and date ideas can borrow when
+ * backend/.env has none: the most recently saved setup on a connection,
+ * with "also use it for daily content" on. As quizGenerator's config shape.
+ */
+export function asContentConfig(conn) {
+  if (!conn?.baseURL || !conn.model) return null;
+  if (conn.extra?.api === 'messages') {
+    return { provider: 'anthropic', apiKey: conn.apiKey || 'none', model: conn.model, baseUrl: conn.baseURL.replace(/\/v1$/, '') };
+  }
+  return { provider: conn.apiKey ? 'custom' : 'ollama', apiKey: conn.apiKey || '', model: conn.model, baseUrl: conn.baseURL };
+}
+
 export async function refreshSharedAiConfig() {
   try {
     const { rows } = await query(
       `SELECT pair_id FROM fable_settings
-        WHERE source = 'key' AND use_for_content ORDER BY updated_at DESC LIMIT 5`
+        WHERE source = 'key' AND use_for_content AND connection IS NOT NULL ORDER BY updated_at DESC LIMIT 5`
     );
     for (const { pair_id: pairId } of rows) {
       const { config } = await resolveConfig(pairId, await getSettings(pairId));
-      if (config) { setSharedAiConfig(config); return config; }
+      const content = asContentConfig(config);
+      if (content) { setSharedAiConfig(content); return content; }
     }
     setSharedAiConfig(null);
     return null;
@@ -300,38 +217,35 @@ export function cleanReply(text, botName) {
   return out.slice(0, MAX_BODY);
 }
 
-/** A provider's error, as a sentence you can act on. */
-export function explainFailure(config, status, detail) {
-  const who = labelOf(config.provider);
-  const text = String(detail || '');
-  if (status === 401 || status === 403 || /api[ _-]?key (not valid|invalid)|invalid[ _-]?api[ _-]?key|incorrect api key|unauthori[sz]ed/i.test(text)) {
-    return `${who} refused the API key. Check it on the setup page.`;
-  }
-  if (status === 429 || /quota|rate limit|resource[_ ]exhausted/i.test(text)) {
-    return `${who}'s limit was reached (free tiers allow a few requests a minute). Try again shortly.`;
-  }
-  if (status === 503 || /overloaded|high demand|unavailable/i.test(text)) {
-    return `${who} is busy right now (too many people using it). Try again in a minute.`;
-  }
-  if (status === 404 || /model.*(not found|does not exist|not supported)/i.test(text)) {
-    return `${who} does not know the model "${config.model}". Pick another on the setup page.`;
-  }
-  let message = '';
-  try { const j = JSON.parse(text); message = j?.error?.message || j?.[0]?.error?.message || j?.message || ''; } catch { /* not JSON */ }
-  return `${who} answered ${status}: ${(message || text).slice(0, 200) || 'no details'}`;
-}
+const KEY_REFUSED = /api[ _-]?key (not valid|invalid)|valid api key|invalid[ _-]?api[ _-]?key|incorrect api key|unauthori[sz]ed|authentication/i;
 
 /** What kind of failure an error is, for deciding whether to try elsewhere. */
 export function failureKind(status, detail = '') {
   const text = String(detail);
-  if (status === 401 || status === 403 || /api[ _-]?key (not valid|invalid)|invalid[ _-]?api[ _-]?key|incorrect api key|unauthori[sz]ed/i.test(text)) return 'key';
+  if (status === 401 || status === 403 || KEY_REFUSED.test(text)) return 'key';
   if (status === 429 || /quota|rate limit|resource[_ ]exhausted/i.test(text)) return 'limit';
   if ([500, 502, 503, 504].includes(status) || /overloaded|high demand|unavailable/i.test(text)) return 'busy';
-  if (status === 404 || /model.*(not found|does not exist|not supported|is not available|decommissioned|deprecated)/i.test(text)) return 'model';
+  if (status === 404 || /model.*(not found|does not exist|not supported|is not available|decommissioned|deprecated)|unknown model|not a valid model/i.test(text)) return 'model';
   return 'other';
 }
 
-/** A provider's error, carrying its status and kind as well as the sentence. */
+/** A provider's error, as a sentence you can act on: what went out, when it was the key. */
+export function explainFailure(config, status, detail) {
+  const who = `"${config.name}"`;
+  switch (failureKind(status, detail)) {
+    case 'key':
+      return `${who} refused the API key (${explain(status, detail)}). It ${asSent(config)}: check it is the whole key, for this service, on the setup page.`;
+    case 'limit':
+      return `${who} hit its limit (free tiers allow a few requests a minute). Try again shortly.`;
+    case 'busy':
+      return `${who} is busy right now (too many people using it). Try again in a minute.`;
+    case 'model':
+      return `${who} does not know the model "${config.model}". Press Find on it to pick one it serves.`;
+    default:
+      return `${who} answered ${explain(status, detail)}`;
+  }
+}
+
 function providerError(config, status, detail) {
   const err = new Error(explainFailure(config, status, detail));
   err.status = status;
@@ -339,58 +253,35 @@ function providerError(config, status, detail) {
   return err;
 }
 
-/**
- * One reply from the model: plain text. `busyWaits` is how long to wait
- * before each retry of a busy model (askWithFallback tries other models
- * instead, so it asks the alternatives only once each).
- */
-export async function askChat(config, { system, user }, { busyWaits = BUSY_RETRY_MS } = {}) {
-  if (config.provider === 'anthropic') {
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
-    const client = new Anthropic({
-      apiKey: config.apiKey,
-      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
-      timeout: TIMEOUT_MS,
-      maxRetries: 1,
-    });
-    let response;
-    try {
-      response = await client.messages.create({
-        model: config.model,
-        max_tokens: 2000,
-        system,
-        messages: [{ role: 'user', content: user }],
-      });
-    } catch (err) {
-      if (err?.status) throw providerError(config, err.status, err.message);
-      const wrapped = networkError(config, err);
-      wrapped.kind = 'network';
-      throw wrapped;
-    }
-    if (response.stop_reason === 'refusal') throw new Error('The model declined to answer that.');
-    return response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-  }
+function unreachable(config, err) {
+  const wrapped = networkError({ provider: config.name, baseUrl: config.baseURL }, err);
+  wrapped.kind = 'network';
+  return wrapped;
+}
 
-  // "Busy right now" (503, and 500/502 from overloaded gateways) is worth
-  // two more tries a few seconds apart: Gemini's free tier says it often and
-  // usually means it for seconds, not minutes. Anything else is said at once.
-  const send = () => fetch(`${config.baseUrl || PROVIDER_URLS[config.provider]}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-    },
-    body: JSON.stringify({
+/**
+ * One reply from the model: plain text, from either shape of endpoint.
+ * `busyWaits` is how long to wait before each retry of a busy model.
+ */
+export async function askChat(config, { system, user }, { busyWaits = BUSY_RETRY_MS, fetchImpl = fetch } = {}) {
+  const messages = config.extra?.api === 'messages';
+  const body = messages
+    ? { model: config.model, max_tokens: 2000, system, messages: [{ role: 'user', content: user }] }
+    : {
       model: config.model,
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       temperature: 0.8,
-    }),
+      ...(config.extra?.tokenParam ? { [config.extra.tokenParam]: 2000 } : {}),
+    };
+  const send = () => fetchImpl(`${config.baseURL}/${messages ? 'messages' : 'chat/completions'}`, {
+    method: 'POST',
+    headers: headersFor(config.apiKey, config.extra || {}, { 'content-type': 'application/json' }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(TIMEOUT_MS),
-  }).catch((err) => {
-    const wrapped = networkError(config, err);
-    wrapped.kind = 'network';
-    throw wrapped;
-  });
+  }).catch((err) => { throw unreachable(config, err); });
+
+  // "Busy right now" is worth two more tries a few seconds apart: Gemini's
+  // free tier says it often and usually means it for seconds.
   let res = await send();
   for (const wait of busyWaits) {
     if (![500, 502, 503].includes(res.status)) break;
@@ -399,10 +290,11 @@ export async function askChat(config, { system, user }, { busyWaits = BUSY_RETRY
     res = await send();
   }
   if (!res.ok) throw providerError(config, res.status, await res.text().catch(() => ''));
-  const data = await res.json();
-  const text = replyText(data?.choices?.[0]?.message?.content);
+  const data = await res.json().catch(() => ({}));
+  if (messages && data?.stop_reason === 'refusal') throw new Error('The model declined to answer that.');
+  const text = messages ? replyText(data?.content) : replyText(data?.choices?.[0]?.message?.content);
   if (!text) {
-    const err = new Error(`${labelOf(config.provider)} sent back an empty reply.`);
+    const err = new Error(`"${config.name}" sent back an empty reply.`);
     err.kind = 'empty';
     throw err;
   }
@@ -410,8 +302,8 @@ export async function askChat(config, { system, user }, { busyWaits = BUSY_RETRY
 }
 
 /**
- * The text of a chat reply. Usually a string; some providers send a list of
- * parts instead ([{ type: 'text', text }]), and thinking models can put their
+ * The text of a reply. Usually a string; some providers (and Anthropic's
+ * shape always) send a list of parts, and thinking models can put their
  * notes in parts of their own, which are left out.
  */
 export function replyText(content) {
@@ -431,14 +323,15 @@ export function replyText(content) {
 const NOT_CHAT = /(^|[-_./:])(tts|embed(ding)?s?|imagen?|images?|whisper|transcribe|audio|speech|moderation|guard|rerank|dall-e|sora|veo|lyria|native-audio|live|computer-use|robotics|aqa|realtime|search-preview)([-_./:]|$)/i;
 
 /**
- * A provider's chat models, best first for a chat: quick, generous, current
+ * An endpoint's chat models, best first for a chat: quick, generous, current
  * ones ahead of previews, the big slow ones and the reasoning-only ones.
  */
-export function chatModels(provider, ids) {
+export function chatModels(baseURL, ids) {
+  const openrouter = /openrouter/i.test(String(baseURL));
   const score = (id) => {
     let n = 0;
     if (/flash|mini|small|instant|versatile|haiku|sonnet|turbo|chat|latest|:free/i.test(id)) n += 2;
-    if (provider === 'openrouter' && /:free$/.test(id)) n += 3;
+    if (openrouter && /:free$/.test(id)) n += 3;
     if (/preview|exp(erimental)?([-_.]|$)|beta|thinking|deep-research|o1|o3|r1|reason/i.test(id)) n -= 3;
     if (/(^|[-_.])pro([-_.]|$)|large|405b|opus|ultra/i.test(id)) n -= 1;
     return n;
@@ -450,43 +343,14 @@ export function chatModels(provider, ids) {
 const modelCache = new Map();
 const MODEL_CACHE_MS = 30 * 60 * 1000;
 
-/**
- * The chat models this key can use, asked of the provider itself (its
- * /models list), so the setup page offers what exists today rather than
- * names that were current when this was written. Kept for half an hour.
- */
+/** The chat models a connection serves today, asked of the endpoint itself. Kept half an hour. */
 export async function listModels(config) {
-  const cacheKey = `${config.provider}|${config.baseUrl}|${crypto.createHash('sha256').update(config.apiKey || '').digest('hex')}`;
+  const cacheKey = `${config.baseURL}|${config.apiKey ? config.apiKey.slice(-6) : ''}`;
   const hit = modelCache.get(cacheKey);
   if (hit && Date.now() - hit.at < MODEL_CACHE_MS) return hit.models;
-
-  let ids;
-  if (config.provider === 'anthropic') {
-    const { default: Anthropic } = await import('@anthropic-ai/sdk');
-    const client = new Anthropic({
-      apiKey: config.apiKey,
-      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
-      timeout: 20_000,
-      maxRetries: 1,
-    });
-    try {
-      const page = await client.models.list({ limit: 100 });
-      ids = page.data.map((m) => m.id);
-    } catch (err) {
-      if (err?.status) throw providerError(config, err.status, err.message);
-      throw networkError(config, err);
-    }
-  } else {
-    const res = await fetch(`${config.baseUrl || PROVIDER_URLS[config.provider]}/models`, {
-      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
-      signal: AbortSignal.timeout(20_000),
-    }).catch((err) => { throw networkError(config, err); });
-    if (!res.ok) throw providerError(config, res.status, await res.text().catch(() => ''));
-    const data = await res.json().catch(() => ({}));
-    const list = Array.isArray(data) ? data : data.data || data.models || [];
-    ids = list.map((m) => (typeof m === 'string' ? m : m.id || m.name));
-  }
-  const models = chatModels(config.provider, ids);
+  const found = await probe({ baseURL: config.baseURL, apiKey: config.apiKey, extra: config.extra || {} });
+  if (!found.ok) throw new Error(found.error);
+  const models = chatModels(config.baseURL, found.models);
   modelCache.set(cacheKey, { at: Date.now(), models });
   return models;
 }
@@ -496,25 +360,24 @@ const TRY_ANOTHER_MODEL = new Set(['busy', 'limit', 'model', 'empty']);
 
 /**
  * One reply, trying harder than askChat: when the chosen model is busy, out
- * of its free quota or no longer exists, a few other models from the same
- * provider are tried (each has its own quota), then your other saved keys.
- * Resolves to { text, config, fallback } where fallback says what stood in
- * and why; throws the first model's error if nothing answers.
+ * of its free quota or no longer exists, a few other models on the same
+ * connection are tried (each has its own quota), then your other
+ * connections. Resolves to { text, config, fallback }; throws the first
+ * model's error if nothing answers.
  *
- * When the chosen model simply no longer exists and another of the same
- * provider answered, the setup is moved onto that one, so the next message
- * does not have to find it again.
+ * When the chosen model simply no longer exists and another on the same
+ * connection answered, the connection is moved onto that one.
  */
-export async function askWithFallback(pairId, config, prompt, { settings = null } = {}) {
+export async function askWithFallback(pairId, config, prompt) {
   let first;
   try {
     return { text: await askChat(config, prompt), config, fallback: null };
   } catch (err) {
     first = err;
   }
-  const tried = new Set([`${config.provider}|${config.model}`]);
+  const tried = new Set([`${config.name}|${config.model}`]);
   const attempt = async (candidate) => {
-    const id = `${candidate.provider}|${candidate.model}`;
+    const id = `${candidate.name}|${candidate.model}`;
     if (tried.has(id)) return null;
     tried.add(id);
     try {
@@ -525,38 +388,29 @@ export async function askWithFallback(pairId, config, prompt, { settings = null 
     }
   };
 
-  // Other models from the same provider.
+  // Other models on the same connection.
   if (TRY_ANOTHER_MODEL.has(first.kind)) {
     const models = await listModels(config).catch(() => []);
     for (const model of models.slice(0, 4)) {
       const got = await attempt({ ...config, model });
       if (got) {
-        if (first.kind === 'model' && settings?.source === 'key' && settings.provider === config.provider && pairId) {
-          await query('UPDATE fable_settings SET model = $2 WHERE pair_id = $1 AND model = $3', [pairId, model, config.model])
+        if (first.kind === 'model' && pairId) {
+          await query('UPDATE ai_connections SET model = $3 WHERE pair_id = $1 AND name = $2 AND model = $4', [pairId, config.name, model, config.model])
             .catch(() => {});
         }
-        return { ...got, fallback: { from: config.model, to: model, provider: config.provider, why: first.message } };
+        return { ...got, fallback: { from: config.model, to: model, connection: config.name, why: first.message } };
       }
     }
   }
 
-  // Your other saved keys, each with its best model.
+  // Your other connections, each with its own model.
   if (pairId && first.kind !== 'other') {
-    const { rows } = await query('SELECT provider, key_enc FROM ai_keys WHERE pair_id = $1 AND provider <> $2 ORDER BY created_at DESC', [pairId, config.provider]);
-    for (const row of rows) {
-      const preset = PROVIDERS.find((p) => p.id === row.provider);
-      const key = openApiKey(row.key_enc);
-      if (!preset || !key || preset.needsBaseUrl) continue;
-      let candidate;
-      try {
-        candidate = buildLlmConfig({ provider: row.provider, apiKey: key, model: preset.defaultModel }, APP_NAMES);
-      } catch { continue; }
-      const listed = await listModels(candidate).catch(() => []);
-      const models = [...new Set([listed.includes(preset.defaultModel) || !listed.length ? preset.defaultModel : null, ...listed.slice(0, 2)].filter(Boolean))];
-      for (const model of models) {
-        const got = await attempt({ ...candidate, model });
-        if (got) return { ...got, fallback: { from: `${labelOf(config.provider)} ${config.model}`, to: `${labelOf(row.provider)} ${model}`, provider: row.provider, why: first.message } };
-      }
+    for (const view of await listConnections(pairId)) {
+      if (view.name === config.name || !view.model) continue;
+      const candidate = await resolveConnection(pairId, view.name);
+      if (!candidate?.baseURL || (!candidate.apiKey && !isLocal(candidate.baseURL))) continue;
+      const got = await attempt(candidate);
+      if (got) return { ...got, fallback: { from: `${config.name} (${config.model})`, to: `${candidate.name} (${candidate.model})`, connection: candidate.name, why: first.message } };
     }
   }
   throw first;
