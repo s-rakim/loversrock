@@ -46,7 +46,8 @@
     "test:voice-ai": "node --env-file=.env test/voiceAi.mjs",
     "test:fable": "node test/fable.mjs",
     "ai:generate": "node scripts/generate-content.js",
-    "test:content-generator": "node test/contentGenerator.mjs"
+    "test:content-generator": "node test/contentGenerator.mjs",
+    "test:security": "node test/security.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",
@@ -58,10 +59,10 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "firebase-admin": "^12.3.1",
+    "firebase-admin": "^14.5.0",
     "jsonwebtoken": "^9.0.2",
     "minio": "^8.0.1",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.6.0",
     "pg": "^8.12.0",
     "socket.io": "^4.7.5"
   }

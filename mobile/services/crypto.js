@@ -19,8 +19,9 @@
 //
 // WHAT IS AND IS NOT COVERED, stated plainly rather than implied:
 //
-//   Encrypted: message text, and doodle stroke data.
-//   Not encrypted: photos, memories and widget images; who sent what and
+//   Encrypted: message text (and edits), polls and shared places.
+//   Not encrypted: photos and drawings, voice notes, memories and widget
+//     images, location sharing, cycle data, Fable; who sent what and
 //     when; everything else in the app.
 //
 // Photos are genuinely harder and the reason is architectural, not laziness:

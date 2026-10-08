@@ -7,6 +7,9 @@
 #   bridge address, which no phone can reach.
 # - PEERCALLS_WS_ORIGIN_PATTERNS: the app connects from a phone, not from a
 #   page this server served, so the origin check is configurable.
+# - PEERCALLS_JOIN_SECRET: a room can only be joined with a pass the
+#   backend signed for it, so the server carries media only for calls the
+#   backend set up (CALLS_SECRET in docker/.env).
 #
 # Only the server is built: the app is the client (mobile/components/calls/
 # sfu.js), so peer-calls' own web page is not needed, and stand-in files take

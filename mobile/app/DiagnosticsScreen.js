@@ -15,7 +15,7 @@ import {
   PermissionsAndroid, Share,
 } from 'react-native';
 import Constants from 'expo-constants';
-import { apiFetch, pingServer, getApiUrl, getAccessToken, mediaUrl, connectSocket, waitForSocket, getSocketState, isUnpaired, getSocketRefusal, UNPAIRED_ERROR } from '../services/api';
+import { apiFetch, pingServer, getApiUrl, getAccessToken, mediaUrl, connectSocket, waitForSocket, getSocketState, isUnpaired, getSocketRefusal, UNPAIRED_ERROR, sfuPass } from '../services/api';
 import { BUILD_STAMP, API_CONTRACT } from '../buildInfo';
 import { spacing, radius } from '../theme';
 import { useTheme } from '../components/ThemeContext';
@@ -168,8 +168,10 @@ export default function DiagnosticsScreen() {
 
       if (key) {
         const url = mediaUrl(key);
-        add('Signed image URL', url?.includes('token=') ? OK : BAD,
-          url?.includes('token=') ? 'URL carries an access token' : 'URL is unsigned — it will 401');
+        add('Signed image URL', /[?&](mt|token)=/.test(url || '') ? OK : BAD,
+          /[?&]mt=/.test(url || '') ? 'URL carries a photo-only token'
+            : url?.includes('token=') ? 'URL carries the sign-in token (a photo-only one comes with the next sign-in renewal)'
+              : 'URL is unsigned — it will 401');
 
         // The plain GET an image loader makes, with no headers of its own.
         const res = await fetch(url);
@@ -228,6 +230,7 @@ export default function DiagnosticsScreen() {
             url: config.sfu.url,
             webrtc,
             getStream: () => webrtc.mediaDevices.getUserMedia({ audio: true, video: false }),
+            getPass: sfuPass,
           });
           add('Call through the call server', test.ok ? OK : BAD, test.detail);
         } else {

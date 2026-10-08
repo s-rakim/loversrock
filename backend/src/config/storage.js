@@ -21,6 +21,28 @@ export async function ensureBucket() {
   }
 }
 
+/**
+ * The image type a file really is, from its first bytes, or null when it is
+ * not one of the pictures the app shows. An upload labelled image/png that is
+ * actually HTML or a script is refused rather than stored and served back.
+ */
+export function sniffImage(buffer) {
+  if (!buffer || buffer.length < 12) return null;
+  const b = buffer;
+  const ascii = (from, to) => b.subarray(from, to).toString('latin1');
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && ascii(1, 4) === 'PNG') return 'image/png';
+  if (ascii(0, 4) === 'GIF8') return 'image/gif';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  if (ascii(4, 8) === 'ftyp') {
+    const brand = ascii(8, 12);
+    if (['heic', 'heix', 'hevc', 'heim', 'heis'].includes(brand)) return 'image/heic';
+    if (['mif1', 'msf1', 'avif'].includes(brand)) return brand === 'avif' ? 'image/avif' : 'image/heif';
+  }
+  if (ascii(0, 2) === 'BM') return 'image/bmp';
+  return null;
+}
+
 export async function uploadBase64Image(base64Data, { prefix = 'uploads' } = {}) {
   const match = /^data:(image\/\w+);base64,(.+)$/.exec(base64Data);
   if (!match) {
@@ -31,10 +53,18 @@ export async function uploadBase64Image(base64Data, { prefix = 'uploads' } = {})
     throw err;
   }
 
-  const [, mimeType, data] = match;
-  const ext = mimeType.split('/')[1] || 'jpg';
-  const key = `${prefix}/${randomUUID()}.${ext}`;
+  const [, , data] = match;
   const buffer = Buffer.from(data, 'base64');
+  // What the bytes are, not what the upload says they are: only real
+  // pictures are stored, under their real type.
+  const mimeType = sniffImage(buffer);
+  if (!mimeType) {
+    const err = new Error('That file is not a picture (JPEG, PNG, GIF, WebP, HEIC or BMP).');
+    err.status = 400;
+    throw err;
+  }
+  const ext = mimeType.split('/')[1].replace('jpeg', 'jpg');
+  const key = `${prefix}/${randomUUID()}.${ext}`;
 
   await storageClient.putObject(BUCKET, key, buffer, buffer.length, {
     'Content-Type': mimeType,

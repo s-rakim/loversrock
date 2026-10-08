@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
+import { purposeKey } from '../config/secrets.js';
 import { putBuffer, statObject, getObjectStream, getPartialObjectStream, deleteObject } from '../config/storage.js';
 import { sendToTokens, sendNotification, deepLink, CHANNELS } from '../config/firebase.js';
 import { senderName } from './messages.js';
@@ -50,7 +51,7 @@ const AUDIO_TYPES = {
 
 function signature(voiceId, userId, expires) {
   return crypto
-    .createHmac('sha256', process.env.JWT_ACCESS_SECRET)
+    .createHmac('sha256', purposeKey('voice-link'))
     .update(`voice:${voiceId}:${userId}:${expires}`)
     .digest('base64url');
 }

@@ -42,7 +42,7 @@ try {
 const {
   RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices, MediaStream,
 } = WebRTC || {};
-import { apiFetch, connectSocket, getSocket, waitForSocket } from '../../services/api';
+import { apiFetch, connectSocket, getSocket, waitForSocket, sfuPass } from '../../services/api';
 import { SfuCall } from './sfu';
 import {
   candidateLines, describePaths, isPrivateCandidate, privateSdp, scrubCandidate,
@@ -451,6 +451,8 @@ export function CallProvider({ children }) {
     const session = new SfuCall({
       url: sfu.url,
       room: sfu.room,
+      // A pass into this call's room, from our own backend, for every join.
+      getPass: sfuPass,
       clientPrefix: roleRef.current || 'p',
       nickname: roleRef.current || '',
       stream,

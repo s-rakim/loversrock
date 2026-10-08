@@ -5,6 +5,9 @@ import { io } from 'socket.io-client';
 // Bearer tokens in expo-secure-store, never cookies — see docs/SPEC.md #1.
 const ACCESS_KEY = 'loversrock_access_token';
 const REFRESH_KEY = 'loversrock_refresh_token';
+// Opens photos of your own pair and nothing else: the one that rides in image
+// URLs, which end up in caches (see mediaUrl).
+const MEDIA_KEY = 'loversrock_media_token';
 const SERVER_URL_KEY = 'loversrock_server_url';
 
 // EXPO_PUBLIC_* is inlined at build time, so the value baked into the binary is
@@ -93,6 +96,26 @@ export function apiUrlProblem() {
   return null;
 }
 
+/**
+ * Whether this address would carry everything in the clear on a shared
+ * network: plain http:// to a home-network address. Over Tailscale (100.64-
+ * 100.127.x.x, or a *.ts.net name) the tunnel encrypts it; over https it is
+ * encrypted anyway; on this phone itself it never leaves it. Anything else,
+ * the PC's Wi-Fi address above all, sends sign-in tokens and every
+ * unencrypted photo where anyone on the same Wi-Fi can read them.
+ */
+export function cleartextRisk(url = currentUrl) {
+  const m = /^(https?):\/\/\[?([^\]/:]+)/i.exec(String(url || ''));
+  if (!m) return null;
+  const [, scheme, host] = m;
+  if (scheme.toLowerCase() === 'https') return null;
+  if (/\.ts\.net$/i.test(host) || host === 'localhost' || host === '127.0.0.1') return null;
+  const octets = host.split('.').map(Number);
+  if (octets.length === 4 && octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) return null;
+  return 'This address is not a Tailscale one, so the app talks to it unencrypted: anyone on the same Wi-Fi '
+    + 'could read your sign-in and photos. Use the PC\'s Tailscale address (tailscale ip -4 on the PC) instead.';
+}
+
 // Wraps fetch so a transport failure says what could not be reached. RN throws
 // a bare TypeError("Network request failed") for DNS failures, refused
 // connections, ATS/cleartext blocks and timeouts alike.
@@ -120,6 +143,7 @@ export async function pingServer() {
 // build a URL synchronously, in render, and SecureStore is async — so the
 // live token is mirrored here every time it is read or written.
 let cachedAccessToken = null;
+let cachedMediaToken = null;
 
 /** Whether a token is in memory yet — mediaUrl() is only usable once it is. */
 export const hasCachedAccessToken = () => Boolean(cachedAccessToken);
@@ -127,6 +151,7 @@ export const hasCachedAccessToken = () => Boolean(cachedAccessToken);
 export async function getAccessToken() {
   if (cachedAccessToken) return cachedAccessToken;
   cachedAccessToken = await SecureStore.getItemAsync(ACCESS_KEY);
+  if (!cachedMediaToken) cachedMediaToken = await SecureStore.getItemAsync(MEDIA_KEY).catch(() => null);
   return cachedAccessToken;
 }
 
@@ -135,32 +160,66 @@ export async function getRefreshToken() {
   return SecureStore.getItemAsync(REFRESH_KEY);
 }
 
-export async function setTokens({ accessToken, refreshToken }) {
+export async function setTokens({ accessToken, refreshToken, mediaToken }) {
   cachedAccessToken = accessToken;
   await SecureStore.setItemAsync(ACCESS_KEY, accessToken);
   if (refreshToken) await SecureStore.setItemAsync(REFRESH_KEY, refreshToken);
+  if (mediaToken) {
+    cachedMediaToken = mediaToken;
+    await SecureStore.setItemAsync(MEDIA_KEY, mediaToken);
+  }
 }
 
 export async function clearTokens() {
   cachedAccessToken = null;
+  cachedMediaToken = null;
   await SecureStore.deleteItemAsync(ACCESS_KEY);
   await SecureStore.deleteItemAsync(REFRESH_KEY);
+  await SecureStore.deleteItemAsync(MEDIA_KEY).catch(() => {});
 }
 
-async function refreshAccessToken() {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) throw new Error('No refresh token');
+/**
+ * Logs out on the server as well as here: the sign-in this phone held stops
+ * working everywhere, not just on this phone. Never blocks logging out; a
+ * server that cannot be reached still gets the phone signed out.
+ */
+export async function logout() {
+  const refreshToken = await getRefreshToken().catch(() => null);
+  if (refreshToken) {
+    await request(`${currentUrl}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    }).catch(() => {});
+  }
+  disconnectSocket();
+  await clearTokens();
+}
 
-  const res = await request(`${currentUrl}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  });
-  if (!res.ok) throw new Error('Refresh failed');
+// One refresh at a time. A refresh token is replaced each time it is used,
+// so two screens refreshing at once with the same one would leave the second
+// holding a token the server has already swapped out; they share one instead.
+let refreshing = null;
 
-  const tokens = await res.json();
-  await setTokens(tokens);
-  return tokens.accessToken;
+function refreshAccessToken() {
+  if (!refreshing) {
+    refreshing = (async () => {
+      const refreshToken = await getRefreshToken();
+      if (!refreshToken) throw new Error('No refresh token');
+
+      const res = await request(`${currentUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (!res.ok) throw new Error('Refresh failed');
+
+      const tokens = await res.json();
+      await setTokens(tokens);
+      return tokens.accessToken;
+    })().finally(() => { refreshing = null; });
+  }
+  return refreshing;
 }
 
 // Thin fetch wrapper: attaches the bearer token, retries once on 401 after
@@ -238,7 +297,21 @@ export function isUnpaired(error) {
 export function mediaUrl(key) {
   if (!key) return null;
   const base = `${currentUrl}/media/${key}`;
+  // The photo-only token: it opens your own pair's pictures and nothing
+  // else, so a URL left in a cache is not a way into the account. Before the
+  // first refresh after an update there is none yet, and the access token
+  // stands in, as it always used to.
+  if (cachedMediaToken) return `${base}?mt=${encodeURIComponent(cachedMediaToken)}`;
   return cachedAccessToken ? `${base}?token=${encodeURIComponent(cachedAccessToken)}` : base;
+}
+
+/**
+ * A pass into one room on the call media server (docker/calls), which lets
+ * nobody in without one. Null when the server does not ask for passes.
+ */
+export async function sfuPass(room) {
+  const data = await apiFetch(`/calls/sfu-pass?room=${encodeURIComponent(room)}`);
+  return data?.pass || null;
 }
 
 // ---------------------------------------------------------------- socket

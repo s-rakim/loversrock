@@ -1,4 +1,5 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 import { query } from './db.js';
 
 let app = null;
@@ -63,8 +64,8 @@ function getApp() {
   // mangled by a shell, is the usual way this goes wrong. Say so once and run
   // without push, rather than throwing on every send.
   try {
-    app = admin.initializeApp({
-      credential: admin.credential.cert(JSON.parse(raw)),
+    app = initializeApp({
+      credential: cert(JSON.parse(raw)),
     });
   } catch (err) {
     lastSetupError = `FIREBASE_SERVICE_ACCOUNT_JSON is not a usable service account: ${err.message}`;
@@ -124,7 +125,7 @@ export async function sendToTokens(tokens, { notification, data, channel, priori
       : {}),
   };
 
-  const result = await admin.messaging(firebaseApp).sendEachForMulticast(message);
+  const result = await getMessaging(firebaseApp).sendEachForMulticast(message);
 
   let pruned = 0;
   if (result.failureCount > 0 && Array.isArray(result.responses)) {

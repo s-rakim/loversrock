@@ -61,8 +61,10 @@ export default function PairingScreen({ navigation }) {
           <Text style={font.h2}>Generate an invite</Text>
           {inviteCode ? (
             <View style={{ marginTop: spacing.md }}>
-              <Text style={styles.code}>{inviteCode}</Text>
-              <Text style={font.muted}>Expires {new Date(expiresAt).toLocaleDateString()}</Text>
+              <Text style={styles.code} numberOfLines={1} adjustsFontSizeToFit selectable>{inviteCode}</Text>
+              <Text style={font.muted}>
+                Good for a day: until {new Date(expiresAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
+              </Text>
               <MorphButton
                 onPress={() => Share.share({ message: `Pair with me on loversrock. — invite code: ${inviteCode}` })}
                 style={styles.secondaryButton}
@@ -83,12 +85,13 @@ export default function PairingScreen({ navigation }) {
         <View style={styles.card}>
           <Text style={font.h2}>Have a code?</Text>
           <TextInput
-            placeholder="6-character code"
+            placeholder="Invite code, e.g. ABCDE-FGHJK"
             placeholderTextColor={colors.textMuted}
             value={enteredCode}
             onChangeText={setEnteredCode}
             autoCapitalize="characters"
-            maxLength={6}
+            autoCorrect={false}
+            maxLength={16}
             style={styles.input}
           />
           <MorphButton onPress={acceptInvite} disabled={loading} style={styles.primaryButton}>
@@ -111,7 +114,7 @@ const makeStyles = (colors) =>
     borderWidth: 1,
     borderColor: colors.border,
   },
-  code: { fontSize: 32, fontWeight: '800', color: colors.accent, letterSpacing: 4, marginBottom: spacing.xs },
+  code: { fontSize: 28, fontWeight: '800', color: colors.accent, letterSpacing: 2, marginBottom: spacing.xs },
   input: {
     backgroundColor: colors.surfaceAlt,
     color: colors.text,

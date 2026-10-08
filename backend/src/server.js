@@ -1,4 +1,8 @@
 import 'dotenv/config';
+import { assertSecrets } from './config/secrets.js';
+// Before anything is served: a placeholder or short secret stops the server
+// here, with the command that fixes it (see config/secrets.js).
+assertSecrets();
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
@@ -6,8 +10,9 @@ import { createServer } from 'http';
 import { initSockets } from './sockets/index.js';
 import { startCronJobs } from './cron/index.js';
 import { refreshSharedAiConfig } from './models/fableAi.js';
+import { resealApiKeys } from './models/aiConnections.js';
 import { ensureBucket, getObjectStream, statObject } from './config/storage.js';
-import { requireAuthAllowingQuery } from './middleware/auth.js';
+import { requireMediaAuth, mayReadMedia } from './middleware/auth.js';
 import { wrapAsync } from './lib/asyncRouter.js';
 
 import authRoutes from './routes/auth.js';
@@ -41,6 +46,10 @@ const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').filter(Boolean);
 
 app.use(cors({ origin: corsOrigins.length ? corsOrigins : true, credentials: true }));
 app.use(express.json({ limit: '15mb' })); // base64 image uploads
+
+// Files are served as the type they were stored with, never sniffed by a
+// browser into something else (an "image" read as a page).
+app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -77,7 +86,7 @@ app.use('/fable', fableRoutes);
 /** image/jpeg for a .jpg, and so on. */
 const EXTENSION_TYPES = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif',
-  webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', bmp: 'image/bmp',
+  webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', bmp: 'image/bmp', avif: 'image/avif',
 };
 
 function contentTypeFor(key, meta) {
@@ -93,13 +102,16 @@ function contentTypeFor(key, meta) {
 // Auth-gated media streaming out of MinIO — mobile clients never get direct
 // storage credentials or presigned URLs, everything proxies through here.
 //
-// The token may arrive in the query string here (see requireAuthAllowingQuery):
+// The credential may arrive in the query string here (see requireMediaAuth):
 // the native image loaders cannot attach headers, so header-only auth meant
 // every photo in the app came back 401 and rendered as nothing.
 app.get(
   '/media/:key(*)',
-  wrapAsync(requireAuthAllowingQuery),
+  wrapAsync(requireMediaAuth),
   wrapAsync(async (req, res) => {
+    // Your own pair's files only. The same 404 as a missing file, so a
+    // stranger cannot even learn that a key exists.
+    if (!(await mayReadMedia(req.userId, req.params.key))) return res.status(404).json({ error: 'Not found' });
     try {
       // Without a Content-Type the iOS image loader refuses the bytes
       // outright and Android only guesses right by luck, so the stored
@@ -153,6 +165,9 @@ ensureBucket()
       console.log(`[server] listening on :${PORT}`);
       // A key added in the app can also write the daily content (aiShared.js);
       // loaded before the first cron tick needs it.
-      refreshSharedAiConfig().finally(startCronJobs);
+      resealApiKeys()
+        .then((n) => { if (n) console.log(`[secrets] ${n} saved AI key(s) sealed again under the new FABLE_KEY_SECRET`); })
+        .catch((err) => console.error('[secrets] could not re-seal saved AI keys:', err.message))
+        .finally(() => refreshSharedAiConfig().finally(startCronJobs));
     });
   });

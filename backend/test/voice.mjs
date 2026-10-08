@@ -133,7 +133,8 @@ check('no signature at all is refused', naked.status === 403, naked.status);
 
 // A correctly signed link for someone outside the pair — the signature is
 // valid, the person is not.
-const sign = (id, user, e) => crypto.createHmac('sha256', process.env.JWT_ACCESS_SECRET)
+const { purposeKey } = await import('../src/config/secrets.js');
+const sign = (id, user, e) => crypto.createHmac('sha256', purposeKey('voice-link'))
   .update(`voice:${id}:${user}:${e}`).digest('base64url');
 const future = Math.floor(Date.now() / 1000) + 600;
 const outsider = await raw(`/voice/${voiceId}/audio?u=${C.id}&e=${future}&s=${sign(voiceId, C.id, future)}`);

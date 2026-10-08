@@ -106,8 +106,8 @@ section('PAIRING / TIMEZONE PINNING / UNLINK');
 check('unpaired user is blocked from pair data', (await req('/bucket-list', { token: A.token })).status === 403);
 
 const invite = await req('/auth/invite', { method: 'POST', token: A.token, body: { deviceTimezone: PAIR_TZ } });
-check('invite generates 6-char code', invite.status === 201 && invite.data.inviteCode?.length === 6, invite.data);
-check('invite has ~7-day expiry', Math.round((new Date(invite.data.expiresAt) - Date.now()) / 86400000) === 7);
+check('invite generates a 10-character code, shown XXXXX-XXXXX', invite.status === 201 && /^[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(invite.data.inviteCode || ''), invite.data);
+check('invite expires in a day', Math.round((new Date(invite.data.expiresAt) - Date.now()) / 3600000) === 24);
 check('invite requires deviceTimezone', (await req('/auth/invite', { method: 'POST', token: B.token, body: {} })).status === 400);
 check('inviter cannot accept own invite', (await req('/auth/invite/accept', { method: 'POST', token: A.token, body: { inviteCode: invite.data.inviteCode } })).status === 400);
 check('bad invite code rejected', (await req('/auth/invite/accept', { method: 'POST', token: B.token, body: { inviteCode: 'ZZZZZZ' } })).status === 404);

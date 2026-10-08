@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { getActivePairForUser } from '../models/pairs.js';
+import { stillValid } from '../models/sessions.js';
 
 // Held so the REST routes can push to a pair room after they change state.
 // A game move arrives as an HTTP POST, not a socket event - the socket is
@@ -27,6 +28,7 @@ export function initSockets(httpServer, corsOrigins) {
       if (!token) return next(new Error('Missing token'));
 
       const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+      if (!(await stillValid(payload))) return next(new Error('Unauthorized'));
       const pair = await getActivePairForUser(payload.sub);
       if (!pair) return next(new Error('Not currently paired'));
 
@@ -43,6 +45,9 @@ export function initSockets(httpServer, corsOrigins) {
   io.on('connection', (socket) => {
     const room = `pair:${socket.pairId}`;
     socket.join(room);
+    // Its own room too, so a password change or "sign out everywhere" can
+    // drop exactly this person's connections (routes/auth.js).
+    socket.join(`user:${socket.userId}`);
 
     const broadcast = (event, payload) => {
       socket.to(room).emit(event, { ...payload, fromUserId: socket.userId });

@@ -285,6 +285,8 @@ async function askModels(base, apiKey, extra = {}, fetchImpl = fetch) {
  */
 export async function probe({ baseURL, apiKey, extra = {}, fetchImpl = fetch }) {
   const tried = [];
+  const refused = addressProblem(baseURL);
+  if (refused) return { ok: false, error: refused, tried };
   for (const base of candidates(baseURL)) {
     const result = await askModels(base, apiKey, extra, fetchImpl);
     tried.push({ baseURL: base, ok: result.ok, error: result.error });
@@ -344,10 +346,24 @@ export async function tryKey({ baseURL, apiKey, model, models, extra = {}, fetch
 
 // -------------------------------------------------------------- the rows
 
+const sealKey = (secret) => crypto.createHash('sha256').update(`loversrock-ai-keys:${secret}`).digest();
+
 function sealSecret() {
   const secret = process.env.FABLE_KEY_SECRET || process.env.JWT_REFRESH_SECRET;
   if (!secret) throw new Error('JWT_REFRESH_SECRET is not set, so API keys cannot be stored safely');
-  return crypto.createHash('sha256').update(`loversrock-ai-keys:${secret}`).digest();
+  return sealKey(secret);
+}
+
+/**
+ * Secrets keys may have been sealed under before: FABLE_KEY_SECRET_OLD (put
+ * there by docker/secure-setup.mjs when it changes the seal) and
+ * JWT_REFRESH_SECRET (the seal when FABLE_KEY_SECRET was empty).
+ */
+function previousSeals() {
+  const current = process.env.FABLE_KEY_SECRET || process.env.JWT_REFRESH_SECRET;
+  return [...new Set([process.env.FABLE_KEY_SECRET_OLD, process.env.JWT_REFRESH_SECRET])]
+    .filter((s) => s && s !== current)
+    .map(sealKey);
 }
 
 export function sealApiKey(plain) {
@@ -357,11 +373,11 @@ export function sealApiKey(plain) {
   return ['v1', iv.toString('base64'), cipher.getAuthTag().toString('base64'), body.toString('base64')].join(':');
 }
 
-export function openApiKey(sealed) {
+function openWith(key, sealed) {
   try {
     const [v, iv, tag, body] = String(sealed).split(':');
     if (v !== 'v1') return null;
-    const decipher = crypto.createDecipheriv('aes-256-gcm', sealSecret(), Buffer.from(iv, 'base64'));
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64'));
     decipher.setAuthTag(Buffer.from(tag, 'base64'));
     return Buffer.concat([decipher.update(Buffer.from(body, 'base64')), decipher.final()]).toString('utf8');
   } catch {
@@ -369,7 +385,66 @@ export function openApiKey(sealed) {
   }
 }
 
+/** A saved key, opened with the current seal or, failing that, a previous one. */
+export function openApiKey(sealed) {
+  const now = openWith(sealSecret(), sealed);
+  if (now !== null) return now;
+  for (const key of previousSeals()) {
+    const old = openWith(key, sealed);
+    if (old !== null) return old;
+  }
+  return null;
+}
+
+/**
+ * Saved keys still sealed under a previous secret are sealed again under the
+ * current one, so FABLE_KEY_SECRET can change without anyone pasting a key
+ * again. Run at startup; returns how many were moved over.
+ */
+export async function resealApiKeys() {
+  const olds = previousSeals();
+  if (!olds.length) return 0;
+  const current = sealSecret();
+  let moved = 0;
+  for (const table of ['ai_connections', 'ai_keys']) {
+    const keyCols = table === 'ai_connections' ? ['pair_id', 'name'] : ['pair_id', 'provider'];
+    const { rows } = await query(`SELECT ${keyCols.join(', ')}, key_enc FROM ${table} WHERE key_enc IS NOT NULL`);
+    for (const row of rows) {
+      if (openWith(current, row.key_enc) !== null) continue;
+      const plain = olds.map((k) => openWith(k, row.key_enc)).find((p) => p !== null);
+      if (plain == null) continue;
+      await query(`UPDATE ${table} SET key_enc = $3 WHERE ${keyCols[0]} = $1 AND ${keyCols[1]} = $2`, [row[keyCols[0]], row[keyCols[1]], sealApiKey(plain)]);
+      moved++;
+    }
+  }
+  return moved;
+}
+
 export class ConnectionError extends Error {}
+
+// The PC's own services, which a connection must never be pointed at: the
+// other containers by name, and the ports the database, photo storage, this
+// backend and the call servers listen on. A connection is a URL the backend
+// fetches; aimed at one of these it would be a way to poke at them from
+// inside. Ollama, LM Studio and Free Claude Code on the PC stay reachable.
+const INTERNAL_HOSTS = new Set(['postgres', 'minio', 'backend', 'calls', 'coturn', 'metadata.google.internal']);
+const INFRA_PORTS = new Set(['5432', '6379', '9000', '9001', '3478', '4100', '4101']);
+
+/** Why an address may not be used for a connection, or null when it may. */
+export function addressProblem(raw) {
+  let url;
+  try { url = new URL(String(raw)); } catch { return null; }
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+  if (INTERNAL_HOSTS.has(host)) return `"${host}" is one of the server's own services, not an AI.`;
+  if (/^169\.254\./.test(host) || host === 'fd00:ec2::254') return 'That address is a cloud metadata service, not an AI.';
+  const ownPort = String(process.env.PORT || 4000);
+  const local = /^(localhost|127\.|0\.0\.0\.0|::1$|host\.docker\.internal|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(host);
+  if (local && (INFRA_PORTS.has(port) || port === ownPort)) {
+    return `Port ${port} on that machine is the server's own (database, storage, calls or this backend), not an AI.`;
+  }
+  return null;
+}
 
 /** A name has to survive being put in a URL. */
 export function checkName(raw) {
@@ -428,6 +503,8 @@ export async function saveConnection(pairId, userId, { name, baseURL, model, api
   const old = existing[0];
   const url = String(baseURL ?? old?.base_url ?? '').trim().replace(/\/+$/, '');
   if (url && !/^https?:\/\/\S+$/i.test(url)) throw new ConnectionError('The address must start with http:// or https://');
+  const refused = url && addressProblem(url);
+  if (refused) throw new ConnectionError(refused);
   let keyEnc = old?.key_enc ?? null;
   if (apiKey !== undefined) {
     const key = cleanKey(apiKey);

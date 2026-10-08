@@ -33,23 +33,65 @@ index ffc8bc8..1de52b1 100644
  
  	if len(allowedInterfaces) > 0 {
 diff --git a/server/wssub.go b/server/wssub.go
-index 3da613b..85195f6 100644
+index 3da613b..969f59c 100644
 --- a/server/wssub.go
 +++ b/server/wssub.go
-@@ -2,7 +2,9 @@ package server
+@@ -1,8 +1,14 @@
+ package server
  
  import (
++	"crypto/hmac"
++	"crypto/sha256"
++	"encoding/base64"
  	"net/http"
 +	"os"
  	"path"
++	"strconv"
 +	"strings"
  	"sync"
  	"time"
  
-@@ -81,8 +83,19 @@ func (w *WebsocketContext) Close(statusCode websocket.StatusCode, reason string)
+@@ -77,12 +83,56 @@ func (w *WebsocketContext) Close(statusCode websocket.StatusCode, reason string)
+ 	return errors.Trace(err)
+ }
+ 
++// validJoinPass checks a pass the loversrock backend signed for one room.
++func validJoinPass(secret, room, pass string, now time.Time) bool {
++	dot := strings.IndexByte(pass, '.')
++	if dot <= 0 {
++		return false
++	}
++
++	expiry, err := strconv.ParseInt(pass[:dot], 10, 64)
++	if err != nil || now.Unix() > expiry {
++		return false
++	}
++
++	mac := hmac.New(sha256.New, []byte(secret))
++	mac.Write([]byte("join:" + room + ":" + pass[:dot]))
++	want := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
++
++	return hmac.Equal([]byte(want), []byte(pass[dot+1:]))
++}
++
+ // NewWebsocketContext initializes a new websocket connection. Users must
  // remember to call WebsocketContext.Close after they are done with the
  // connection.
  func (wss *WSS) NewWebsocketContext(w http.ResponseWriter, r *http.Request) (*WebsocketContext, error) {
++	// loversrock: with PEERCALLS_JOIN_SECRET set, a room can only be joined
++	// with a pass the backend signed for it (routes/calls.js, /calls/sfu-pass):
++	// ?t=<expiry unix seconds>.<base64url HMAC-SHA256(secret, "join:<room>:<expiry>")>.
++	// Without one this server would carry media for anyone who reached it.
++	if secret := os.Getenv("PEERCALLS_JOIN_SECRET"); secret != "" {
++		room := path.Base(path.Dir(r.URL.Path))
++		if !validJoinPass(secret, room, r.URL.Query().Get("t"), time.Now()) {
++			prometheusWSConnErrTotal.Inc()
++			http.Error(w, "a valid join pass is required", http.StatusForbidden)
++
++			return nil, errors.Errorf("no valid join pass for room %q", room)
++		}
++	}
++
 +	// loversrock: the phones are the client, not a page served from here, so
 +	// which origins may connect is configurable (PEERCALLS_WS_ORIGIN_PATTERNS,
 +	// comma-separated, e.g. "*"). Unset, only the same origin, as before.

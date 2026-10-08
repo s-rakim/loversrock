@@ -65,6 +65,7 @@ import PerfectPairScreen from './app/games/PerfectPairScreen';
 import LoveLettersScreen from './app/games/LoveLettersScreen';
 import VoiceNotesScreen from './app/VoiceNotesScreen';
 import SharedItemsScreen from './app/SharedItemsScreen';
+import SafetyNumberScreen from './app/SafetyNumberScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -330,6 +331,7 @@ function Root() {
             <Stack.Screen name="Wallpaper" component={WallpaperScreen} options={{ title: 'Wallpaper' }} />
             <Stack.Screen name="SharedItems" component={SharedItemsScreen} options={{ title: 'Shared in the chat' }} />
             <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: 'Diagnostics' }} />
+            <Stack.Screen name="SafetyNumber" component={SafetyNumberScreen} options={{ title: 'Encryption' }} />
             <Stack.Screen name="Wardrobe" component={WardrobeScreen} options={{ title: 'Your character' }} />
             {/* Fable: its own screen, opened from its button on Home, with a
                 back arrow rather than living behind chips inside the chat. */}

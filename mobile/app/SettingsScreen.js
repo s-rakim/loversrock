@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Alert, Switch, ScrollView } from 'react-native'
 import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { apiFetch, clearTokens, disconnectSocket } from '../services/api';
+import { apiFetch, logout as signOut } from '../services/api';
 import Constants from 'expo-constants';
 import {
   clearWidgets,
@@ -26,6 +26,7 @@ import CallReadinessCard from '../components/CallReadinessCard';
 import { spacing, radius } from '../theme';
 import { FadeInUp, MorphButton } from '../components/Motion';
 import ConnectionCard from '../components/ConnectionCard';
+import AccountSecurityCard from '../components/AccountSecurityCard';
 import ColorPicker from '../components/ColorPicker';
 import { useLanguage } from '../components/LanguageContext';
 import Icon3D from '../components/Icon3D';
@@ -136,8 +137,8 @@ export default function SettingsScreen() {
 
   async function logout() {
     await clearWidgets();
-    await clearTokens();
-    disconnectSocket();
+    // Ends this sign-in on the server too, not only on this phone.
+    await signOut();
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   }
 
@@ -631,6 +632,17 @@ export default function SettingsScreen() {
             <Text style={font.muted}>Choose the AI in your group chat and add your own API keys.</Text>
           </View>
         </MorphButton>
+      </FadeInUp>
+
+      <FadeInUp delay={96}>
+        <MorphButton onPress={() => navigation.navigate('SafetyNumber')} style={styles.actionRow}>
+          <Icon name="lock-closed" chip chipColor={colors.surfaceAlt} color={colors.success} />
+          <View style={{ flex: 1 }}>
+            <Text style={font.body}>Encryption</Text>
+            <Text style={font.muted}>What is end-to-end encrypted, and the safety number to check it.</Text>
+          </View>
+        </MorphButton>
+        <AccountSecurityCard style={styles.actionRow} />
       </FadeInUp>
 
       <FadeInUp delay={98}>

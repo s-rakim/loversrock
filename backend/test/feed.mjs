@@ -8,6 +8,8 @@
 // adding things while the other scrolls. Those are what this hammers.
 const API = 'http://localhost:4000';
 const stamp = Date.now();
+// A real one-pixel picture: uploads are checked to be images.
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 let pass = 0; const fails = [];
 const check = (n, c, d) => { if (c) { pass++; console.log(`  PASS  ${n}`); } else { fails.push(n); console.log(`  FAIL  ${n} :: ${JSON.stringify(d)?.slice(0, 300)}`); } };
 
@@ -56,7 +58,7 @@ check('and the question', typeof prompt.title === 'string' && prompt.title.lengt
 check('exactly once, not once per answer', whole.data.items.filter((i) => i.kind === 'prompt').length === 1);
 
 console.log('\n=== EVERY SOURCE LANDS IN IT ===');
-await req('/memories', { method: 'POST', token: A.token, body: { image: `data:image/png;base64,${Buffer.from('x'.repeat(40)).toString('base64')}`, caption: 'a memory' } });
+await req('/memories', { method: 'POST', token: A.token, body: { image: PNG, caption: 'a memory' } });
 await req('/canvas', { method: 'POST', token: B.token, body: { strokeData: { strokes: [{ points: [{ x: 1, y: 1 }, { x: 5, y: 9 }], color: '#FF5C8D', width: 6, tool: 'pen' }] }, title: 'a drawing' } });
 const bucket = await req('/bucket-list', { method: 'POST', token: A.token, body: { title: 'see the northern lights' } });
 await req(`/bucket-list/${bucket.data.item.id}`, { method: 'PATCH', token: B.token, body: { isCompleted: true } });
@@ -127,7 +129,7 @@ check('a page comes back at the size asked for', page1.data.items.length === 5, 
 check('with a cursor', Boolean(page1.data.nextCursor), page1.data.nextCursor);
 
 // Something new lands between the two requests.
-await req('/memories', { method: 'POST', token: B.token, body: { image: `data:image/png;base64,${Buffer.from('y'.repeat(40)).toString('base64')}`, caption: 'added mid-scroll' } });
+await req('/memories', { method: 'POST', token: B.token, body: { image: PNG, caption: 'added mid-scroll' } });
 
 const c = page1.data.nextCursor;
 const page2 = await req(`/feed?limit=5&cursorAt=${encodeURIComponent(c.at)}&cursorId=${c.id}`, { token: A.token });

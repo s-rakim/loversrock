@@ -6,8 +6,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-loversrock}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-loversrock}
       POSTGRES_DB: ${POSTGRES_DB:-loversrock}
+    # Only this PC can reach it (127.0.0.1): the backend reaches it inside
+    # Docker by name, and nothing on the Wi-Fi or the tailnet needs it. It
+    # used to be published on every interface with the default password.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -35,9 +38,12 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-loversrock}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-loversrock123}
+    # This PC only, like Postgres: the backend is the only thing that talks
+    # to storage, and it does so inside Docker. The console stays at
+    # http://localhost:9001 on the PC itself.
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - miniodata:/data
     healthcheck:
@@ -69,7 +75,7 @@ services:
     restart: unless-stopped
     command: >
       -c /etc/coturn/turnserver.conf
-      --static-auth-secret=${TURN_SECRET:-change-me-turn-secret}
+      --static-auth-secret=${TURN_SECRET:?TURN_SECRET is not set in docker/.env - run node docker/secure-setup.mjs}
       --external-ip=${TURN_PUBLIC_IP:-127.0.0.1}
       --min-port=${TURN_MIN_PORT:-49160}
       --max-port=${TURN_MAX_PORT:-49180}
@@ -105,6 +111,10 @@ services:
       PEERCALLS_ICE_SERVER_URLS: ""
       PEERCALLS_NAT1TO1_IPS: ${CALLS_PUBLIC_IP:-${TURN_PUBLIC_IP:-}}
       PEERCALLS_WS_ORIGIN_PATTERNS: "*"
+      # Joining a room takes a pass the backend signed for that room, so only
+      # calls the backend set up get media carried. Empty: anyone who reaches
+      # port 4100 can (how it was). docker/secure-setup.mjs sets it.
+      PEERCALLS_JOIN_SECRET: ${CALLS_SECRET:-}
     ports:
       - "0.0.0.0:4100:4100/tcp"
       - "0.0.0.0:4101:4101/tcp"
@@ -145,14 +155,22 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-loversrock}:${POSTGRES_PASSWORD:-loversrock}@postgres:5432/${POSTGRES_DB:-loversrock}
       STORAGE_ENDPOINT: minio
       STORAGE_PORT: "9000"
+      # The same credentials MinIO was started with, so changing its password
+      # in docker/.env (docker/secure-setup.mjs does) cannot leave the
+      # backend holding the old one.
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-loversrock}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-loversrock123}
       # The backend mints short-lived TURN credentials from this secret, so
       # it must be the same string coturn was started with.
-      TURN_SECRET: ${TURN_SECRET:-change-me-turn-secret}
+      # No default: the old one was public. docker/secure-setup.mjs makes one.
+      TURN_SECRET: ${TURN_SECRET:?TURN_SECRET is not set in docker/.env - run node docker/secure-setup.mjs}
       TURN_PUBLIC_IP: ${TURN_PUBLIC_IP:-}
       # The call media server: where the phones reach it (this port, on the
       # address they reach the backend on) and where the backend checks it
       # is up before offering it.
       CALLS_SFU_PORT: "4100"
+      # Signs the passes the call server checks (PEERCALLS_JOIN_SECRET above).
+      CALLS_SECRET: ${CALLS_SECRET:-}
       CALLS_SFU_HEALTH: http://calls:4100
     ports:
       # 0.0.0.0 on purpose: the phone reaches this over the Tailscale interface,

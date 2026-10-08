@@ -6,6 +6,7 @@ import {
   pingServer,
   resetApiUrl,
   setApiUrl,
+  cleartextRisk,
 } from '../services/api';
 import { provisionWidgets } from '../services/widgetBridge';
 import Icon from './Icon';
@@ -101,6 +102,16 @@ export default function ServerAddress({ compact = false }) {
         style={styles.input}
       />
 
+      {/* Plain http to a Wi-Fi address carries everything readable. */}
+      {value.trim() && cleartextRisk(/^https?:\/\//i.test(value.trim()) ? value.trim() : `http://${value.trim()}`) ? (
+        <View style={styles.risk}>
+          <Icon name="alert-circle" size={16} color={colors.danger} />
+          <Text style={[font.muted, { flex: 1, color: colors.danger }]}>
+            {cleartextRisk(/^https?:\/\//i.test(value.trim()) ? value.trim() : `http://${value.trim()}`)}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.buttonRow}>
         <View style={styles.buttonSlot}>
           <MorphButton onPress={save} disabled={busy} style={[styles.button, styles.primary]}>
@@ -137,6 +148,7 @@ const makeStyles = (colors) =>
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   hint: { fontSize: 12, marginTop: spacing.xs, marginBottom: spacing.sm },
+  risk: { flexDirection: 'row', gap: spacing.xs, alignItems: 'flex-start', marginTop: spacing.xs },
   input: {
     backgroundColor: 'transparent', color: colors.text, borderRadius: radius.md,
     padding: spacing.md, borderWidth: 1, borderColor: colors.border,

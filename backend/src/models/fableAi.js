@@ -14,7 +14,7 @@ import { query } from '../config/db.js';
 import { PROVIDER_URLS, serverLlmConfig, networkError } from './quizGenerator.js';
 import { setSharedAiConfig } from './aiShared.js';
 import {
-  resolveConnection, listConnections, probe, headersFor, asSent, explain, migrateLegacy,
+  resolveConnection, listConnections, probe, headersFor, asSent, explain, migrateLegacy, addressProblem,
 } from './aiConnections.js';
 
 const TIMEOUT_MS = 60_000;
@@ -138,6 +138,8 @@ export async function resolveConfig(pairId, settings, { connection: override } =
   if (!conn) return { problem: `There is no connection called "${name}" any more. Choose another on the setup page.` };
   if (conn.keyUnreadable) return { problem: `The key saved on "${name}" can no longer be read (the server's secret changed). Paste it again.` };
   if (!conn.baseURL) return { problem: `"${name}" has no address. Add one on the setup page.` };
+  const refused = addressProblem(conn.baseURL);
+  if (refused) return { problem: `"${name}": ${refused}` };
   if (!conn.apiKey && !isLocal(conn.baseURL)) return { problem: `"${name}" has no API key. Paste one on the setup page.` };
   if (!conn.model) return { problem: `"${name}" has no model chosen. Press Find on it to pick one.` };
   return { config: conn };

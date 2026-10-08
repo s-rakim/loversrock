@@ -55,6 +55,10 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Missing info', 'Please fill in every field.');
       return;
     }
+    if (mode === 'signup' && password.length < 8) {
+      Alert.alert('A longer password', 'Use at least 8 characters.');
+      return;
+    }
     setLoading(true);
     try {
       const path = mode === 'login' ? '/auth/login' : '/auth/signup';
@@ -62,7 +66,7 @@ export default function LoginScreen({ navigation }) {
         ? { email, password }
         : { name, email, password, cycleRole };
       const data = await apiFetch(path, { method: 'POST', body });
-      await setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+      await setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken, mediaToken: data.mediaToken });
 
       // Hands the home/lock screen widgets their own scoped token. No-ops in
       // Expo Go, where the native widget module isn't present.
@@ -149,7 +153,7 @@ export default function LoginScreen({ navigation }) {
           style={styles.input}
         />
         <TextInput
-          placeholder="Password"
+          placeholder={mode === 'signup' ? 'Password (at least 8 characters)' : 'Password'}
           placeholderTextColor={colors.textMuted}
           value={password}
           onChangeText={setPassword}

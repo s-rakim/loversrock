@@ -31,6 +31,12 @@ export const SERVER_PEER = '__SERVER__';
 const TRACK_ADDED = 1;
 const TRACK_SUB = 3;
 
+/** ws://host:4100/ws/<room>/<client>, with the join pass when there is one. */
+export function roomAddress(url, room, clientId, pass = null) {
+  const base = `${String(url).replace(/\/+$/, '')}/${encodeURIComponent(room)}/${encodeURIComponent(clientId)}`;
+  return pass ? `${base}?t=${encodeURIComponent(pass)}` : base;
+}
+
 /** A random id for this phone in the room; the server keys everything by it. */
 export function newClientId(prefix = 'p') {
   const rand = () => Math.random().toString(36).slice(2, 10);
@@ -45,13 +51,14 @@ export class SfuSession {
    */
   constructor({
     url, room, clientId, nickname = '', stream, webrtc, iceServers = [],
+    pass = null, getPass = null,
     WebSocketImpl = globalThis.WebSocket,
     onRemoteStream = () => {}, onIceState = () => {}, onPeerLeft = () => {}, onClosed = () => {},
     log = () => {},
   }) {
     Object.assign(this, {
       url, room, clientId, nickname, stream, webrtc, iceServers, WebSocketImpl,
-      onRemoteStream, onIceState, onPeerLeft, onClosed, log,
+      pass, getPass, onRemoteStream, onIceState, onPeerLeft, onClosed, log,
     });
     this.pc = null;
     this.ws = null;
@@ -64,9 +71,26 @@ export class SfuSession {
     this.queue = Promise.resolve();
   }
 
+  /**
+   * Connects. With `getPass`, a pass into this room is asked of our own
+   * backend first (GET /calls/sfu-pass): the call server lets nobody into a
+   * room without one. A fresh pass for every join, so a call that rejoins
+   * hours in still gets in.
+   */
   start() {
-    const address = `${this.url.replace(/\/+$/, '')}/${encodeURIComponent(this.room)}/${encodeURIComponent(this.clientId)}`;
-    this.log('connect', address);
+    if (this.getPass && !this.pass) {
+      Promise.resolve()
+        .then(() => this.getPass(this.room))
+        .then((pass) => { this.pass = pass || null; }, (err) => this.log('no pass', err?.message || ''))
+        .then(() => { if (!this.closed) this.connect(); });
+      return this;
+    }
+    return this.connect();
+  }
+
+  connect() {
+    const address = roomAddress(this.url, this.room, this.clientId, this.pass);
+    this.log('connect', address.replace(/\?t=.*$/, '?t=…'));
     const ws = new this.WebSocketImpl(address);
     this.ws = ws;
     ws.onopen = () => this.send('ready', { nickname: this.nickname });

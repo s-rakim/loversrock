@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 # ffmpeg: the voice-note effects (src/models/voiceFilters.js).
 RUN apk add --no-cache ffmpeg

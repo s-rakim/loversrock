@@ -9,7 +9,7 @@
 //
 // Each failure says what to change on the PC, because that is where every
 // one of them is fixed.
-import { SfuSession, newClientId } from './sfu';
+import { SfuSession, newClientId, roomAddress } from './sfu';
 
 const SOCKET_MS = 6000;
 const MEDIA_MS = 12000;
@@ -20,20 +20,31 @@ const MEDIA_MS = 12000;
  * { ok, step: 'socket' | 'media' | 'done', detail }.
  */
 export async function testCallServer({
-  url, webrtc, getStream, WebSocketImpl = globalThis.WebSocket,
+  url, webrtc, getStream, getPass = null, WebSocketImpl = globalThis.WebSocket,
   socketMs = SOCKET_MS, mediaMs = MEDIA_MS,
 }) {
   if (!url) return { ok: false, step: 'socket', detail: 'The server did not offer a call server.' };
 
   // 1. The websocket on its own, so a refused connection is told apart from
   // media that never arrives.
+  // The call server asks for a pass into the room (CALLS_SECRET): without
+  // one it refuses the connection, which would read as "cannot reach it".
+  const probeRoom = `selftest-${newClientId('r')}`;
+  let probePass = null;
+  if (getPass) {
+    try {
+      probePass = await getPass(probeRoom);
+    } catch (err) {
+      return { ok: false, step: 'socket', detail: `The backend would not give a pass into the call server: ${err?.message || err}` };
+    }
+  }
   const reached = await new Promise((resolve) => {
     let done = false;
     const finish = (value) => { if (!done) { done = true; clearTimeout(timer); try { ws?.close(); } catch { /* gone */ } resolve(value); } };
     let ws = null;
     const timer = setTimeout(() => finish(false), socketMs);
     try {
-      ws = new WebSocketImpl(`${url.replace(/\/+$/, '')}/selftest-${newClientId('r')}/${newClientId('t')}`);
+      ws = new WebSocketImpl(roomAddress(url, probeRoom, newClientId('t'), probePass));
     } catch {
       finish(false);
       return;
@@ -68,6 +79,7 @@ export async function testCallServer({
       url,
       room: `selftest-${newClientId('r')}`,
       clientId: newClientId('t'),
+      getPass,
       nickname: 'self-test',
       stream,
       webrtc,

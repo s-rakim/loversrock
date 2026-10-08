@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { asyncRouter } from '../lib/asyncRouter.js';
 import { query } from '../config/db.js';
 import { requireAuth, requirePair } from '../middleware/auth.js';
+import { purposeKey } from '../config/secrets.js';
 import { sendNotification, sendToTokens, deepLink, CHANNELS } from '../config/firebase.js';
 import { getUserDevices } from '../models/pairs.js';
 import { senderName } from './messages.js';
@@ -24,8 +25,8 @@ const router = asyncRouter();
  * works without opening the app, so it has no session to send. It is good
  * for that one call only, and only to decline it.
  */
-export function declineToken(callId, secret = process.env.JWT_REFRESH_SECRET || '') {
-  return crypto.createHmac('sha256', `call-decline:${secret}`).update(String(callId)).digest('base64url');
+export function declineToken(callId, key = purposeKey('call-decline')) {
+  return crypto.createHmac('sha256', key).update(String(callId)).digest('base64url');
 }
 
 /**
@@ -176,6 +177,33 @@ export function sfuUrl(req, env = process.env) {
   if (!host) return null;
   return `ws://${host.includes(':') ? `[${host}]` : host}:${port}/ws`;
 }
+
+/**
+ * A pass into one room on the call media server (docker/calls checks it when
+ * CALLS_SECRET is set): `call-<id>` for a call of your own pair, or a
+ * `selftest-…` room for Diagnostics, which only ever holds one phone. Good
+ * for a day, which covers rejoining after a dropped connection mid-call.
+ */
+export const SFU_PASS_TTL_SECONDS = 24 * 60 * 60;
+
+export function sfuPass(room, secret = process.env.CALLS_SECRET, now = Date.now()) {
+  if (!secret) return null;
+  const expiry = String(Math.floor(now / 1000) + SFU_PASS_TTL_SECONDS);
+  const sig = crypto.createHmac('sha256', secret).update(`join:${room}:${expiry}`).digest('base64url');
+  return `${expiry}.${sig}`;
+}
+
+router.get('/sfu-pass', async (req, res) => {
+  const room = String(req.query.room || '');
+  const call = /^call-([0-9a-f-]{36})$/i.exec(room);
+  if (call) {
+    const { rows } = await query('SELECT 1 FROM call_sessions WHERE id = $1 AND pair_id = $2', [call[1], req.pair.id]);
+    if (!rows.length) return res.status(404).json({ error: 'No such call' });
+  } else if (!/^selftest-[A-Za-z0-9_-]{1,64}$/.test(room)) {
+    return res.status(400).json({ error: 'Not a room you can join' });
+  }
+  res.json({ pass: sfuPass(room) });
+});
 
 router.get('/config', async (req, res) => {
   const iceServers = [];

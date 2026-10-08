@@ -1072,3 +1072,22 @@ CREATE TABLE IF NOT EXISTS ai_connections (
 
 -- Which connection Fable talks through.
 ALTER TABLE fable_settings ADD COLUMN IF NOT EXISTS connection TEXT;
+
+-- Signed-in sessions (models/sessions.js). One row per refresh token, so a
+-- token can be ended: by logging out, by being replaced (rotated_at; it
+-- still works for a minute after, for two requests that refreshed at once),
+-- or by a password change. Tokens issued before this table existed carry no
+-- id and are honoured until users.sessions_valid_after passes them.
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id          UUID PRIMARY KEY,
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device      TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at  TIMESTAMPTZ NOT NULL,
+  rotated_at  TIMESTAMPTZ,
+  revoked_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+
+-- Every token (access, refresh, media) issued before this moment is void.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sessions_valid_after TIMESTAMPTZ;

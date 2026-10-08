@@ -35,6 +35,7 @@ import CallButtons from '../components/calls/CallButtons';
 import { setActiveScreen } from '../services/notifications';
 import Wallpaper from '../components/Wallpaper';
 import { getKeyPair, encryptFor } from '../services/crypto';
+import { checkPartnerKey } from '../services/keyTrust';
 import Icon3D from '../components/Icon3D';
 import MessageBubble from '../components/chat/MessageBubble';
 import ChatSheet from '../components/chat/ChatSheet';
@@ -137,6 +138,7 @@ export default function MessagesScreen({ navigation, route }) {
   // arrives there is nobody to encrypt for, and the composer says so rather
   // than quietly sending in the clear.
   const [partnerKey, setPartnerKey] = useState(null);
+  const [keyTrust, setKeyTrust] = useState(null);
   const { textOf, remember } = useDecrypted(messages, partnerKey);
   // Before pairing the server refuses this, correctly. That is a state, not
   // a failure, and it gets a screen rather than a dialog.
@@ -228,6 +230,9 @@ export default function MessagesScreen({ navigation, route }) {
           setMeId(d?.me?.id || null);
           setPartnerName(d?.partner?.displayName || null);
           setPartnerKey(d?.partner?.publicKey || null);
+          // A key other than the one this phone first saw for them is not
+          // used until you accept it (services/keyTrust.js).
+          setKeyTrust(await checkPartnerKey(d?.partner?.id, d?.partner?.publicKey));
 
           // Publish our own key if the server does not have this device's
           // yet — a fresh install, or the first run after encryption shipped.
@@ -320,10 +325,19 @@ export default function MessagesScreen({ navigation, route }) {
   }, [editing, tellTyping]);
 
   // ---- Sending --------------------------------------------------------------
-  /** A body sealed for the partner when there is a key, plain when not. */
-  const seal = useCallback(async (plain) => (partnerKey
-    ? { content: await encryptFor(partnerKey, plain), encrypted: true }
-    : { content: plain }), [partnerKey]);
+  /**
+   * A body sealed for the partner when there is a key, plain when not. A key
+   * that changed since this phone last trusted one is not used, and nothing
+   * is sent in plain text instead: you accept it (or check it) first.
+   */
+  const seal = useCallback(async (plain) => {
+    if (partnerKey && keyTrust?.status === 'changed') {
+      throw new Error(`${partnerName || 'Your partner'}'s encryption key changed. Tap the warning above the message box to check it, then send again.`);
+    }
+    return partnerKey
+      ? { content: await encryptFor(partnerKey, plain), encrypted: true }
+      : { content: plain };
+  }, [partnerKey, keyTrust, partnerName]);
 
   const post = useCallback(async (body, plain) => {
     const data = await apiFetch('/messages', { method: 'POST', body });
@@ -711,19 +725,28 @@ export default function MessagesScreen({ navigation, route }) {
         </Pressable>
       ) : null}
 
-      <View style={[styles.column, styles.encryptionRow]}>
+      {/* What is encrypted, said exactly: texts, polls and places are; photos
+          and voice notes are not. Tapping it opens the full list and the
+          safety number. A changed key is a warning here, and blocks sending. */}
+      <Pressable
+        onPress={() => navigation.navigate('SafetyNumber')}
+        style={[styles.column, styles.encryptionRow, keyTrust?.status === 'changed' && styles.keyWarning]}
+        accessibilityRole="button"
+      >
         <Icon
-          name={partnerKey ? 'lock-closed' : 'lock-open-outline'}
+          name={keyTrust?.status === 'changed' ? 'alert-circle' : partnerKey ? 'lock-closed' : 'lock-open-outline'}
           chip={false}
           size={12}
-          color={partnerKey ? colors.success : colors.textMuted}
+          color={keyTrust?.status === 'changed' ? colors.danger : partnerKey ? colors.success : colors.textMuted}
         />
-        <Text style={styles.encryptionText}>
-          {partnerKey
-            ? 'End-to-end encrypted'
-            : "Not encrypted yet — waiting for your partner's key"}
+        <Text style={[styles.encryptionText, keyTrust?.status === 'changed' && { color: colors.danger }]}>
+          {keyTrust?.status === 'changed'
+            ? `${partnerName || 'Your partner'}'s encryption key changed. Tap to check it before sending.`
+            : partnerKey
+              ? `Texts, polls and places are end-to-end encrypted${keyTrust?.verified ? ' (verified)' : ''}. Photos and voice notes are not.`
+              : "Not encrypted yet — waiting for your partner's key"}
         </Text>
-      </View>
+      </Pressable>
 
       <View style={[styles.column, styles.composer, { marginBottom: clearance.above }]}>
         {replyTo || editing ? (
@@ -872,7 +895,8 @@ const makeStyles = (colors) =>
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
       gap: 4, paddingBottom: 2,
     },
-    encryptionText: { fontSize: 11, color: colors.textMuted },
+    keyWarning: { borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, paddingVertical: 4 },
+    encryptionText: { fontSize: 11, color: colors.textMuted, flexShrink: 1, textAlign: 'center' },
     composer: { borderTopWidth: 1, borderTopColor: colors.border },
     context: {
       flexDirection: 'row', alignItems: 'center', gap: spacing.sm,

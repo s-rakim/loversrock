@@ -189,8 +189,10 @@ check('incoming ciphertext is opened rather than shown raw',
 check('polls and places are sealed like texts', /type: 'poll', \.\.\.\(await seal\(plain\)\)/.test(body) && /type: 'location', \.\.\.\(await seal\(plain\)\)/.test(body));
 check('a message that will not open says so instead of rendering blank',
   /keys don&apos;t match|keys don't match/.test(bubble));
-check('and the composer states which mode is in force',
-  /End-to-end encrypted/.test(body) && /Not encrypted yet/.test(body));
+check('and the composer states which mode is in force, exactly: texts are, photos and voice notes are not',
+  /Texts, polls and places are end-to-end encrypted/.test(body) && /Photos and voice notes are not/.test(body) && /Not encrypted yet/.test(body));
+check('a partner key that changed is not used until accepted, and nothing goes out in plain text instead',
+  /keyTrust\?\.status === 'changed'/.test(body) && /throw new Error\(`\$\{partnerName \|\| 'Your partner'\}'s encryption key changed/.test(body));
 check('mine and theirs are styled apart', /mine\s*\?\s*\{ backgroundColor: colors\.accent/.test(bubble) && /: \{ backgroundColor: colors\.surface/.test(bubble));
 check('and the id it compares against is fetched', /setMeId/.test(body));
 
