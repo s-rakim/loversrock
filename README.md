@@ -27,6 +27,10 @@ isn't on the tailnet.
 
 ## Setup
 
+> **Server on all the time, without the PC:** `docs/ORACLE.md` puts the whole
+> server on Oracle Cloud's free tier with one command, and can bring your
+> existing data across (`export-for-server.ps1`).
+
 1. Install Docker Desktop, Node.js LTS, Git, [Tailscale](https://tailscale.com/download) (on both your PC and phone), and [Expo Go](https://expo.dev/client) (on your phone).
 2. **Backend config:**
    ```bash

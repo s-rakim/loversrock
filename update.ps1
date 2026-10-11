@@ -14,10 +14,14 @@
 #
 #   -SkipApk    only the server and the over-the-air update
 #   -SkipOta    no over-the-air update
+#   -SkipServer the server lives elsewhere now (docs/ORACLE.md): update the
+#               phones only, and leave this PC's Docker alone. Update that
+#               server on the server: bash docker/server-setup.sh
 #   -Message    the update's description
 param(
   [switch]$SkipApk,
   [switch]$SkipOta,
+  [switch]$SkipServer,
   [string]$Message = 'Security fixes, Fable connections, Talk-style chat, tablets, calls'
 )
 $ErrorActionPreference = 'Continue'
@@ -28,6 +32,7 @@ function Step($text) { Write-Host "`n=== $text" -ForegroundColor Cyan }
 function Stop-With($text) { Write-Host "`n$text" -ForegroundColor Red; exit 1 }
 
 # ------------------------------------------------------------- the server
+if (-not $SkipServer) {
 Step 'Server: secrets, passwords, containers'
 node docker\secure-setup.mjs
 if ($LASTEXITCODE -ne 0) { Stop-With 'The server update did not finish (see above). Is Docker Desktop running? Fix that, then run this again.' }
@@ -43,6 +48,7 @@ if (-not $up) {
   Stop-With 'The backend did not come up (its last lines are above). The phones were not updated: the new app needs the new server.'
 }
 Write-Host '   backend is up' -ForegroundColor Green
+}
 
 # ------------------------------------------------------------- the phones
 Set-Location (Join-Path $root 'mobile')

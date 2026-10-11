@@ -45,3 +45,8 @@ backend/test/.s3-data/
 mobile/android/
 mobile/ios/
 mobile/google-services.json
+
+# The server export (export-for-server.ps1): the database, every photo and
+# both .env files in one file. Never commit it.
+loversrock-move.tar.gz
+*.before-restore
