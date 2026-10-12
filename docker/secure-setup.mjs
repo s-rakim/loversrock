@@ -119,6 +119,48 @@ function waitForPostgres(user, seconds = 90) {
   return false;
 }
 
+// ------------------------------------------------------------ Windows ports
+//
+// Windows (Hyper-V, WSL, Docker Desktop's own networking) reserves blocks of
+// ports for itself, and the blocks move from one boot to the next. They sit
+// in the "dynamic" range, 49152 and up by default, which is where the call
+// relay's ports used to be (49160-49180). When a block landed on one of them,
+// coturn could not start: "ports are not available ... bind: An attempt was
+// made to access a socket in a way forbidden by its access permissions".
+// On Windows the relay's range is moved below the dynamic range, to a stretch
+// nothing has reserved, where a reboot cannot take it away again.
+
+/** [start, end] pairs from `netsh interface ipv4 show excludedportrange`. */
+export function parseExcluded(text) {
+  return [...String(text ?? '').matchAll(/^\s*(\d+)\s+(\d+)/gm)].map((m) => [Number(m[1]), Number(m[2])]);
+}
+
+/** The first port of the dynamic range, from `netsh ... show dynamicport`. */
+export function parseDynamicStart(text) {
+  const m = /:\s*(\d+)/.exec(String(text ?? ''));
+  return m ? Number(m[1]) : 49152;
+}
+
+/**
+ * A relay range clear of every reserved block and below the dynamic range,
+ * or null when [min, max] is already one. `avoid` is the other UDP ports
+ * this setup publishes (the call server's 4110-4130, TURN's 3478).
+ */
+export function pickTurnRange({ min, max, excluded, dynamicStart, avoid = [[3478, 3478], [4110, 4130]] }) {
+  const clashes = (lo, hi) => [...excluded, ...avoid].some(([a, b]) => lo <= b && a <= hi);
+  if (max < dynamicStart && !clashes(min, max)) return null;
+  const size = Math.max(1, max - min);
+  for (const start of [40000, 41000, 42000, 43000, 44000, 45000, 46000, 47000, 30000, 35000, 20000, 25000]) {
+    if (start + size < dynamicStart && !clashes(start, start + size)) return [start, start + size];
+  }
+  return null;
+}
+
+function netsh(args) {
+  const r = spawnSync('netsh', args, { encoding: 'utf8' });
+  return r.status === 0 ? r.stdout : '';
+}
+
 // ------------------------------------------------------------ main
 
 const backend = readEnv(path.join(root, 'backend', '.env'), path.join(root, 'backend', '.env.example'));
@@ -153,6 +195,24 @@ if (weak(getVar(backend, 'FABLE_KEY_SECRET'))) {
 let turn = getVar(dock, 'TURN_SECRET');
 if (weak(turn)) { turn = strong(); change(dock, 'TURN_SECRET', turn); }
 if (getVar(backend, 'TURN_SECRET') !== undefined && getVar(backend, 'TURN_SECRET') !== turn) change(backend, 'TURN_SECRET', turn);
+
+// The relay's ports, on Windows: out of the blocks Windows reserves.
+if (process.platform === 'win32' || process.env.LOVERSROCK_FAKE_NETSH) {
+  const excludedText = process.env.LOVERSROCK_FAKE_NETSH ?? netsh(['interface', 'ipv4', 'show', 'excludedportrange', 'protocol=udp']);
+  const dynamicText = process.env.LOVERSROCK_FAKE_DYNAMIC ?? netsh(['interface', 'ipv4', 'show', 'dynamicport', 'udp']);
+  const min = Number(getVar(dock, 'TURN_MIN_PORT') || 40000);
+  const max = Number(getVar(dock, 'TURN_MAX_PORT') || 40020);
+  const excluded = parseExcluded(excludedText);
+  const moved = pickTurnRange({ min, max, excluded, dynamicStart: parseDynamicStart(dynamicText) });
+  if (moved) {
+    change(dock, 'TURN_MIN_PORT', String(moved[0]));
+    change(dock, 'TURN_MAX_PORT', String(moved[1]));
+    say(`The call relay's ports ${min}-${max} are where Windows reserves ports for itself; moving them to ${moved[0]}-${moved[1]}.`);
+  }
+  if (excluded.some(([a, b]) => a <= 4130 && 4110 <= b)) {
+    say('Warning: Windows has reserved some of UDP 4110-4130, which the call server needs. Restarting the PC usually frees them.');
+  }
+}
 
 // The call media server: rooms open only with a pass the backend signed.
 if (weak(getVar(dock, 'CALLS_SECRET'))) change(dock, 'CALLS_SECRET', strong());
@@ -220,12 +280,22 @@ if (!RESTART) {
 say('\nRestarting everything with the new secrets…');
 const restarted = docker(['up', '-d', '--build']);
 if (!restarted.ok) {
-  say(`\n"docker compose up" failed (${restarted.error || `exit ${restarted.status}`}). The files are written: once Docker is running, run`);
-  say('    cd docker; docker compose up -d --build');
-  process.exit(1);
+  // One service failing (the relay, on a port Windows took) need not stop
+  // the rest: with the backend running the app works, and calls go through
+  // the call server. Say which one is down, and carry on.
+  const ps = restarted.error ? { ok: false } : docker(['ps', '--status', 'running', '--services'], { quiet: true });
+  const running = ps.ok ? ps.stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [];
+  const down = ['postgres', 'minio', 'backend', 'calls', 'coturn'].filter((name) => !running.includes(name));
+  if (!running.includes('backend') || !running.includes('postgres')) {
+    say(`\n"docker compose up" failed (${restarted.error || `exit ${restarted.status}`}). The files are written: once Docker is running, run`);
+    say('    cd docker; docker compose up -d --build');
+    process.exit(1);
+  }
+  say(`\nEverything is running except: ${down.join(', ')} (the error is above).`);
+  if (down.includes('coturn')) say('The relay is only a fallback for calls; run this again after a restart of the PC to retry it.');
 }
 say('\nAll set.');
-say('- Both of you sign in to the app again, once.');
+if (changes.some((c) => c.includes('JWT_'))) say('- Both of you sign in to the app again, once.');
 if (changes.some((c) => c.includes('FABLE_KEY_SECRET'))) say('- AI keys saved in Fable are re-sealed with the new secret when the backend starts.');
 if (pgNew && !dbChanged) say('- The database password is still the old one: run this again when Docker is up.');
 say('- Check: docker compose logs backend --tail 20   (no "[secrets]" lines means all good)');

@@ -77,12 +77,12 @@ services:
       -c /etc/coturn/turnserver.conf
       --static-auth-secret=${TURN_SECRET:?TURN_SECRET is not set in docker/.env - run node docker/secure-setup.mjs}
       --external-ip=${TURN_PUBLIC_IP:-127.0.0.1}
-      --min-port=${TURN_MIN_PORT:-49160}
-      --max-port=${TURN_MAX_PORT:-49180}
+      --min-port=${TURN_MIN_PORT:-40000}
+      --max-port=${TURN_MAX_PORT:-40020}
     ports:
       - "3478:3478/udp"
       - "3478:3478/tcp"
-      - "${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49180}:${TURN_MIN_PORT:-49160}-${TURN_MAX_PORT:-49180}/udp"
+      - "${TURN_MIN_PORT:-40000}-${TURN_MAX_PORT:-40020}:${TURN_MIN_PORT:-40000}-${TURN_MAX_PORT:-40020}/udp"
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
 
