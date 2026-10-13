@@ -35,5 +35,16 @@
 
   { "slug": "popular-most-asked", "category": "Popular Community Questions", "emoji": "trophy-outline", "title": "Most Asked Questions", "isLocked": false, "sortOrder": 1 },
   { "slug": "popular-newlywed-game", "category": "Popular Community Questions", "emoji": "heart-outline", "title": "The Newlywed Game", "isLocked": false, "sortOrder": 2 },
-  { "slug": "popular-late-night", "category": "Popular Community Questions", "emoji": "moon-outline", "title": "Late Night Talks", "isLocked": true, "sortOrder": 3 }
+  { "slug": "popular-late-night", "category": "Popular Community Questions", "emoji": "moon-outline", "title": "Late Night Talks", "isLocked": true, "sortOrder": 3 },
+
+  { "slug": "seasonal-valentines", "category": "Seasonal", "emoji": "heart-outline", "title": "Valentine's Special", "isLocked": false, "sortOrder": 1, "seasonStart": "02-01", "seasonEnd": "02-20" },
+  { "slug": "seasonal-spring", "category": "Seasonal", "emoji": "flower-outline", "title": "Spring Awakening", "isLocked": false, "sortOrder": 2, "seasonStart": "03-20", "seasonEnd": "05-31" },
+  { "slug": "seasonal-summer", "category": "Seasonal", "emoji": "sunny-outline", "title": "Summer Nights", "isLocked": false, "sortOrder": 3, "seasonStart": "06-01", "seasonEnd": "08-31" },
+  { "slug": "seasonal-autumn", "category": "Seasonal", "emoji": "leaf-outline", "title": "Cozy Autumn", "isLocked": false, "sortOrder": 4, "seasonStart": "09-01", "seasonEnd": "11-30" },
+  { "slug": "seasonal-halloween", "category": "Seasonal", "emoji": "skull-outline", "title": "Spooky Season", "isLocked": false, "sortOrder": 5, "seasonStart": "10-01", "seasonEnd": "10-31" },
+  { "slug": "seasonal-holidays", "category": "Seasonal", "emoji": "snow-outline", "title": "Holiday Cheer", "isLocked": false, "sortOrder": 6, "seasonStart": "12-01", "seasonEnd": "12-31" },
+  { "slug": "seasonal-new-year", "category": "Seasonal", "emoji": "sparkles-outline", "title": "New Year, Same Us", "isLocked": false, "sortOrder": 7, "seasonStart": "12-26", "seasonEnd": "01-15" },
+  { "slug": "sparks-intimacy", "category": "Sparks Exclusives", "emoji": "flame-outline", "title": "Intimacy & Desire", "isLocked": false, "sortOrder": 1, "sparkCost": 60 },
+  { "slug": "sparks-debates", "category": "Sparks Exclusives", "emoji": "megaphone-outline", "title": "Hot Takes & Debates", "isLocked": false, "sortOrder": 2, "sparkCost": 40 },
+  { "slug": "sparks-memory-lane", "category": "Sparks Exclusives", "emoji": "time-outline", "title": "Memory Lane", "isLocked": false, "sortOrder": 3, "sparkCost": 40 }
 ]

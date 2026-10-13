@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_days_together_description">Days together — How long you’ve been together</string>
+    <string name="widget_anniversary_description">Anniversary — Countdown to your anniversary</string>
+    <string name="widget_streak_description">Streak — Your daily streak</string>
+    <string name="widget_countdown_description">Countdown — Your next countdown</string>
+    <string name="widget_distance_description">Distance — How far apart you are</string>
+    <string name="widget_partner_mood_description">Partner mood — How your partner is feeling</string>
+    <string name="widget_next_date_description">Next date — Your next planned date</string>
+    <string name="widget_love_note_description">Love note — Your partner’s latest note</string>
+    <string name="widget_secret_message_description">Secret message — A secret from your partner (never shows the words)</string>
+    <string name="widget_daily_question_description">Daily question — Today’s question</string>
+    <string name="widget_quick_kiss_description">Quick kiss — One tap to Thumb Kiss</string>
+    <string name="widget_canvas_description">Canvas — your shared drawing</string>
+</resources>

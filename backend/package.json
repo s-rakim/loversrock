@@ -11,7 +11,9 @@
     "test:integration": "node test/integration.mjs",
     "test:contract": "node test/contract.mjs",
     "test:cron": "node test/cron.mjs",
-    "test:widget": "node test/widget.mjs"
+    "test:widget": "node test/widget.mjs",
+    "test:features": "node test/features.mjs",
+    "test:chess": "node test/chess.mjs"
   },
   "devDependencies": {
     "s3rver": "^3.7.1",

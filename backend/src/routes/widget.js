@@ -4,6 +4,7 @@ import { query } from '../config/db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { getObjectStream } from '../config/storage.js';
 import { computePredictions, toDateString } from '../models/periodPredictions.js';
+import { pairLocalDateString } from '../models/pairs.js';
 
 const router = asyncRouter();
 
@@ -97,6 +98,20 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     latestPhotoUrl: null,
     partnerCyclePhase: null,
     partnerNextPeriodDate: null,
+    // Candle-parity widget fields (all nullable, like everything above).
+    partnerName: null,
+    partnerMood: null,
+    daysTogether: null,
+    anniversary: null,
+    nextDate: null,
+    latestNote: null,
+    secretMessageWaiting: false,
+    todayQuestion: null,
+    latestPhotoCaption: null,
+    latestPhotoFromPartner: null,
+    canvasUpdatedAt: null,
+    canvasStrokeCount: 0,
+    streakFreezes: 0,
     updatedAt: new Date().toISOString(),
   };
 
@@ -175,7 +190,89 @@ router.get('/summary', requireWidgetToken, async (req, res) => {
     }
   }
 
+  await addCandleFields(summary, pair, req.userId, partnerId);
   res.json(summary);
+});
+
+function daysUntilNextOccurrence(dateStr, todayStr) {
+  // Anniversary recurs yearly; returns { date: next occurrence, daysRemaining, years }.
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [ty] = todayStr.split('-').map(Number);
+  const today = new Date(`${todayStr}T00:00:00Z`);
+  let next = new Date(Date.UTC(ty, m - 1, d));
+  if (next < today) next = new Date(Date.UTC(ty + 1, m - 1, d));
+  return {
+    date: next.toISOString().slice(0, 10),
+    daysRemaining: Math.round((next - today) / 86400000),
+    years: next.getUTCFullYear() - y,
+  };
+}
+
+async function addCandleFields(summary, pair, userId, partnerId) {
+  const today = pairLocalDateString(pair);
+  const [partnerRes, planRes, noteRes, secretRes, questionRes, photoRes, canvasRes] = await Promise.all([
+    query('SELECT name, mood_emoji, mood_text, mood_updated_at FROM users WHERE id = $1', [partnerId]),
+    query(
+      `SELECT title, scheduled_for FROM date_plans WHERE pair_id = $1 AND status IN ('planned', 'confirmed') AND scheduled_for > now()
+       ORDER BY scheduled_for ASC LIMIT 1`,
+      [pair.id]
+    ),
+    query('SELECT id, title, body, updated_at FROM notes WHERE pair_id = $1 AND author_id = $2 ORDER BY updated_at DESC LIMIT 1', [pair.id, partnerId]),
+    query('SELECT COUNT(*)::int AS n FROM secret_messages WHERE pair_id = $1 AND sender_id = $2 AND opened_at IS NULL', [pair.id, partnerId]),
+    query('SELECT content FROM daily_prompts WHERE scheduled_date = $1', [today]),
+    query('SELECT caption, sender_id FROM widget_photos WHERE pair_id = $1 ORDER BY created_at DESC LIMIT 1', [pair.id]),
+    query('SELECT jsonb_array_length(strokes) AS n, updated_at FROM pair_canvas WHERE pair_id = $1', [pair.id]),
+  ]);
+
+  const partner = partnerRes.rows[0];
+  if (partner) {
+    summary.partnerName = partner.name;
+    if (partner.mood_emoji) {
+      summary.partnerMood = { emoji: partner.mood_emoji, text: partner.mood_text, updatedAt: partner.mood_updated_at };
+    }
+  }
+  const since = pair.together_since || pair.created_at;
+  summary.daysTogether = Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 86400000));
+  if (pair.anniversary_date) summary.anniversary = daysUntilNextOccurrence(pair.anniversary_date, today);
+
+  const plan = planRes.rows[0];
+  if (plan) {
+    summary.nextDate = {
+      title: plan.title,
+      scheduledFor: new Date(plan.scheduled_for).toISOString(),
+      daysRemaining: Math.max(0, Math.ceil((new Date(plan.scheduled_for).getTime() - Date.now()) / 86400000)),
+    };
+  }
+  const note = noteRes.rows[0];
+  if (note) summary.latestNote = { id: note.id, title: note.title, body: note.body.slice(0, 160), updatedAt: note.updated_at };
+
+  // Existence only — the body of a secret message never reaches a widget.
+  summary.secretMessageWaiting = secretRes.rows[0].n > 0;
+  summary.todayQuestion = questionRes.rows[0]?.content || null;
+  if (photoRes.rows[0]) {
+    summary.latestPhotoCaption = photoRes.rows[0].caption;
+    summary.latestPhotoFromPartner = photoRes.rows[0].sender_id === partnerId;
+  }
+  if (canvasRes.rows[0]) {
+    summary.canvasStrokeCount = canvasRes.rows[0].n;
+    summary.canvasUpdatedAt = canvasRes.rows[0].updated_at;
+  }
+  summary.streakFreezes = pair.streak_freezes;
+}
+
+// The shared canvas as vector strokes — both native widget renderers draw
+// these onto a bitmap themselves, so there is no server-side rasteriser.
+router.get('/canvas', requireWidgetToken, async (req, res) => {
+  const { rows: pairRows } = await query(
+    `SELECT id FROM pairs WHERE (user_a_id = $1 OR user_b_id = $1) AND unlinked_at IS NULL AND user_b_id IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+    [req.userId]
+  );
+  if (!pairRows[0]) return res.status(404).json({ error: 'Not paired' });
+  const { rows } = await query('SELECT strokes, background, updated_at FROM pair_canvas WHERE pair_id = $1', [pairRows[0].id]);
+  // Author ids are stripped: the widget only needs geometry and colour.
+  const strokes = (rows[0]?.strokes || []).map(({ color, width, tool, points }) => ({ color, width, tool, points }));
+  res.json({ strokes, background: rows[0]?.background || '#FFFFFF', updatedAt: rows[0]?.updated_at || null });
 });
 
 // Widgets can't send an Authorization header through the image loader on

@@ -66,6 +66,24 @@ async function seedDateIdeas() {
     inserted += 1;
   }
   console.log(`[seed] date_ideas: ${inserted} new / ${ideas.length} total`);
+
+  // Location tailoring + premium pack. Ideas written before these fields
+  // existed get settings inferred from their category.
+  const SETTINGS_BY_CATEGORY = {
+    at_home: ['city', 'suburbs', 'rural', 'long_distance'],
+    outdoors: ['suburbs', 'rural'],
+    culture: ['city', 'suburbs'],
+    going_out: ['city', 'suburbs'],
+    sentimental: ['city', 'suburbs', 'rural'],
+    splurge: ['city', 'suburbs', 'rural'],
+  };
+  for (const idea of ideas) {
+    const settings = idea.settings || SETTINGS_BY_CATEGORY[idea.category] || null;
+    await query(
+      `UPDATE date_ideas SET settings = $1::jsonb, is_premium = $2 WHERE pair_id IS NULL AND title = $3`,
+      [settings ? JSON.stringify(settings) : null, Boolean(idea.isPremium), idea.title]
+    );
+  }
 }
 
 async function seedQuestionDecks() {
@@ -81,6 +99,13 @@ async function seedQuestionDecks() {
     );
   }
   console.log(`[seed] question_decks: ${decks.length} decks`);
+
+  // Seasonal windows and Sparks prices (null for ordinary decks).
+  for (const deck of decks) {
+    await query('UPDATE question_decks SET season_start = $1, season_end = $2, spark_cost = $3 WHERE slug = $4', [
+      deck.seasonStart || null, deck.seasonEnd || null, deck.sparkCost || null, deck.slug,
+    ]);
+  }
 
   const deckQuestionsBySlug = loadJson('deck_questions.json');
   let questionCount = 0;

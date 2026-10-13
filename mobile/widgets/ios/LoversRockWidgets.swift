@@ -274,5 +274,7 @@ struct LoversRockWidgetBundle: WidgetBundle {
         SummaryWidget()
         PhotoWidget()
         LockScreenWidget()
+        MomentWidgetsA().body
+        MomentWidgetsB().body
     }
 }

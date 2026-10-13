@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -35,9 +35,58 @@ import DrawDuelScreen from './app/games/DrawDuelScreen';
 import WhatYouSayingScreen from './app/games/WhatYouSayingScreen';
 import PerfectPairScreen from './app/games/PerfectPairScreen';
 import LoveLettersScreen from './app/games/LoveLettersScreen';
+import WhosMoreLikelyScreen from './app/games/WhosMoreLikelyScreen';
+import ChessScreen from './app/games/ChessScreen';
+import FeedScreen from './app/FeedScreen';
+import ProfileScreen from './app/ProfileScreen';
+import OnboardingScreen from './app/OnboardingScreen';
+import ConnectScreen from './app/ConnectScreen';
+import SparksScreen from './app/SparksScreen';
+import AchievementsScreen from './app/AchievementsScreen';
+import NotesScreen from './app/NotesScreen';
+import SecretMessageScreen from './app/SecretMessageScreen';
+import SharedCanvasScreen from './app/SharedCanvasScreen';
+import CanvasGalleryScreen from './app/CanvasGalleryScreen';
+import DailySnapScreen from './app/DailySnapScreen';
+import DateDiscoverScreen from './app/DateDiscoverScreen';
+import DatePlansScreen from './app/DatePlansScreen';
+import CheckInScreen from './app/CheckInScreen';
+import ChallengeScreen from './app/ChallengeScreen';
+import TimelineScreen from './app/TimelineScreen';
+import NotificationSettingsScreen from './app/NotificationSettingsScreen';
+import { CoupleProvider, loadCachedCouple, characterFor } from './components/CoupleContext';
+import { CoupleMascots } from './components/Mascot';
+import { LanguageProvider, t } from './i18n';
+import { apiFetch as apiFetchForLanguage } from './services/api';
+import { refreshPushRegistration, routeNotificationTaps } from './services/push';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+const navigationRef = createNavigationContainerRef();
+
+// Widget taps open loversrock://<path> (see mobile/widgets/*).
+const linking = {
+  prefixes: ['loversrock://'],
+  config: {
+    screens: {
+      MainTabs: { screens: { Home: 'home', Feed: 'feed', Messages: 'chat', Memories: 'memories' } },
+      ThumbKiss: 'thumbkiss',
+      SecretMessage: 'secret',
+      DailySnap: 'snap',
+      SharedCanvas: 'canvas',
+      Notes: 'notes',
+      DatePlans: 'dates',
+      Countdown: 'countdowns',
+      DailyPrompt: 'question',
+      DistanceApart: 'distance',
+      Profile: 'mood',
+      Achievements: 'streak',
+    },
+  },
+};
+
+// The account's language preference follows the device's choice.
+const syncLanguage = (language) => apiFetchForLanguage('/profile', { method: 'PATCH', body: { language } }).catch(() => {});
 
 const navTheme = {
   ...DefaultTheme,
@@ -62,6 +111,7 @@ function MainTabs() {
       tabBar={(props) => <GlassTabBar {...props} />}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Feed" component={FeedScreen} />
       <Tab.Screen name="Games" component={GamesScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="Memories" component={MemoriesScreen} />
@@ -73,6 +123,19 @@ function MainTabs() {
 export default function App() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [hasToken, setHasToken] = useState(false);
+  const [cachedCouple, setCachedCouple] = useState(null);
+
+  // The couple's characters greet you on the loading screen, straight from
+  // the on-device cache so they appear before the network does.
+  useEffect(() => {
+    loadCachedCouple().then(setCachedCouple);
+  }, []);
+
+  useEffect(() => {
+    if (!hasToken) return undefined;
+    refreshPushRegistration();
+    return routeNotificationTaps(navigationRef);
+  }, [hasToken]);
 
   useEffect(() => {
     // The saved server address has to be restored before anything can make a
@@ -87,15 +150,23 @@ export default function App() {
   if (checkingAuth) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <CoupleMascots
+          me={characterFor(cachedCouple?.me) || { emotion: 'happy' }}
+          partner={characterFor(cachedCouple?.partner) || { emotion: 'happy', avatar: { preset: 'her' } }}
+          context="loading"
+          showLabels={false}
+        />
+        <ActivityIndicator color={colors.accent} size="large" style={{ marginTop: 24 }} />
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
+      <LanguageProvider onChange={syncLanguage}>
+      <CoupleProvider>
       <GlassProvider>
-        <NavigationContainer theme={navTheme}>
+        <NavigationContainer theme={navTheme} ref={navigationRef} linking={linking}>
           <StatusBar style="dark" />
           <Stack.Navigator initialRouteName={hasToken ? 'MainTabs' : 'Login'} screenOptions={screenOptions}>
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
@@ -118,9 +189,29 @@ export default function App() {
             <Stack.Screen name="WhatYouSaying" component={WhatYouSayingScreen} options={{ title: 'What You Saying' }} />
             <Stack.Screen name="PerfectPair" component={PerfectPairScreen} options={{ title: 'Perfect Pair' }} />
             <Stack.Screen name="LoveLetters" component={LoveLettersScreen} options={{ title: 'Love Letters' }} />
+            <Stack.Screen name="WhosMoreLikely" component={WhosMoreLikelyScreen} options={{ title: t('screen.wml') }} />
+            <Stack.Screen name="Chess" component={ChessScreen} options={{ title: t('screen.chess') }} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: t('screen.profile') }} />
+            <Stack.Screen name="Connect" component={ConnectScreen} options={{ title: t('screen.connect') }} />
+            <Stack.Screen name="Sparks" component={SparksScreen} options={{ title: t('screen.sparks') }} />
+            <Stack.Screen name="Achievements" component={AchievementsScreen} options={{ title: t('screen.achievements') }} />
+            <Stack.Screen name="Notes" component={NotesScreen} options={{ title: t('screen.notes') }} />
+            <Stack.Screen name="SecretMessage" component={SecretMessageScreen} options={{ title: t('screen.secret') }} />
+            <Stack.Screen name="SharedCanvas" component={SharedCanvasScreen} options={{ title: t('screen.canvas') }} />
+            <Stack.Screen name="CanvasGallery" component={CanvasGalleryScreen} options={{ title: t('screen.gallery') }} />
+            <Stack.Screen name="DailySnap" component={DailySnapScreen} options={{ title: t('screen.snap') }} />
+            <Stack.Screen name="DateDiscover" component={DateDiscoverScreen} options={{ title: t('screen.dateDiscover') }} />
+            <Stack.Screen name="DatePlans" component={DatePlansScreen} options={{ title: t('screen.datePlans') }} />
+            <Stack.Screen name="CheckIn" component={CheckInScreen} options={{ title: t('screen.checkin') }} />
+            <Stack.Screen name="Challenge" component={ChallengeScreen} options={{ title: t('screen.challenge') }} />
+            <Stack.Screen name="Timeline" component={TimelineScreen} options={{ title: t('screen.timeline') }} />
+            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: t('screen.notifications') }} />
           </Stack.Navigator>
         </NavigationContainer>
       </GlassProvider>
+      </CoupleProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

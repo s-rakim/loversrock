@@ -56,7 +56,7 @@ function withWidgetSources(config) {
       fs.mkdirSync(targetDir, { recursive: true });
 
       // Widget extension sources (the RN bridge belongs to the app target, not here).
-      for (const file of ['WidgetData.swift', 'LoversRockWidgets.swift']) {
+      for (const file of ['WidgetData.swift', 'LoversRockWidgets.swift', 'MomentWidgets.swift']) {
         fs.copyFileSync(path.join(source, file), path.join(targetDir, file));
       }
       fs.writeFileSync(path.join(targetDir, 'Info.plist'), INFO_PLIST);
@@ -100,7 +100,7 @@ function withWidgetTarget(config) {
     project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', target.uuid);
 
     const group = project.addPbxGroup(
-      ['WidgetData.swift', 'LoversRockWidgets.swift', 'Info.plist', `${TARGET_NAME}.entitlements`],
+      ['WidgetData.swift', 'LoversRockWidgets.swift', 'MomentWidgets.swift', 'Info.plist', `${TARGET_NAME}.entitlements`],
       TARGET_NAME,
       TARGET_NAME
     );
@@ -115,6 +115,7 @@ function withWidgetTarget(config) {
 
     project.addSourceFile('WidgetData.swift', { target: target.uuid }, group.uuid);
     project.addSourceFile('LoversRockWidgets.swift', { target: target.uuid }, group.uuid);
+    project.addSourceFile('MomentWidgets.swift', { target: target.uuid }, group.uuid);
 
     // The bridge compiles into the app target. A group key is required here:
     // without one, xcode's addSourceFile falls through to addPluginFile, which

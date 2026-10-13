@@ -247,8 +247,11 @@ check('widget photo MIRRORS into memories with source=widget', memsAfterWidget.d
 // ---------------------------------------------------------------- DECKS
 section('QUESTION DECKS');
 const decks = await req('/decks', { token: A.token });
-const cats = Object.keys(decks.data.decksByCategory || {});
-const deckCount = Object.values(decks.data.decksByCategory || {}).flat().length;
+// Seasonal and Sparks-exclusive decks are counted separately (test/features.mjs):
+// seasonal ones come and go with the calendar, so they'd make this date-dependent.
+const coreDecks = Object.fromEntries(Object.entries(decks.data.decksByCategory || {}).filter(([c]) => !['Seasonal', 'Sparks Exclusives'].includes(c)));
+const cats = Object.keys(coreDecks);
+const deckCount = Object.values(coreDecks).flat().length;
 check('decks grouped by category', decks.status === 200 && cats.length === 11, cats.length);
 check('27 decks seeded', deckCount === 27, deckCount);
 check('locked/premium decks flagged', Object.values(decks.data.decksByCategory).flat().some((d) => d.is_locked));
@@ -275,7 +278,7 @@ const conv = await req(`/bucket-list/${bl.data.item.id}/convert-to-memory`, { me
 check('bucket item converts to a real memory', conv.status === 201 && conv.data.memory.caption === 'See the northern lights', conv.data);
 
 const ideas = await req('/date-ideas', { token: A.token });
-check('10 global curated ideas', ideas.data.ideas.length === 10, ideas.data.ideas.length);
+check('62 global curated ideas', ideas.data.ideas.length === 62, ideas.data.ideas.length);
 const freeIdeas = await req('/date-ideas?costTier=free', { token: A.token });
 check('ideas filter by cost tier', freeIdeas.data.ideas.length > 0 && freeIdeas.data.ideas.every((i) => i.cost_tier === 'free'), freeIdeas.data.ideas.length);
 const catIdeas = await req('/date-ideas?category=at_home', { token: A.token });
@@ -300,8 +303,8 @@ check('countdown deletes', (await req(`/countdowns/${cdFuture.data.countdown.id}
 check('countdown requires label+date', (await req('/countdowns', { method: 'POST', token: A.token, body: { label: 'x' } })).status === 400);
 
 const games = await req('/games', { token: A.token });
-check('7 games in catalog', games.data.games.length === 7, games.data.games.length);
-check('all 7 games marked implemented', games.data.games.every((g) => g.is_implemented === true));
+check('9 games in catalog', games.data.games.length === 9, games.data.games.length);
+check('all 9 games marked implemented', games.data.games.every((g) => g.is_implemented === true));
 check('game icons are Ionicons names (not emoji)', games.data.games.every((g) => /^[a-z-]+$/.test(g.emoji)), games.data.games.map((g) => g.emoji));
 
 // ---------------------------------------------------------------- LOCATION

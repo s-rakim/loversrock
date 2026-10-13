@@ -5,5 +5,7 @@
   { "slug": "draw-duel", "emoji": "brush-outline", "title": "Draw Duel", "subtitle": "One draws live, the other guesses in real time", "isLocked": false, "isImplemented": true, "sortOrder": 4 },
   { "slug": "what-you-saying", "emoji": "chatbox-ellipses-outline", "title": "What You Saying", "subtitle": "Guess the word as letters reveal", "isLocked": false, "isImplemented": true, "sortOrder": 5 },
   { "slug": "perfect-pair", "emoji": "link-outline", "title": "Perfect Pair", "subtitle": "Word association chain — don't break it", "isLocked": false, "isImplemented": true, "sortOrder": 6 },
-  { "slug": "love-letters", "emoji": "albums-outline", "title": "Love Letters", "subtitle": "Scrabble-style tile scoring word game", "isLocked": false, "isImplemented": true, "sortOrder": 7 }
+  { "slug": "love-letters", "emoji": "albums-outline", "title": "Love Letters", "subtitle": "Scrabble-style tile scoring word game", "isLocked": false, "isImplemented": true, "sortOrder": 7 },
+  { "slug": "whos-more-likely", "emoji": "people-outline", "title": "Who's More Likely", "subtitle": "Point at each other — see if you agree", "isLocked": false, "isImplemented": true, "sortOrder": 8 },
+  { "slug": "chess", "emoji": "trophy-outline", "title": "Chess", "subtitle": "A real game of chess, one move at a time", "isLocked": false, "isImplemented": true, "sortOrder": 9 }
 ]

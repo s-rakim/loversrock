@@ -14,6 +14,8 @@ const ROUTE_BY_SLUG = {
   'what-you-saying': 'WhatYouSaying',
   'perfect-pair': 'PerfectPair',
   'love-letters': 'LoveLetters',
+  'whos-more-likely': 'WhosMoreLikely',
+  chess: 'Chess',
 };
 
 export default function GamesScreen({ navigation }) {

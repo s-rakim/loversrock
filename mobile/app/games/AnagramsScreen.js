@@ -4,6 +4,7 @@ import { colors, font, spacing, radius } from '../../theme';
 import { MorphButton, FadeInUp } from '../../components/Motion';
 import Icon from '../../components/Icon';
 import StickerField from '../../components/Stickers';
+import SparkHint from '../../components/SparkHint';
 
 const WORD_BANK = [
   'LOVE', 'HEART', 'KISS', 'HUGS', 'DATE', 'SWEET', 'DREAM', 'TOGETHER',
@@ -107,6 +108,9 @@ export default function AnagramsScreen() {
           <Text style={font.body}>Skip</Text>
         </MorphButton>
       </View>
+      <SparkHint game="anagrams" style={{ marginTop: spacing.md }}
+        onReveal={() => setFeedback(`hint:${word.slice(0, Math.max(1, Math.ceil(word.length / 3)))}`)} />
+      {feedback?.startsWith?.('hint:') && <Text style={[font.muted, { marginTop: spacing.sm }]}>Starts with “{feedback.slice(5)}…”</Text>}
     </View>
   );
 }

@@ -4,6 +4,8 @@ import { requireAuth, requirePair } from '../middleware/auth.js';
 import { pairLocalDateString } from '../models/pairs.js';
 import { sendNotification } from '../config/firebase.js';
 import { getUserDeviceTokens } from '../models/pairs.js';
+import { earnSparks, SPARK_REWARDS } from '../models/sparks.js';
+import { notifyUser, userName } from '../models/notify.js';
 
 const router = asyncRouter();
 
@@ -76,11 +78,33 @@ router.post('/today/respond', async (req, res) => {
         .toISOString()
         .slice(0, 10);
       newStreak = lastActiveDate === yesterday ? req.pair.streak_count + 1 : 1;
+
+      // Streak protection: banked freezes (bought with Sparks) cover missed
+      // days one-for-one. If they can't cover the whole gap, the streak is
+      // recorded as lost so it can be restored for a short while.
+      let freezesUsed = 0;
+      let lostStreak = null;
+      if (lastActiveDate && lastActiveDate !== yesterday && req.pair.streak_count > 0) {
+        const missedDays = Math.round((new Date(`${yesterday}T00:00:00Z`) - new Date(`${lastActiveDate}T00:00:00Z`)) / 86400000);
+        if (missedDays > 0 && missedDays <= req.pair.streak_freezes) {
+          freezesUsed = missedDays;
+          newStreak = req.pair.streak_count + 1;
+        } else if (req.pair.streak_count > 1) {
+          lostStreak = req.pair.streak_count;
+        }
+      }
+
       await query('UPDATE pairs SET streak_count = $1, last_active_date = $2 WHERE id = $3', [
         newStreak,
         today,
         req.pair.id,
       ]);
+      if (freezesUsed > 0) {
+        await query('UPDATE pairs SET streak_freezes = streak_freezes - $1 WHERE id = $2', [freezesUsed, req.pair.id]);
+      }
+      if (lostStreak) {
+        await query('UPDATE pairs SET lost_streak = $1, lost_streak_on = $2 WHERE id = $3', [lostStreak, today, req.pair.id]);
+      }
     }
 
     // Idempotent "both answered" push: notified_at is only set once we've
@@ -98,6 +122,16 @@ router.post('/today/respond', async (req, res) => {
         prompt.id,
       ]);
     }
+  }
+
+  await earnSparks({ pairId: req.pair.id, userId: req.userId, amount: SPARK_REWARDS.prompt_answer, reason: 'prompt_answer', ref: today });
+  if (bothAnswered) {
+    for (const uid of [req.userId, req.partnerId]) {
+      await earnSparks({ pairId: req.pair.id, userId: uid, amount: SPARK_REWARDS.prompt_both, reason: 'prompt_both', ref: today });
+    }
+  } else {
+    const name = await userName(req.userId);
+    notifyUser(req.partnerId, 'messages', { title: `${name} answered today's question`, body: 'Answer yours to reveal both.' }, { screen: 'DailyPrompt' });
   }
 
   res.json({

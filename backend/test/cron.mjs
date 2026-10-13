@@ -101,6 +101,16 @@ check('luteal phase correctly identified at day 19', predNotDue.phase === 'lutea
 await cron.pushPeriodReminders();
 check('pushPeriodReminders() no-ops when nothing is due', true);
 
+console.log('\n=== CRON: CHECK-IN REMINDER / STREAK AT RISK ===');
+// Push delivery itself needs Firebase; these prove the jobs walk every pair
+// (including ones with live streaks and half-answered days) without throwing.
+let threw = null;
+try { await cron.pushMonthlyCheckinReminder(); } catch (err) { threw = err.message; }
+check('pushMonthlyCheckinReminder() runs across all pairs', threw === null, threw);
+threw = null;
+await query(`UPDATE pairs SET streak_count = GREATEST(streak_count, 3), last_active_date = CURRENT_DATE - 1 WHERE id = $1`, [pair.id]);
+try { await cron.pushStreakAtRisk(); } catch (err) { threw = err.message; }
+check('pushStreakAtRisk() runs with an at-risk streak present', threw === null, threw);
 
 console.log(`\nCRON RESULT — PASSED: ${pass}  FAILED: ${fails.length}`);
 await pool.end();

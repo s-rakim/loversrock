@@ -144,6 +144,14 @@ git push -u origin main
 
 (On Windows, if `git` isn't installed: `winget install --id Git.Git -e --source winget`.)
 
+### New in this build
+
+See [`docs/FEATURES.md`](docs/FEATURES.md) for the full Candle / Lovers X
+feature map. After pulling: `npm run migrate && npm run seed` on the backend
+(new tables and content), and `npm install` in `mobile/` (adds
+`expo-notifications`). The mascot runs in Expo Go; widgets and push still
+need a real build.
+
 ## Pinned architectural decisions
 
 See [`docs/SPEC.md`](docs/SPEC.md) for the full rationale on each of these —
@@ -175,6 +183,15 @@ they're load-bearing and shouldn't be casually reversed:
 | Games: Four in a Row, Anagrams, Love Golf (tilt physics), Draw Duel (live sockets), What You Saying, Perfect Pair, Love Letters | ✅ All 7 genuinely playable |
 | Home screen widgets (Android `AppWidgetProvider` + iOS WidgetKit) | ⚠️ Written, not compiled — needs a dev-client build. See `docs/WIDGETS.md`. |
 | Lock screen widget (iOS 16+ accessory families) | ⚠️ Written, not compiled — Android has no lock screen widget API, so it gets an ongoing notification instead. |
+| Couple mascot — your own image, unchanged, animated live with each partner's mood | ✅ Implemented — see `docs/FEATURES.md` |
+| Lovers X: joint feed (likes, loves, comments), partner profiles, moods + mood pushes | ✅ Implemented |
+| Sparks, streak freeze/restore, achievements | ✅ Implemented |
+| Shared live Canvas (eyedropper, zoom, sizes) + Gallery, Daily Snap with captions | ✅ Implemented |
+| Date discovery (weekly, location-tailored swipe), matching, scheduling with statuses | ✅ Implemented |
+| Monthly check-ins, random challenges, notes, secret messages, calendar timeline | ✅ Implemented |
+| Adaptive "For you" questions, seasonal + Sparks decks, Who's More Likely, Chess | ✅ Implemented |
+| Onboarding questionnaire, notification preferences, EN/FR/ES/DE | ✅ Implemented |
+| 12 more widgets (days together, anniversary, mood, love note, secret, canvas, …) | ⚠️ Written, not compiled — same as the originals |
 | **Web marketing landing page** | ❌ Out of scope — mobile-only by design; the reference design's effects (WebGL, DOM SVG filters) don't map to React Native anyway. |
 
 ## A note on the animation library
